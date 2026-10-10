@@ -149,6 +149,7 @@ pub fn zendInternalFunction(comptime func: anytype, comptime self_src: SelfSourc
             const retval: *Value = @ptrCast(zretval);
             var iter = args.iterate();
             if (iter.extract(AT[0].?)) |arg0| {
+                defer Value.freeAny(arg0);
                 const result = switch (returning_error) {
                     true => func(arg0) catch |err| return failure.throw(err),
                     false => func(arg0),
@@ -177,6 +178,7 @@ pub fn zendInternalFunction(comptime func: anytype, comptime self_src: SelfSourc
                 .none => unreachable,
             };
             if (iter.extract(AT[1].?)) |arg1| {
+                defer Value.freeAny(arg1);
                 const result = switch (returning_error) {
                     true => func(arg0, arg1) catch |err| return failure.throw(err),
                     false => func(arg0, arg1),

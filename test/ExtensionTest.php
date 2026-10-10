@@ -37,6 +37,45 @@ final class ExtensionTest extends TestCase
         $this->assertSame("flags = .{ .option1 = false, .option2 = false, .option3 = false, .option4 = false, ._ = 0 }", $lines[2]);
     }
 
+    public function testListArgs(): void
+    {
+        $lines = $this->runTest("arguments", "list.php");
+        $this->assertSame("0: hello", $lines[0]);
+        $this->assertSame("1: world", $lines[1]);
+        $this->assertSame("2: chicken", $lines[2]);
+    }
+
+    public function testStructArgs(): void
+    {
+        $lines = $this->runTest("arguments", "struct.php");
+        $this->assertSame("number = 1234", $lines[0]); 
+        $this->assertSame("0: hello", $lines[1]);
+        $this->assertSame("1: world", $lines[2]);
+        $this->assertSame("2: chicken", $lines[3]);
+        $this->assertSame("number = 4567", $lines[4]);
+        $this->assertSame("0: hello", $lines[5]);
+        $this->assertSame("1: world", $lines[6]);
+    }
+
+    public function testUnionArgs(): void
+    {
+        $lines = $this->runTest("arguments", "union.php");
+        $this->assertSame("number = 1234", $lines[0]); 
+        $this->assertSame("string = Hello world", $lines[1]);
+    }
+
+    public function testArrayArgs(): void
+    {
+        $lines = $this->runTest("arguments", "array.php");
+        $this->assertSame("array = { 1.5, 2.3, 789 }", $lines[0]); 
+    }
+
+    public function testVectorArgs(): void
+    {
+        $lines = $this->runTest("arguments", "vector.php");
+        $this->assertSame("vector = { 1.5, 2.3, 789 }", $lines[0]); 
+    }
+
     private function runTest($test_name, $script_name): array
     {
         chdir(__DIR__ . "/$test_name");
@@ -50,7 +89,8 @@ final class ExtensionTest extends TestCase
             default: $so_ext = 'so'; break;
         }
         $ext_path = __DIR__ . "/$test_name/extensions/$php_version/php_$test_name.$so_ext";
-        $result = exec("php -d extension='$ext_path' '$script_name'", $lines, $code);
+        $cmd = "php -d extension='$ext_path' '$script_name'";
+        $result = exec($cmd, $lines, $code);
         if ($result === false) {
             throw new Exception("Unable to run PHP with extension: $test_name");
         } else if ($code !== 0) {

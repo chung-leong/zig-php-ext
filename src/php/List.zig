@@ -67,46 +67,55 @@ pub const @"union" = union(enum) {
 
     pub fn extract(self: *const @This(), comptime T: type) !T {
         switch (@typeInfo(T)) {
-            inline .array, .vector => |ar| {
-                var s: T = undefined;
+            .array => |ar| {
+                var result: T = undefined;
                 {
                     var failure_at: usize = undefined;
                     errdefer {
                         for (0..ar.len) |i| {
                             if (i == failure_at) break;
-                            Value.freeAny(s[i]);
+                            Value.freeAny(result[i]);
                         }
                     }
                     for (0..ar.len) |i| {
                         errdefer failure_at = i;
                         const value = try self.read(i);
                         defer value.release();
-                        s[i] = try value.convertTo(ar.child);
+                        result[i] = try value.convertTo(ar.child);
                     }
                 }
-                return s;
+                return result;
+            },
+            .vector => |ve| {
+                var result: T = undefined;
+                inline for (0..ve.len) |i| {
+                    const value = try self.read(i);
+                    defer value.release();
+                    result[i] = try value.convertTo(ve.child);
+                }
+                return result;
             },
             .pointer => |pt| switch (pt.size) {
                 .slice => {
                     const len = try self.getLength();
-                    const s = try php_al.alloc(pt.child, len);
-                    errdefer php_al.free(s);
+                    const result = try php_al.alloc(pt.child, len);
+                    errdefer php_al.free(result);
                     {
                         var failure_at: usize = undefined;
                         errdefer {
                             for (0..len) |i| {
                                 if (i == failure_at) break;
-                                Value.freeAny(s[i]);
+                                Value.freeAny(result[i]);
                             }
                         }
                         for (0..len) |i| {
                             errdefer failure_at = i;
                             const value = try self.read(i);
                             defer value.release();
-                            s[i] = try value.convertTo(pt.child);
+                            result[i] = try value.convertTo(pt.child);
                         }
                     }
-                    return s;
+                    return result;
                 },
                 else => @compileError("Slice pointer type expected, received: " ++ @typeName(T)),
             },

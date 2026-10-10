@@ -376,7 +376,7 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
                 false => @compileError("Union must be tagged"),
             },
         },
-        .array => get: {
+        .array, .vector => get: {
             const list = try self.getList();
             break :get list.extract(T);
         },
@@ -408,8 +408,17 @@ pub fn freeAny(arg: anytype) void {
         },
         .optional => if (arg) |payload| freeAny(payload),
         .@"struct" => |st| if (st.backing_integer == null) {
-            inline for (st.field_names) |field_name| {
-                freeAny(@field(arg, field_name));
+            inline for (st.field_names, 0..) |field_name, i| {
+                const value = @field(arg, field_name);
+                const freeing = if (st.field_attrs[i].default_value_ptr) |opaque_ptr| check: {
+                    const FT = st.field_types[i];
+                    const value_ptr: *const FT = @ptrCast(@alignCast(opaque_ptr));
+                    const default_value = value_ptr.*;
+                    break :check !std.meta.eql(value, default_value);
+                } else true;
+                if (freeing) {
+                    freeAny(value);
+                }
             }
         },
         .@"union" => |un| switch (T) {

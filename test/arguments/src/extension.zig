@@ -70,3 +70,52 @@ pub fn @"call printFlags"(self: *@This(), args: struct {
     _ = self;
     php.print("flags = {}\n", .{args.flags});
 }
+
+pub fn @"call printStringList"(self: *@This(), args: struct {
+    list: [][]const u8,
+}) void {
+    _ = self;
+    for (args.list, 0..) |item, i| {
+        php.print("{d}: {s}\n", .{ i, item });
+    }
+}
+
+pub fn @"call printStruct"(self: *@This(), args: struct {
+    data: struct {
+        list: []const []const u8 = &.{ "hello", "world" },
+        number: f64,
+    },
+}) void {
+    _ = self;
+    php.print("number = {d}\n", .{args.data.number});
+    for (args.data.list, 0..) |item, i| {
+        php.print("{d}: {s}\n", .{ i, item });
+    }
+}
+
+pub fn @"call printUnion"(self: *@This(), args: struct {
+    input: union(enum) {
+        string: []const u8,
+        number: f64,
+    },
+}) void {
+    _ = self;
+    switch (args.input) {
+        .string => |str| php.print("string = {s}\n", .{str}),
+        .number => |num| php.print("number = {d}\n", .{num}),
+    }
+}
+
+pub fn @"call printArray"(self: *@This(), args: struct {
+    array: [3]f64,
+}) void {
+    _ = self;
+    php.print("array = {any}\n", .{args.array});
+}
+
+pub fn @"call printVector"(self: *@This(), args: struct {
+    vector: @Vector(3, f64),
+}) void {
+    _ = self;
+    php.print("vector = {d}\n", .{args.vector});
+}

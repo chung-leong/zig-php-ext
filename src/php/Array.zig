@@ -71,12 +71,7 @@ pub fn subtractRef(self: *@This()) void {
 }
 
 pub fn has(self: *const @This(), key: anytype) bool {
-    if (self.get(key)) |value| {
-        value.release();
-        return true;
-    } else |_| {
-        return false;
-    }
+    return if (self.getPointer(key)) |_| true else |_| false;
 }
 
 pub fn get(self: *const @This(), key: anytype) !Value {

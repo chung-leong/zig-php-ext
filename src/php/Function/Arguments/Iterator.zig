@@ -247,6 +247,7 @@ fn valueTypeName(comptime T: type) []const u8 {
         .bool => "boolean",
         .int => "int",
         .float => "float",
+        .array, .vector => "array",
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
                 String => "string",
@@ -257,7 +258,7 @@ fn valueTypeName(comptime T: type) []const u8 {
             },
             .slice => switch (pt.child) {
                 u8 => "string",
-                else => unsupported(T),
+                else => "array",
             },
             else => unsupported(T),
         },

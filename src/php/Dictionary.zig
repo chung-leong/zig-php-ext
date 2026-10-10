@@ -83,7 +83,7 @@ pub const @"union" = union(enum) {
                         const opaque_ptr = st.field_attrs[i].default_value_ptr orelse {
                             return failure.report("Missing field value: {s}", .{field_name});
                         };
-                        const field_value_ptr: *const FT = @ptrCast(opaque_ptr);
+                        const field_value_ptr: *const FT = @ptrCast(@alignCast(opaque_ptr));
                         break :get field_value_ptr.*;
                     }
                 };
