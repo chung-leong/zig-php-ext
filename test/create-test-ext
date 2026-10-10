@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 <directory_name>"
+    exit 1
+fi
+
+DIR_NAME="$1"
+
+if [ -d "$DIR_NAME" ]; then
+    echo "Notice: Directory '$DIR_NAME' already exists."
+    exit 0
+fi
+
+cd "$(dirname "$0")"
+mkdir -p "$DIR_NAME/src"
+ln -s ../../../src/php "$DIR_NAME/src/php"
+ln -s ../../../src/include "$DIR_NAME/src/include"
+ln -s ../../../src/main.c "$DIR_NAME/src/main.c"
+ln -s ../../../src/main.zig "$DIR_NAME/src/main.zig"
+ln -s ../../php-devel "$DIR_NAME/php-devel"
+ln -s ../../vendor "$DIR_NAME/vendor"
+ln -s ../../build.zig "$DIR_NAME/build.zig"
+cp ../src/extension.zig "$DIR_NAME/src/extension.zig"
+cp ../build "$DIR_NAME/build"
+cp ../build.php "$DIR_NAME/build.php"
+sed "s/hello/$DIR_NAME/" ../composer.json > "$DIR_NAME/composer.json"
