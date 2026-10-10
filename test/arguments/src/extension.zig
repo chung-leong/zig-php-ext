@@ -30,14 +30,14 @@ pub fn @"call printUint"(self: *@This(), args: struct {
 pub fn @"call printIntFloats"(self: *@This(), args: struct {
     int: i32,
     float1: f32,
-    float2: f64,
+    float2: f64 = 8.88,
 }) !void {
     _ = self;
     php.print("int = {d}, float1 = {d}, float2 = {d}\n", .{ args.int, args.float1, args.float2 });
 }
 
 pub fn @"call printString"(self: *@This(), args: struct {
-    string: []const u8,
+    string: []const u8 = "Dingo ate my baby!",
 }) void {
     _ = self;
     php.print("string = {s}\n", .{args.string});

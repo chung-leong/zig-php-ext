@@ -76,6 +76,13 @@ final class ExtensionTest extends TestCase
         $this->assertSame("vector = { 1.5, 2.3, 789 }", $lines[0]); 
     }
 
+    public function testOptionalArgs(): void
+    {
+        $lines = $this->runTest("arguments", "optional.php");
+        $this->assertSame("int = 100, float1 = 42.5, float2 = 8.88", $lines[0]);
+        $this->assertSame("string = Dingo ate my baby!", $lines[1]);
+    }
+
     private function runTest($test_name, $script_name): array
     {
         chdir(__DIR__ . "/$test_name");

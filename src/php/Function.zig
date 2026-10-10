@@ -94,15 +94,15 @@ pub fn handlerType(comptime F: type, comptime self_src: SelfSource) HandlerType 
 pub fn handlerInfo(comptime func: anytype, comptime self_src: SelfSource) HandlerInfo {
     const F = @TypeOf(func);
     const handler_type = handlerType(F, self_src);
-    const arg_names, const arg_types, const is_raw = switch (handler_type) {
-        .raw => .{ &.{}, &.{}, true },
+    const arg_names, const arg_types, const arg_attrs, const is_raw = switch (handler_type) {
+        .raw => .{ &.{}, &.{}, &.{}, true },
         .handler, .method => init: {
             const f = @typeInfo(F).@"fn";
             const AT = f.param_types;
             const offset = if (handler_type == .method) 1 else 0;
             const Struct = AT[offset].?;
             const st = @typeInfo(Struct).@"struct";
-            break :init .{ st.field_names, st.field_types, false };
+            break :init .{ st.field_names, st.field_types, st.field_attrs, false };
         },
     };
     const is_variadic = is_raw or check: {
@@ -117,9 +117,12 @@ pub fn handlerInfo(comptime func: anytype, comptime self_src: SelfSource) Handle
         var arguments: [arg_types.len]ArgumentInfo = undefined;
         var required_count: usize = 0;
         inline for (arg_names, 0..) |arg_name, i| {
-            const required = switch (@typeInfo(arg_types[i])) {
-                .optional => false,
-                else => true,
+            const required = switch (arg_attrs[i].default_value_ptr != null) {
+                true => false,
+                false => switch (@typeInfo(arg_types[i])) {
+                    .optional => false,
+                    else => true,
+                },
             };
             if (required) required_count += 1;
             arguments[i] = .{
