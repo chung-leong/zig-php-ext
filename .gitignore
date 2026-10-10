@@ -1,4 +1,9 @@
+extensions/
+php-devel/
+vendor/
 .zig-cache/
 zig-out/
 zig-pkg/
 *.o
+*.ini
+composer.lock
