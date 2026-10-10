@@ -48,14 +48,27 @@ pub fn create(ce: *const Class, params: []const Value) !*@This() {
     return @ptrCast(zobj);
 }
 
+pub fn createStandard() *@This() {
+    const ce = Class.builtin(.standard);
+    return .create(ce, &.{});
+}
+
 pub fn createFromName(name: anytype, params: []const Value) !*@This() {
     const ce = Class.find(name) orelse return error.ClassNotFound;
     return .create(ce, params);
 }
 
-pub fn createStandard() !*@This() {
-    const ce = Class.builtin(.standard);
-    return .create(ce, &.{});
+pub fn createFromStruct(arg: anytype) *@This() {
+    const T = @TypeOf(arg);
+    if (@typeInfo(T) != .@"struct") @compileError("Struct expected, received: " ++ @typeName(T));
+    const st = @typeInfo(T).@"struct";
+    const obj = createStandard();
+    const arr = obj.properties();
+    inline for (st.field_names) |field_name| {
+        const field_value = @field(arg, field_name);
+        arr.set(String.static(field_name), .fromAny(field_value));
+    }
+    return obj;
 }
 
 pub fn retain(self: *@This()) *@This() {
@@ -143,7 +156,7 @@ pub fn readProperty(self: *const @This(), name: anytype) !Value {
     const zn: *c.zend_string = @ptrCast(n);
     const handler = zobj.handlers.*.read_property orelse return error.NoPropertyAccess;
     const access: Value.Access = .read;
-    const result = handler(zobj, zn, @intFromEnum(access), null, zval);
+    const result = handler(zobj, zn, @backingInt(access), null, zval);
     if (result != c.SUCCESS) return error.Missing;
     return value;
 }
@@ -155,8 +168,8 @@ pub fn hasProperty(self: *const @This(), name: anytype) !bool {
     const zn: *c.zend_string = @ptrCast(n);
     const handler = zobj.handlers.*.has_property orelse return error.NoPropertyAccess;
     const state: Value.State = .present;
-    const result = handler(zobj, zn, @intFromEnum(state), null);
-    return result == c.SUCCESS;
+    const result = handler(zobj, zn, @backingInt(state), null);
+    return result != 0;
 }
 
 pub fn getProperties(self: *const @This()) *Array {

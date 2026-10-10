@@ -21,6 +21,22 @@ final class ExtensionTest extends TestCase
         $this->assertSame("string1 = foo, string2 = bar", $lines[1]);
     }
 
+    public function testEnumArgs(): void
+    {
+        $lines = $this->runTest("arguments", "enum.php");
+        $this->assertSame("enum = .cat", $lines[0]);
+        $this->assertSame("enum = .dog", $lines[1]);
+        $this->assertSame("enum = .monkey", $lines[2]);
+    }
+
+    public function testFlagsArgs(): void
+    {
+        $lines = $this->runTest("arguments", "flags.php");
+        $this->assertSame("flags = .{ .option1 = true, .option2 = false, .option3 = true, .option4 = false, ._ = 0 }", $lines[0]);
+        $this->assertSame("flags = .{ .option1 = false, .option2 = false, .option3 = false, .option4 = true, ._ = 0 }", $lines[1]);
+        $this->assertSame("flags = .{ .option1 = false, .option2 = false, .option3 = false, .option4 = false, ._ = 0 }", $lines[2]);
+    }
+
     private function runTest($test_name, $script_name): array
     {
         chdir(__DIR__ . "/$test_name");

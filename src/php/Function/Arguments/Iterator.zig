@@ -262,9 +262,12 @@ fn valueTypeName(comptime T: type) []const u8 {
             else => unsupported(T),
         },
         .optional => |opt| std.fmt.comptimePrint("?{s}", .{valueTypeName(opt.child)}),
-        .@"struct" => switch (T) {
+        .@"struct" => |st| switch (T) {
             Callable => "callable",
-            else => unsupported(T),
+            else => switch (st.backing_integer != null) {
+                true => "number|array|object",
+                false => "array|object",
+            },
         },
         .@"union" => |un| switch (T) {
             Dictionary => "array|object",
@@ -293,6 +296,7 @@ fn valueTypeName(comptime T: type) []const u8 {
                 break :format &combined_name;
             },
         },
+        .@"enum" => "number|string",
         else => unsupported(T),
     };
 }

@@ -50,3 +50,23 @@ pub fn @"call printStrings"(self: *@This(), args: struct {
     _ = self;
     php.print("string1 = {s}, string2 = {s}\n", .{ args.string1, args.string2 });
 }
+
+pub fn @"call printEnum"(self: *@This(), args: struct {
+    animal: enum { cat, dog, monkey },
+}) void {
+    _ = self;
+    php.print("enum = {}\n", .{args.animal});
+}
+
+pub fn @"call printFlags"(self: *@This(), args: struct {
+    flags: packed struct(u8) {
+        option1: bool = false,
+        option2: bool = false,
+        option3: bool = false,
+        option4: bool = false,
+        _: u4 = 0,
+    },
+}) void {
+    _ = self;
+    php.print("flags = {}\n", .{args.flags});
+}

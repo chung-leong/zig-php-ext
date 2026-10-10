@@ -5,7 +5,9 @@ const php = @import("root.zig");
 const Array = php.Array;
 const Object = php.Object;
 const String = php.String;
+const N = String.static;
 const Value = php.Value;
+const failure = php.failure;
 
 pub const @"union" = union(enum) {
     pub fn addRef(self: @This()) void {
@@ -29,8 +31,8 @@ pub const @"union" = union(enum) {
 
     pub fn has(self: @This(), key: anytype) bool {
         return switch (self) {
-            .array => |arr| try arr.has(key),
-            .object => |obj| try obj.hasProperty(key),
+            .array => |arr| arr.has(key),
+            .object => |obj| obj.hasProperty(key) catch false,
         };
     }
 
@@ -71,9 +73,20 @@ pub const @"union" = union(enum) {
             }
             inline for (st.field_names, 0..) |field_name, i| {
                 errdefer failure_at = i;
-                const value = try self.read(String.static(field_name));
-                defer value.release();
-                @field(s, field_name) = try value.convertTo(st.field_types[i]);
+                @field(s, field_name) = get: {
+                    const FT = st.field_types[i];
+                    if (self.has(N(field_name))) {
+                        const value = try self.read(N(field_name));
+                        defer value.release();
+                        break :get try value.convertTo(FT);
+                    } else {
+                        const opaque_ptr = st.field_attrs[i].default_value_ptr orelse {
+                            return failure.report("Missing field value: {s}", .{field_name});
+                        };
+                        const field_value_ptr: *const FT = @ptrCast(opaque_ptr);
+                        break :get field_value_ptr.*;
+                    }
+                };
             }
         }
         return s;

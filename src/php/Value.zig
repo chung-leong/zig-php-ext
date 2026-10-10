@@ -3,6 +3,7 @@ const std = @import("std");
 const php = @import("root.zig");
 const c = php.c;
 const pi = php.imports;
+const failure = php.failure;
 const php_al = php.allocator;
 const Callable = php.Callable;
 const Dictionary = php.Dictionary;
@@ -251,19 +252,43 @@ pub fn getEnum(self: *const @This(), comptime T: type) !T {
     if (@typeInfo(T) != .@"enum") {
         @compileError("Enum type expected, received: " ++ @typeName(T));
     }
-    const int = try self.getInteger();
-    return std.enums.fromInt(T, int) orelse error.InvalidEnumValue;
+    if (self.getInteger()) |int| {
+        return std.enums.fromInt(T, int) orelse error.InvalidEnumValue;
+    } else |_| {
+        const str = self.getString() catch return error.NotIntegerOrString;
+        const field_names = @typeInfo(T).@"enum".field_names;
+        inline for (field_names) |field_name| {
+            if (str.matchSlice(field_name)) return @field(T, field_name);
+        } else {
+            const list = comptime join: {
+                var text: []const u8 = "";
+                for (field_names) |field_name| {
+                    const quoted = "'" ++ field_name ++ "'";
+                    text = if (text.len == 0) quoted else text ++ ", " ++ quoted;
+                }
+                break :join text;
+            };
+            return failure.report("Enum can be {s}, received: '{s}'", .{ list, str.slice() });
+        }
+    }
 }
 
-pub fn getPackedStruct(self: *const @This(), comptime T: type) !T {
-    const BT = switch (@typeInfo(T)) {
-        .@"struct" => |st| st.backing_integer,
-        else => null,
-    } orelse @compileError("Packed struct type expected, received: " ++ @typeName(T));
-    const int = try self.getInteger();
-    const bits: @Int(@typeInfo(BT).int.signedness, @bitSizeOf(c_long)) = @bitCast(int);
-    const backing_int: BT = @truncate(bits);
-    return @bitCast(backing_int);
+pub fn getStruct(self: *const @This(), comptime T: type) !T {
+    if (@typeInfo(T) != .@"struct") @compileError("Struct type expected, received: " ++ @typeName(T));
+    const st = @typeInfo(T).@"struct";
+    if (self.kind() == .integer) {
+        if (st.backing_integer) |Int| {
+            if (self.getInteger()) |int| {
+                const bits: @Int(@typeInfo(Int).int.signedness, @bitSizeOf(c_long)) = @bitCast(int);
+                const backing_int: Int = @truncate(bits);
+                return @bitCast(backing_int);
+            } else |_| {}
+        }
+    }
+    const dict = self.getDictionary() catch |err| {
+        return if (st.backing_integer != null) error.NotIntegerOrAssociativeArray else err;
+    };
+    return dict.extract(T);
 }
 
 pub fn compareWith(self: *const @This(), other: @This()) c_int {
@@ -337,15 +362,9 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
             else => unsupported(T),
         },
         .optional => |opt| if (self.isNull()) null else try self.convertTo(opt.child),
-        .@"struct" => |st| switch (T) {
+        .@"struct" => switch (T) {
             Callable => try self.getCallable(),
-            else => switch (st.backing_integer != null) {
-                true => try self.getPackedStruct(T),
-                false => get: {
-                    const dict = try self.getDictionary();
-                    break :get dict.extract(T);
-                },
-            },
+            else => try self.getStruct(T),
         },
         .@"union" => |un| switch (T) {
             Dictionary => try self.getDictionary(),
@@ -511,6 +530,27 @@ pub fn fromPointer(ptr: *const anyopaque) @This() {
     };
 }
 
+pub fn fromEnum(arg: anytype) @This() {
+    const T = @TypeOf(arg);
+    if (@typeInfo(T) != .@"enum") @compileError("Enum expected, received: " ++ @typeName(T));
+    const int: c_long = @backingInt(arg);
+    return fromInteger(int);
+}
+
+pub fn fromStruct(arg: anytype) @This() {
+    const T = @TypeOf(arg);
+    if (@typeInfo(T) != .@"struct") @compileError("Struct expected, received: " ++ @typeName(T));
+    const st = @typeInfo(T).@"struct";
+    if (st.backing_int) |Int| {
+        const int: Int = @bitCast(arg);
+        const long: c_long = @truncate(int);
+        return .fromInteger(long);
+    } else {
+        const obj: *Object = .createFromStruct(arg);
+        return .fromObject(obj);
+    }
+}
+
 pub fn fromAny(arg: anytype) switch (@typeInfo(@TypeOf(arg))) {
     .error_union => |eu| eu.error_set!@This(),
     else => @This(),
@@ -543,10 +583,10 @@ pub fn fromAny(arg: anytype) switch (@typeInfo(@TypeOf(arg))) {
             },
             else => unsupported(T),
         },
-        .@"struct" => |st| if (st.backing_integer) |BT|
-            @as(BT, @bitCast(arg))
-        else
-            unsupported(T),
+        .@"struct" => switch (T) {
+            Callable => arg.value,
+            else => .fromStruct(T),
+        },
         .@"union" => |un| if (un.tag_type) |Tag|
             inline for (un.field_names) |name| {
                 if (arg == @field(Tag, name)) break .fromAny(@field(arg, name));

@@ -80,7 +80,8 @@ pub fn has(self: *const @This(), key: anytype) bool {
 }
 
 pub fn get(self: *const @This(), key: anytype) !Value {
-    return self.getPointer(key).*;
+    const ptr = try self.getPointer(key);
+    return ptr.*;
 }
 
 pub fn getPointer(self: *const @This(), key: anytype) !*Value {
