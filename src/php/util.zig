@@ -42,6 +42,36 @@ pub fn errable(arg: anytype) !WithoutError(@TypeOf(arg)) {
     };
 }
 
+pub fn getter(comptime T: type, field: std.meta.FieldEnum(T)) RT: {
+    const field_name = @tagName(field);
+    const FT = @FieldType(T, field_name);
+    break :RT fn (*const T) FT;
+} {
+    const field_name = @tagName(field);
+    const FT = @FieldType(T, field_name);
+    const ns = struct {
+        fn @"fn"(self: *const T) FT {
+            return @field(self, field_name);
+        }
+    };
+    return ns.@"fn";
+}
+
+pub fn setter(comptime T: type, field: std.meta.FieldEnum(T)) RT: {
+    const field_name = @tagName(field);
+    const FT = @FieldType(T, field_name);
+    break :RT fn (*T, FT) void;
+} {
+    const field_name = @tagName(field);
+    const FT = @FieldType(T, field_name);
+    const ns = struct {
+        fn @"fn"(self: *T, value: FT) void {
+            @field(self, field_name) = value;
+        }
+    };
+    return ns.@"fn";
+}
+
 pub inline fn camelize(comptime name: []const u8) [:0]const u8 {
     var buffer: [name.len + 1]u8 = undefined;
     var len: usize = 0;

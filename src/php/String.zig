@@ -64,7 +64,7 @@ pub fn createUnitialized(len: usize) *@This() {
     };
 }
 
-pub fn createInterned(s: []const u8) !*@This() {
+pub fn createInterned(s: []const u8) *@This() {
     const zend_string_init_interned = deref(pi.zend_string_init_interned);
     const zstr = zend_string_init_interned.?(s.ptr, s.len, false);
     return @ptrCast(zstr);
@@ -93,6 +93,25 @@ pub fn createFromAny(arg: anytype) *@This() {
         },
         else => unsupported(AT),
     };
+}
+
+pub fn allocPrint(comptime fmt: []const u8, args: anytype) *@This() {
+    const offset = @offsetOf(c.zend_string, "val");
+    const offset_bytes = comptime init: {
+        var bytes: [offset]u8 = undefined;
+        for (&bytes) |*ptr| ptr.* = ' ';
+        break :init bytes;
+    };
+    const bytes = std.fmt.allocPrintSentinel(offset_bytes ++ fmt, args, 0) catch unreachable;
+    const zs: *c.zend_string = @ptrCast(@alignCast(bytes.ptr));
+    var type_info: u32 = c.GC_STRING;
+    if (Allocator.mode == .persistent) type_info |= c.IS_STR_PERSISTENT;
+    zs.* = .{
+        .gc = .{ .refcount = 1, .u = .{ .type_info = type_info } },
+        .h = 0,
+        .len = @intCast(bytes.len),
+    };
+    return @ptrCast(zs);
 }
 
 pub fn retain(self: *@This()) *@This() {

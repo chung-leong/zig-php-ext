@@ -11,8 +11,7 @@
         ]
     },
     "scripts": {
-        "test": "php ./vendor/bin/phpunit --testdox test --display-warnings",
-        "debug": "lldb php -- ./vendor/bin/phpunit test"
+        "test": "php ./vendor/bin/phpunit --testdox test/ExtensionTest.php --display-warnings"
     },
     "require": {
         "revolt/event-loop": "^1.0",

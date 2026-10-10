@@ -98,32 +98,17 @@ fn ZendTypePointer(comptime Ptr: type) type {
     }
 }
 
-pub fn getter(comptime T: type, field: std.meta.FieldEnum(T)) RT: {
-    const field_name = @tagName(field);
-    const FT = @FieldType(T, field_name);
-    break :RT fn (*const T) FT;
-} {
-    const field_name = @tagName(field);
-    const FT = @FieldType(T, field_name);
-    const ns = struct {
-        fn @"fn"(self: *const T) FT {
-            return @field(self, field_name);
-        }
-    };
-    return ns.@"fn";
+pub fn write(bytes: []const u8) void {
+    _ = imports.php_write(@ptrCast(@constCast(bytes.ptr)), bytes.len);
 }
 
-pub fn setter(comptime T: type, field: std.meta.FieldEnum(T)) RT: {
-    const field_name = @tagName(field);
-    const FT = @FieldType(T, field_name);
-    break :RT fn (*T, FT) void;
-} {
-    const field_name = @tagName(field);
-    const FT = @FieldType(T, field_name);
-    const ns = struct {
-        fn @"fn"(self: *T, value: FT) void {
-            @field(self, field_name) = value;
-        }
-    };
-    return ns.@"fn";
+pub fn print(comptime fmt: []const u8, args: anytype) void {
+    var buffer: [1024]u8 = undefined;
+    if (std.fmt.bufPrint(&buffer, fmt, args)) |str| {
+        write(str);
+    } else |_| {
+        const str = std.fmt.allocPrint(allocator, fmt, args) catch unreachable;
+        defer allocator.free(str);
+        write(str);
+    }
 }

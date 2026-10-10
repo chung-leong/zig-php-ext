@@ -3,13 +3,13 @@ const std = @import("std");
 const php = @import("php/root.zig");
 const InfoTable = php.InfoTable;
 const Module = php.Module;
-const getter = php.getter;
-const setter = php.setter;
+const getter = php.util.getter;
+const setter = php.util.setter;
 
 pub fn @"call greet"(self: *@This(), args: struct {
     name: []const u8,
 }) !void {
-    std.debug.print("{s}, {s}!\n", .{ self.greeting, args.name });
+    php.print("{s}, {s}!\n", .{ self.greeting, args.name });
 }
 
 pub const @"get greeting" = getter(@This(), .greeting);

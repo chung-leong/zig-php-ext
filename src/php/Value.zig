@@ -18,7 +18,7 @@ const Array = php.Array;
 pub fn kind(self: *const @This()) Kind {
     return switch (self.impl.u1.v.type) {
         c.IS_TRUE => .boolean,
-        else => @enumFromInt(self.impl.u1.v.type),
+        else => @fromBackingInt(@intCast(self.impl.u1.v.type)),
     };
 }
 
@@ -311,7 +311,7 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
             break :get @intCast(int_value);
         },
         .float => get: {
-            const float_value = self.getFloat();
+            const float_value = try self.getFloat();
             break :get @floatCast(float_value);
         },
         .@"enum" => try self.getEnum(T),
@@ -590,7 +590,7 @@ pub const Kind = enum(u8) {
     pub fn fromZvalType(zval_type: c_int) @This() {
         return switch (zval_type) {
             c._IS_BOOL => .boolean,
-            else => @enumFromInt(zval_type),
+            else => @fromBackingInt(@intCast(zval_type)),
         };
     }
 };
