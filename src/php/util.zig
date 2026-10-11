@@ -189,6 +189,23 @@ pub fn setterNames(comptime T: type, comptime scope: Scope) []const [:0]const u8
     });
 }
 
+pub fn exportPrefix() []const u8 {
+    return "export ";
+}
+
+pub fn exportNames(comptime T: type) []const [:0]const u8 {
+    return nameList(T, struct {
+        pub const prefix = exportPrefix();
+
+        pub fn extract(comptime decl_name: [:0]const u8) ?[:0]const u8 {
+            if (std.mem.startsWith(u8, decl_name, prefix)) {
+                return decl_name[prefix.len..];
+            }
+            return null;
+        }
+    });
+}
+
 fn nameList(comptime T: type, comptime criteria: type) []const [:0]const u8 {
     const names = init: {
         var count: usize = 0;

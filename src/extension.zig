@@ -6,6 +6,8 @@ const Module = php.Module;
 const getter = php.util.getter;
 const setter = php.util.setter;
 
+pub const @"export SOME_CONSTANT" = "Hello world";
+
 pub fn @"call greet"(self: *@This(), args: struct {
     name: []const u8,
 }) !void {

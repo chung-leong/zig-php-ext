@@ -435,7 +435,7 @@ pub fn freeAny(arg: anytype) void {
 }
 
 pub fn toZval(self: *const @This()) c.zval {
-    return @as(*const c.zval, @ptrCast(&self)).*;
+    return self.impl;
 }
 
 pub fn fromZval(val: c.zval) @This() {
@@ -480,7 +480,7 @@ pub fn fromString(str: *const String) @This() {
     return .{
         .impl = .{
             .u1 = .{
-                .type_info = switch (str.isInterned()) {
+                .type_info = switch (@inComptime() or str.isInterned()) {
                     false => c.IS_STRING_EX, // with gc flag
                     true => c.IS_STRING,
                 },
@@ -573,7 +573,8 @@ pub fn fromAny(arg: anytype) switch (@typeInfo(@TypeOf(arg))) {
             .signed => .fromInteger(arg),
             .unsigned => .fromUnsigned(arg),
         },
-        .float => .fromFloat(arg),
+        .comptime_int => .fromInteger(arg),
+        .float, .comptime_float => .fromFloat(arg),
         .@"enum" => .fromEnum(arg),
         .error_union => if (arg) |payload| .fromAny(payload) else |err| err,
         .array, .vector => .fromArray(.createFromAny(arg)),
@@ -586,7 +587,13 @@ pub fn fromAny(arg: anytype) switch (@typeInfo(@TypeOf(arg))) {
                 Resource => .fromResource(arg),
                 Stream => .fromStream(arg),
                 Reference => .fromReference(arg),
-                else => unsupported(T),
+                else => switch (@typeInfo(pt.child)) {
+                    .array => |ar| switch (@inComptime() and ar.child == u8) {
+                        true => .fromString(.static(arg)),
+                        false => unsupported(T),
+                    },
+                    else => unsupported(T),
+                },
             },
             .slice => switch (pt.child) {
                 u8 => .fromString(.create(arg)),

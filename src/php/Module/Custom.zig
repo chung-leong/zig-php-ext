@@ -4,6 +4,8 @@ const php = @import("../root.zig");
 const c = php.c;
 const pi = php.imports;
 const Allocator = php.Allocator;
+const Class = php.Class;
+const Constant = php.Constant;
 const Function = php.Function;
 const failure = php.failure;
 const Module = php.Module;
@@ -35,7 +37,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                                 .name = dep.name.ptr,
                                 .rel = @tagName(dep.rel),
                                 .version = dep.version.ptr,
-                                .type = @intFromEnum(dep.type),
+                                .type = @backingInt(dep.type),
                             };
                         }
                         deps[list.len] = .{ .name = null };
@@ -75,21 +77,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             try CustomSingleton.init();
             if (!@hasDecl(T, "onModuleStartup")) return;
             const self = CustomSingleton.get();
-            // initialize the ini entries after we have create the singleton
-            var arena: std.heap.ArenaAllocator = .init(php.allocator);
-            defer arena.deinit();
-            const allocator = arena.allocator();
-            inline for (getter_names, 0..) |getter_name, index| {
-                const setter_name = comptime for (setter_names) |name| {
-                    if (std.mem.startsWith(u8, name, getter_name)) {
-                        if (name.len == getter_name.len or name[getter_name.len] == ' ') {
-                            break name;
-                        }
-                    }
-                } else @compileError("Missing setter: " ++ getter_name);
-                ini_entries[index] = .init(allocator, self, options.name, getter_name, setter_name);
-            }
-            if (pi.zend_register_ini_entries(@ptrCast(&ini_entries), module_no) != c.SUCCESS) return error.CannotRegisterIniEntries;
+            try registerIniEntries(self, module_no);
+            try registerConstants();
             return T.onModuleStartup(self, module_type, module_no);
         }
 
@@ -106,7 +95,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             Allocator.mode = .persistent;
             defer {
                 CustomSingleton.deinit();
-                pi.zend_unregister_ini_entries(module_no);
+                unregisterIniEntries(module_no);
+                unregisterConstants();
             }
             if (!@hasDecl(T, "onModuleShutdown")) return;
             const self = CustomSingleton.get();
@@ -156,11 +146,51 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             return T.onInfoRequest(self, module);
         }
 
+        fn registerIniEntries(self: *T, module_no: c_int) !void {
+            // initialize the ini entries after we have create the singleton
+            var arena: std.heap.ArenaAllocator = .init(php.allocator);
+            defer arena.deinit();
+            const allocator = arena.allocator();
+            inline for (getter_names, 0..) |getter_name, index| {
+                const setter_name = comptime for (setter_names) |name| {
+                    if (std.mem.startsWith(u8, name, getter_name)) {
+                        if (name.len == getter_name.len or name[getter_name.len] == ' ') {
+                            break name;
+                        }
+                    }
+                } else @compileError("Missing setter: " ++ getter_name);
+                ini_entries[index] = .init(allocator, self, options.name, getter_name, setter_name);
+            }
+            if (pi.zend_register_ini_entries(@ptrCast(&ini_entries), module_no) != c.SUCCESS) {
+                return error.CannotRegisterIniEntries;
+            }
+        }
+
+        fn unregisterIniEntries(module_no: c_int) void {
+            pi.zend_unregister_ini_entries(module_no);
+        }
+
+        fn registerConstants() !void {
+            for (&constants) |*ptr| try ptr.register();
+        }
+
+        fn unregisterConstants() void {
+            for (&constants) |*ptr| ptr.unregister();
+        }
+
+        fn isCustomClass(comptime Decl: type) bool {
+            return switch (@typeInfo(Decl)) {
+                .@"struct" => @hasField(Decl, "class") and @FieldType(Decl, "class") == Class,
+                else => false,
+            };
+        }
+
         const CustomSingleton = Singleton(T);
 
         const getter_names = php.util.getterNames(T, .instance);
         const setter_names = php.util.setterNames(T, .instance);
         const method_names = php.util.methodNames(T, .instance);
+        const export_names = php.util.exportNames(T);
         const function_entries = init: {
             // create entries for them (extra entry for sentinel)
             var entries: [method_names.len + 1]FunctionEntry = undefined;
@@ -172,6 +202,75 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             }
             // list is terminated by an empty entry
             entries[i] = std.mem.zeroes(FunctionEntry);
+            break :init entries;
+        };
+        const constants = init: {
+            // get count first
+            var count: usize = 0;
+            for (export_names) |export_name| {
+                const prefix = php.util.exportPrefix();
+                const decl = @field(T, prefix ++ export_name);
+                switch (@typeInfo(@TypeOf(decl))) {
+                    .type => if (!isCustomClass(decl)) {
+                        const len = switch (@typeInfo(T)) {
+                            .@"struct" => |st| if (st.backing_integer) st.field_names.len else null,
+                            .@"enum" => |en| en.field_names.len,
+                            else => null,
+                        } orelse @compileError("Expected enum or packed struct, received: " ++ @typeName(T));
+                        count += len;
+                    },
+                    else => {
+                        count += 1;
+                    },
+                }
+            }
+            var entries: [count]Constant = undefined;
+            var index: usize = 0;
+            for (export_names) |export_name| {
+                const prefix = php.util.exportPrefix();
+                const decl = @field(T, prefix ++ export_name);
+                switch (@typeInfo(@TypeOf(decl))) {
+                    .type => if (!isCustomClass(decl)) {
+                        // see if export_name is all-cap, then the rest of the name will be capitalized as well
+                        const use_uppercase = for (export_name) |ch| {
+                            if (std.ascii.isLower(ch)) break false;
+                        } else true;
+                        const item_names, const item_values = switch (@typeInfo(decl)) {
+                            .@"struct" => |st| get: {
+                                var values: [st.len]c_long = undefined;
+                                for (st.field_names, 0..) |field_name, i| {
+                                    if (st.field_types[i] != bool) {
+                                        @compileError("Only pack structs containing booleans can be exported");
+                                    }
+                                    values[i] = @intCast(i << @bitOffsetOf(decl, field_name));
+                                }
+                                break :get .{ st.field_names, values };
+                            },
+                            .@"enum" => |en| get: {
+                                var values: [en.len]c_long = undefined;
+                                for (en.field_values, 0..) |v, i| values[i] = v;
+                                break :get .{ en.field_names, values };
+                            },
+                            else => unreachable,
+                        };
+                        for (item_names, 0..) |item_name, i| {
+                            const p_len = export_name.len;
+                            var constant_name: [p_len + item_name.len]u8 = undefined;
+                            @memcpy(constant_name[0..p_len], export_name);
+                            for (item_name, 0..) |ch, j| constant_name[p_len + j] = switch (use_uppercase) {
+                                true => std.ascii.tpUpper(ch),
+                                false => ch,
+                            };
+                            entries[index] = .fromAny(.static(constant_name), item_values[i]);
+                            index += 1;
+                        }
+                    },
+                    else => {
+                        entries[index] = .fromAny(.static(export_name), decl);
+                        index += 1;
+                    },
+                }
+            }
             break :init entries;
         };
         //  ini entries need to be var because their values are determined at runtime

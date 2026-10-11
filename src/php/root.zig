@@ -7,6 +7,7 @@ pub const Allocator = @import("Allocator.zig");
 pub const Array = @import("Array.zig");
 pub const Callable = @import("Callable.zig");
 pub const Class = @import("Class.zig");
+pub const Constant = @import("Constant.zig");
 pub const Dictionary = @import("Dictionary.zig").@"union";
 pub const failure = @import("failure.zig");
 pub const Function = @import("Function.zig");
