@@ -30,10 +30,7 @@ pub fn properties(self: *const @This()) *Array {
 }
 
 pub fn create(ce: *const Class, params: []const Value) !*@This() {
-    var zval: c.zval = undefined;
-    const result = pi.object_init_ex(&zval, @ptrCast(@constCast(ce)));
-    if (result != c.SUCCESS) return error.CannotCreateObject;
-    const zobj = zval.value.obj;
+    const zobj = pi.zend_objects_new(@ptrCast(@constCast(ce)));
     const handlers = zobj.*.handlers;
     const handler = handlers.*.get_constructor;
     const ctor = handler.?(zobj);
@@ -50,7 +47,8 @@ pub fn create(ce: *const Class, params: []const Value) !*@This() {
 
 pub fn createStandard() *@This() {
     const ce = Class.builtin(.standard);
-    return .create(ce, &.{});
+    const zobj = pi.zend_objects_new(@ptrCast(@constCast(ce)));
+    return @ptrCast(zobj);
 }
 
 pub fn createFromName(name: anytype, params: []const Value) !*@This() {
@@ -63,11 +61,12 @@ pub fn createFromStruct(arg: anytype) *@This() {
     if (@typeInfo(T) != .@"struct") @compileError("Struct expected, received: " ++ @typeName(T));
     const st = @typeInfo(T).@"struct";
     const obj = createStandard();
-    const arr = obj.properties();
+    const arr: *Array = .create();
     inline for (st.field_names) |field_name| {
         const field_value = @field(arg, field_name);
         arr.set(String.static(field_name), .fromAny(field_value));
     }
+    obj.impl.properties = @ptrCast(arr);
     return obj;
 }
 

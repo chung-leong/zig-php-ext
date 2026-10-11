@@ -550,9 +550,9 @@ pub fn fromStruct(arg: anytype) @This() {
     const T = @TypeOf(arg);
     if (@typeInfo(T) != .@"struct") @compileError("Struct expected, received: " ++ @typeName(T));
     const st = @typeInfo(T).@"struct";
-    if (st.backing_int) |Int| {
+    if (st.backing_integer) |Int| {
         const int: Int = @bitCast(arg);
-        const long: c_long = @truncate(int);
+        const long: c_long = @intCast(int);
         return .fromInteger(long);
     } else {
         const obj: *Object = .createFromStruct(arg);
@@ -576,6 +576,8 @@ pub fn fromAny(arg: anytype) switch (@typeInfo(@TypeOf(arg))) {
         .float => .fromFloat(arg),
         .@"enum" => .fromEnum(arg),
         .error_union => if (arg) |payload| .fromAny(payload) else |err| err,
+        .array, .vector => .fromArray(.createFromAny(arg)),
+        .optional => if (arg) |p| fromAny(p) else .fromNull(),
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
                 String => .fromString(arg),
@@ -594,7 +596,7 @@ pub fn fromAny(arg: anytype) switch (@typeInfo(@TypeOf(arg))) {
         },
         .@"struct" => switch (T) {
             Callable => arg.value,
-            else => .fromStruct(T),
+            else => .fromStruct(arg),
         },
         .@"union" => |un| if (un.tag_type) |Tag|
             inline for (un.field_names) |name| {

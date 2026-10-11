@@ -1,8 +1,8 @@
 <?php declare(strict_types=1);
-use PHPUnit\Framework\TestCase;
-use Revolt\EventLoop;
 
-final class ExtensionTest extends TestCase
+require_once __DIR__ . '/ExtensionTestCase.php';
+
+final class ArgumentTest extends ExtensionTestCase
 {   
     public function testSimpleArgs(): void
     {
@@ -81,28 +81,5 @@ final class ExtensionTest extends TestCase
         $lines = $this->runTest("arguments", "optional.php");
         $this->assertSame("int = 100, float1 = 42.5, float2 = 8.88", $lines[0]);
         $this->assertSame("string = Dingo ate my baby!", $lines[1]);
-    }
-
-    private function runTest($test_name, $script_name): array
-    {
-        chdir(__DIR__ . "/$test_name");
-        if (exec("./build") === false) {
-            throw new Exception("Unable to build extension: $test_name");
-        }
-        $php_version = substr(PHP_VERSION, 0, strrpos(PHP_VERSION, '.'));
-        switch (PHP_OS_FAMILY) {
-            case 'Windows': $so_ext = 'dll'; break;
-            case 'Darwin': $so_ext = 'dylib'; break;
-            default: $so_ext = 'so'; break;
-        }
-        $ext_path = __DIR__ . "/$test_name/extensions/$php_version/php_$test_name.$so_ext";
-        $cmd = "php -d extension='$ext_path' '$script_name'";
-        $result = exec($cmd, $lines, $code);
-        if ($result === false) {
-            throw new Exception("Unable to run PHP with extension: $test_name");
-        } else if ($code !== 0) {
-            throw new Exception($result);
-        }
-        return $lines;
     }
 }

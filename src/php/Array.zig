@@ -44,12 +44,40 @@ pub fn create() *@This() {
     return @ptrCast(arr);
 }
 
+pub fn createWithLength(len: usize) *@This() {
+    const arr = pi._zend_new_array(@intCast(len));
+    return @ptrCast(arr);
+}
+
 pub fn createNonDestructive() *@This() {
     const alignment: std.mem.Alignment = .fromByteUnits(@alignOf(c.zend_array));
     const byte_ptr = php_al.rawAlloc(@sizeOf(c.zend_array), alignment, @returnAddress());
     const arr: *c.zend_array = @ptrCast(@alignCast(byte_ptr));
     pi._zend_hash_init(arr, c.HT_MIN_SIZE, null, false);
     return @ptrCast(arr);
+}
+
+pub fn createFromAny(list: anytype) *@This() {
+    const T = @TypeOf(list);
+    const supported = switch (@typeInfo(T)) {
+        .array, .vector => true,
+        .pointer => |pt| pt.size == .slice,
+        else => false,
+    };
+    if (!supported) @compileError("Array, slice, or vector expected, received: " ++ @typeName(T));
+    switch (@typeInfo(T)) {
+        .vector => |ve| {
+            // vectors require an unrolled loop
+            const arr = createWithLength(ve.len);
+            inline for (0..ve.len) |i| arr.append(.fromAny(list[i]));
+            return arr;
+        },
+        else => {
+            const arr = createWithLength(list.len);
+            for (list) |item| arr.append(.fromAny(item));
+            return arr;
+        },
+    }
 }
 
 pub fn retain(self: *@This()) *@This() {
