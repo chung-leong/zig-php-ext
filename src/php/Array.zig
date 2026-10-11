@@ -74,7 +74,11 @@ pub fn createFromAny(list: anytype) *@This() {
         },
         else => {
             const arr = createWithLength(list.len);
-            for (list) |item| arr.append(.fromAny(item));
+            for (list) |item| {
+                const value: Value = .fromAny(item);
+                defer value.release();
+                arr.append(value);
+            }
             return arr;
         },
     }

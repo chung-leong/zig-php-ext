@@ -34,24 +34,28 @@ final class ReturnValueTest extends ExtensionTestCase
     public function testArrayRetval(): void
     {
         $lines = $this->runTest("return-value", "array.php");
-        $this->assertSame("Array", $lines[0]);
-        $this->assertSame("(", $lines[1]);
-        $this->assertSame("    [0] => 1", $lines[2]);
-        $this->assertSame("    [1] => 2", $lines[3]);
-        $this->assertSame("    [2] => 3", $lines[4]);
-        $this->assertSame("    [3] => 4", $lines[5]);
-        $this->assertSame(")", $lines[6]);
+        $this->assertSame(<<<OUTPUT
+        Array
+        (
+            [0] => 1
+            [1] => 2
+            [2] => 3
+            [3] => 4
+        )
+        OUTPUT, implode("\n", $lines));
     }
 
     public function testVectorRetval(): void
     {
         $lines = $this->runTest("return-value", "vector.php");
-        $this->assertSame("Array", $lines[0]);
-        $this->assertSame("(", $lines[1]);
-        $this->assertSame("    [0] => 1.5", $lines[2]);
-        $this->assertSame("    [1] => 2.5", $lines[3]);
-        $this->assertSame("    [2] => 3.5", $lines[4]);
-        $this->assertSame(")", $lines[5]);
+        $this->assertSame(<<<OUTPUT
+        Array
+        (
+            [0] => 1.5
+            [1] => 2.5
+            [2] => 3.5
+        )
+        OUTPUT, implode("\n", $lines));
     }
 
     public function testOptionalRetval(): void
@@ -64,36 +68,41 @@ final class ReturnValueTest extends ExtensionTestCase
     public function testStructRetval(): void
     {
         $lines = $this->runTest("return-value", "struct.php");
-        $this->assertSame("stdClass Object", $lines[0]);
-        $this->assertSame("(", $lines[1]);
-        $this->assertSame("    [name] => Bigus Dickus", $lines[2]);
-        $this->assertSame("    [age] => 32", $lines[3]);
-        $this->assertSame(")", $lines[4]);
+        $this->assertSame(<<<OUTPUT
+        stdClass Object
+        (
+            [name] => Bigus Dickus
+            [age] => 32
+        )
+        OUTPUT, implode("\n", $lines));
     }
 
     public function testStructArrayRetval(): void
     {
         $lines = $this->runTest("return-value", "struct-array.php");
-        $this->assertSame("Array", $lines[0]);
-        $this->assertSame("(", $lines[1]);
-        $this->assertSame("    [0] => stdClass Object", $lines[2]);
-        $this->assertSame("        (", $lines[3]);
-        $this->assertSame("            [name] => Doctor Evil", $lines[4]);
-        $this->assertSame("            [age] => 32", $lines[5]);
-        $this->assertSame("        )", $lines[6]);
-        $this->assertSame("", $lines[7]);
-        $this->assertSame("    [1] => stdClass Object", $lines[8]);
-        $this->assertSame("        (", $lines[9]);
-        $this->assertSame("            [name] => Doctor Doom", $lines[10]);
-        $this->assertSame("            [age] => 100", $lines[11]);
-        $this->assertSame("        )", $lines[12]);
-        $this->assertSame("", $lines[13]);
-        $this->assertSame("    [2] => stdClass Object", $lines[14]);
-        $this->assertSame("        (", $lines[15]);
-        $this->assertSame("            [name] => Doctor Zhivago", $lines[16]);
-        $this->assertSame("            [age] => 45", $lines[17]);
-        $this->assertSame("        )", $lines[18]);
-        $this->assertSame("", $lines[19]);
-        $this->assertSame(")", $lines[20]);
+        $this->assertSame(<<<OUTPUT
+        Array
+        (
+            [0] => stdClass Object
+                (
+                    [name] => Doctor Evil
+                    [age] => 32
+                )
+
+            [1] => stdClass Object
+                (
+                    [name] => Doctor Doom
+                    [age] => 100
+                )
+
+            [2] => stdClass Object
+                (
+                    [name] => Doctor Zhivago
+                    [age] => 45
+                )
+
+        )
+        OUTPUT
+        , implode("\n", $lines));
     }
 }

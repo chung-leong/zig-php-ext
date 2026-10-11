@@ -64,7 +64,9 @@ pub fn createFromStruct(arg: anytype) *@This() {
     const arr: *Array = .create();
     inline for (st.field_names) |field_name| {
         const field_value = @field(arg, field_name);
-        arr.set(String.static(field_name), .fromAny(field_value));
+        const value: Value = .fromAny(field_value);
+        defer value.release();
+        arr.set(String.static(field_name), value);
     }
     obj.impl.properties = @ptrCast(arr);
     return obj;
