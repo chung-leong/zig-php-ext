@@ -75,10 +75,10 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
 
         fn tryModuleStartup(module_type: Module.Type, module_no: c_int) !void {
             try CustomSingleton.init();
-            if (!@hasDecl(T, "onModuleStartup")) return;
             const self = CustomSingleton.get();
             try registerIniEntries(self, module_no);
             try registerConstants();
+            if (!@hasDecl(T, "onModuleStartup")) return;
             return T.onModuleStartup(self, module_type, module_no);
         }
 
@@ -95,8 +95,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             Allocator.mode = .persistent;
             defer {
                 CustomSingleton.deinit();
-                unregisterIniEntries(module_no);
                 unregisterConstants();
+                unregisterIniEntries(module_no);
             }
             if (!@hasDecl(T, "onModuleShutdown")) return;
             const self = CustomSingleton.get();
@@ -147,6 +147,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         }
 
         fn registerIniEntries(self: *T, module_no: c_int) !void {
+            if (ini_entries.len == 0) return;
             // initialize the ini entries after we have create the singleton
             var arena: std.heap.ArenaAllocator = .init(php.allocator);
             defer arena.deinit();
@@ -161,12 +162,15 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                 } else @compileError("Missing setter: " ++ getter_name);
                 ini_entries[index] = .init(allocator, self, options.name, getter_name, setter_name);
             }
+            // last entry is delimiter
+            ini_entries[ini_entries.len - 1] = std.mem.zeroes(IniEntryDef);
             if (pi.zend_register_ini_entries(@ptrCast(&ini_entries), module_no) != c.SUCCESS) {
                 return error.CannotRegisterIniEntries;
             }
         }
 
         fn unregisterIniEntries(module_no: c_int) void {
+            if (ini_entries.len == 0) return;
             pi.zend_unregister_ini_entries(module_no);
         }
 
@@ -214,7 +218,13 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                     .type => if (!isCustomClass(decl)) {
                         const len = get: {
                             switch (@typeInfo(decl)) {
-                                .@"struct" => |st| if (st.backing_integer != null) break :get st.field_names.len,
+                                .@"struct" => |st| if (st.backing_integer != null) {
+                                    var bool_count: usize = 0;
+                                    for (st.field_types) |FT| {
+                                        if (FT == bool) bool_count += 1;
+                                    }
+                                    break :get bool_count;
+                                },
                                 .@"enum" => |en| break :get en.field_names.len,
                                 else => {},
                             }
@@ -240,19 +250,30 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                         } else true;
                         const item_names, const item_values = switch (@typeInfo(decl)) {
                             .@"struct" => |st| get: {
-                                var values: [st.len]c_long = undefined;
-                                for (st.field_names, 0..) |field_name, i| {
-                                    if (st.field_types[i] != bool) {
-                                        @compileError("Only pack structs containing booleans can be exported");
-                                    }
-                                    values[i] = @intCast(i << @bitOffsetOf(decl, field_name));
+                                var bool_count: usize = 0;
+                                for (st.field_types) |FT| {
+                                    if (FT == bool) bool_count += 1;
                                 }
-                                break :get .{ st.field_names, values };
+                                var names: [bool_count][:0]const u8 = undefined;
+                                var values: [bool_count]c_long = undefined;
+                                var value_index: usize = 0;
+                                for (st.field_names, 0..) |field_name, i| {
+                                    if (st.field_types[i] == bool) {
+                                        names[value_index] = field_name;
+                                        values[value_index] = @intCast(1 << @bitOffsetOf(decl, field_name));
+                                        value_index += 1;
+                                    }
+                                }
+                                break :get .{ names, values };
                             },
                             .@"enum" => |en| get: {
+                                var names: [en.field_values.len][:0]const u8 = undefined;
                                 var values: [en.field_values.len]c_long = undefined;
-                                for (en.field_values, 0..) |v, i| values[i] = v;
-                                break :get .{ en.field_names, values };
+                                for (en.field_names, 0..) |field_name, i| {
+                                    names[i] = field_name;
+                                    values[i] = en.field_values[i];
+                                }
+                                break :get .{ names, values };
                             },
                             else => unreachable,
                         };
@@ -281,7 +302,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             break :init entries;
         };
         //  ini entries need to be var because their values are determined at runtime
-        var ini_entries: [getter_names.len]IniEntryDef = undefined;
+        const ini_count = if (getter_names.len > 0) getter_names.len + 1 else 0;
+        var ini_entries: [ini_count]IniEntryDef = undefined;
 
         entry: Module,
     };

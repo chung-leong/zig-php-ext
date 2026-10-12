@@ -16,6 +16,13 @@ pub fn value(self: *const @This()) Value {
     return .fromZval(self.impl.value);
 }
 
+pub fn find(n: *String) ?*@This() {
+    const eg = php.globals("executor");
+    const list: *Array = @ptrCast(eg.zend_constants);
+    const v = list.get(n) catch return null;
+    return v.getPointerOf(@This()) catch return null;
+}
+
 pub fn fromAny(n: *String, arg: anytype) @This() {
     var v: Value = .fromAny(arg);
     v.impl.u2.constant_flags = c.CONST_PERSISTENT;
