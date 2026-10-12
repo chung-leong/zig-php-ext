@@ -212,11 +212,14 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                 const decl = @field(T, prefix ++ export_name);
                 switch (@typeInfo(@TypeOf(decl))) {
                     .type => if (!isCustomClass(decl)) {
-                        const len = switch (@typeInfo(T)) {
-                            .@"struct" => |st| if (st.backing_integer) st.field_names.len else null,
-                            .@"enum" => |en| en.field_names.len,
-                            else => null,
-                        } orelse @compileError("Expected enum or packed struct, received: " ++ @typeName(T));
+                        const len = get: {
+                            switch (@typeInfo(decl)) {
+                                .@"struct" => |st| if (st.backing_integer != null) break :get st.field_names.len,
+                                .@"enum" => |en| break :get en.field_names.len,
+                                else => {},
+                            }
+                            @compileError("Expected a custom class, enum, or packed struct, received: " ++ @typeName(decl));
+                        };
                         count += len;
                     },
                     else => {
@@ -247,21 +250,25 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                                 break :get .{ st.field_names, values };
                             },
                             .@"enum" => |en| get: {
-                                var values: [en.len]c_long = undefined;
+                                var values: [en.field_values.len]c_long = undefined;
                                 for (en.field_values, 0..) |v, i| values[i] = v;
                                 break :get .{ en.field_names, values };
                             },
                             else => unreachable,
                         };
                         for (item_names, 0..) |item_name, i| {
-                            const p_len = export_name.len;
-                            var constant_name: [p_len + item_name.len]u8 = undefined;
-                            @memcpy(constant_name[0..p_len], export_name);
-                            for (item_name, 0..) |ch, j| constant_name[p_len + j] = switch (use_uppercase) {
-                                true => std.ascii.tpUpper(ch),
-                                false => ch,
+                            const constant_name = create: {
+                                const p_len = export_name.len;
+                                var buffer: [p_len + 1 + item_name.len]u8 = undefined;
+                                @memcpy(buffer[0..p_len], export_name);
+                                buffer[p_len] = '_';
+                                for (item_name, 0..) |ch, j| buffer[p_len + 1 + j] = switch (use_uppercase) {
+                                    true => std.ascii.toUpper(ch),
+                                    false => ch,
+                                };
+                                break :create buffer;
                             };
-                            entries[index] = .fromAny(.static(constant_name), item_values[i]);
+                            entries[index] = .fromAny(.static(&constant_name), item_values[i]);
                             index += 1;
                         }
                     },
