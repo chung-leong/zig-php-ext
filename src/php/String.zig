@@ -102,15 +102,13 @@ pub fn allocPrint(comptime fmt: []const u8, args: anytype) *@This() {
         for (&bytes) |*ptr| ptr.* = ' ';
         break :init bytes;
     };
-    const bytes = std.fmt.allocPrintSentinel(offset_bytes ++ fmt, args, 0) catch unreachable;
+    const bytes = std.fmt.allocPrintSentinel(php_al, offset_bytes ++ fmt, args, 0) catch unreachable;
     const zs: *c.zend_string = @ptrCast(@alignCast(bytes.ptr));
     var type_info: u32 = c.GC_STRING;
     if (Allocator.mode == .persistent) type_info |= c.IS_STR_PERSISTENT;
-    zs.* = .{
-        .gc = .{ .refcount = 1, .u = .{ .type_info = type_info } },
-        .h = 0,
-        .len = @intCast(bytes.len),
-    };
+    zs.gc = .{ .refcount = 1, .u = .{ .type_info = type_info } };
+    zs.h = 0;
+    zs.len = @intCast(bytes.len - offset);
     return @ptrCast(zs);
 }
 

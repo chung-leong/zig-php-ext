@@ -8,5 +8,9 @@ pub const @"set x" = setter(@This(), .x);
 pub const @"get y" = getter(@This(), .y);
 pub const @"set y" = setter(@This(), .y);
 
+pub fn @"get normal"(self: *const @This()) f64 {
+    return @sqrt(self.x * self.x + self.y * self.y);
+}
+
 x: f64 = 0,
 y: f64 = 0,

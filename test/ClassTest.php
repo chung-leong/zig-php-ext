@@ -37,18 +37,27 @@ final class ClassTest extends ExtensionTestCase
         (
             [x] => 200
             [y] => 4000
+            [normal] => 4004.9968789002
         )
         Point Object
         (
             [x] => 123
             [y] => 0
+            [normal] => 123
         )
         Point Object
         (
             [x] => 123
             [y] => 456
+            [normal] => 472.29757568719
         )
         OUTPUT, implode("\n", $lines));
     }
 
+    public function testComputedProperty(): void
+    {
+        $lines = $this->runTest("classes", "computed.php");
+        $this->assertSame("normal = 5", $lines[0]);
+        $this->assertSame("template = Hi, \$name!", $lines[1]);
+    }
 }
