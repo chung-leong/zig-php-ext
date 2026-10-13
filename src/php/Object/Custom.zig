@@ -24,6 +24,74 @@ const WithoutError = php.util.WithoutError;
 const errable = php.util.errable;
 
 pub fn @"fn"(comptime T: type) type {
+    const getter_names = php.util.getterNames(T, .instance);
+    const setter_names = php.util.setterNames(T, .instance);
+    const method_names = php.util.methodNames(T, .instance);
+    const Methods = Object.MethodSet(method_names);
+    const ObjectLite = init: {
+        const st = @typeInfo(c.zend_object).@"struct";
+        const len = st.field_names.len;
+        const field_names = st.field_names[0 .. len - 1];
+        const field_types = st.field_types[0 .. len - 1];
+        const field_attrs = st.field_attrs[0 .. len - 1];
+        break :init @Struct(st.layout, null, field_names, field_types, field_attrs);
+    };
+    const init_fn = init: {
+        if (@hasDecl(T, "init")) {
+            const Init = @TypeOf(T.init);
+            const arg_count = php.util.argCount(Init);
+            const Arg0 = switch (arg_count) {
+                0 => struct {},
+                1 => php.util.ArgType(Init, 0),
+                else => void,
+            };
+            if (@typeInfo(Arg0) != .@"struct") {
+                @compileError("init() should accept a single struct as its sole argument");
+            }
+            break :init .{ .exists = true, .Args = Arg0, .uses_args = arg_count > 0 };
+        } else {
+            // use setters to initialize custom struct
+            const len = setter_names.len;
+            const prefix = php.util.setterPrefix(.instance);
+            var field_names: [len][:0]const u8 = undefined;
+            var field_types: [len]type = undefined;
+            var field_attrs: [len]std.lang.Type.Struct.FieldAttributes = undefined;
+            for (setter_names, 0..) |setter_name, i| {
+                const set = @field(T, prefix ++ setter_name);
+                const Arg = php.util.ArgType(@TypeOf(set), 1);
+                field_names[i] = setter_name;
+                field_types[i] = switch (@typeInfo(Arg)) {
+                    .optional => Arg,
+                    else => ?Arg,
+                };
+                field_attrs[i] = .{};
+            }
+            const Args = @Struct(.auto, null, &field_names, &field_types, &field_attrs);
+            break :init .{ .exists = false, .Args = Args };
+        }
+    };
+    const deinit_fn = init: {
+        if (@hasDecl(T, "deinit")) {
+            const Deinit = @TypeOf(T.deinit);
+            const arg_count = php.util.argCount(Deinit);
+            const Arg0 = switch (arg_count) {
+                0 => void,
+                else => php.util.ArgType(Deinit, 0),
+            };
+            if (@typeInfo(Arg0) != .pointer or @typeInfo(Arg0).pointer.child != T) {
+                @compileError("deinit() should accept a self pointer");
+            }
+            if (arg_count > 1) {
+                @compileError("deinit() should accept no argument");
+            }
+            if (php.util.ReturnType(Deinit) != void) {
+                @compileError("deinit() should return void");
+            }
+            break :init .{ .exists = true };
+        } else {
+            break :init .{ .exists = false };
+        }
+    };
     return struct {
         pub fn object(self: *@This()) *Object {
             return @ptrCast(&self.php_object);
@@ -40,13 +108,11 @@ pub fn @"fn"(comptime T: type) type {
             pi.zend_object_std_init(@ptrCast(&self.php_object), @ptrCast(class));
             // handlers need to be set after zend_object_std_init() due to change in PHP 8.3
             self.php_object.handlers = &handlers;
-            if (comptime !php.util.hasRequiredFields(T)) {
-                // use default values when there are no required fields
-                self.custom_struct = .{};
-            } else {
-                // __construct is required otherwise
-                if (!@hasDecl(T, "getConstructor") and comptime !Methods.has("__construct")) {
-                    @compileError("Object must have a constructor when it has fields without default value");
+            // custom
+            // set fields of custom struct to their default values (when available)
+            inline for (comptime std.meta.fieldNames(T)) |field_name| {
+                if (php.util.getFieldDefaultValue(T, field_name)) |def_value| {
+                    @field(self.custom_struct, field_name) = def_value;
                 }
             }
             return self;
@@ -122,6 +188,48 @@ pub fn @"fn"(comptime T: type) type {
             .doOperation = fn (u8, Value, Value) Value,
         };
 
+        fn construct(obj: *Object, args: init_fn.Args) !void {
+            const self: *@This() = @ptrCast(obj);
+            if (init_fn.exists) {
+                self.custom_struct = switch (init_fn.uses_args) {
+                    true => try errable(T.init(args)),
+                    false => try errable(T.init()),
+                };
+            } else {
+                self.custom_struct = .{};
+                const prefix = comptime php.util.setterPrefix(.instance);
+                inline for (setter_names) |setter_name| {
+                    const set = @field(T, prefix ++ setter_name);
+                    const arg = @field(args, setter_name);
+                    const Arg = php.util.ArgType(@TypeOf(set), 1);
+                    if (Arg == @TypeOf(arg)) {
+                        try errable(set(self.custom(), arg));
+                    } else {
+                        // field is not nullable: skip if argument is null
+                        if (arg) |value| try errable(set(self.custom(), value));
+                    }
+                }
+            }
+            self.flags.initialized = true;
+            return switch (@hasDecl(T, "finalizeObject")) {
+                true => T.finalizeObject(self.custom()),
+                false => {},
+            };
+        }
+
+        fn destruct(obj: *Object) void {
+            const self: *@This() = @ptrCast(obj);
+            switch (deinit_fn.exists) {
+                true => T.deinit(self.custom()),
+                false => {
+                    if (comptime php.util.hasPointer(T)) {
+                        // free memory allocated by setters
+                        php.util.freeAny(self.custom_struct);
+                    }
+                },
+            }
+        }
+
         /// free_obj should release any resources the object holds, without freeing the
         /// object structure itself. The object does not need to be in a valid state after
         /// free_obj finishes running.
@@ -137,20 +245,12 @@ pub fn @"fn"(comptime T: type) type {
 
         fn tryFreeObject(obj: *Object) !void {
             const self: *@This() = @ptrCast(obj);
-            if (comptime Methods.has("__destruct")) {
-                // TODO: don't call if __construct failed
-                const prefix = comptime php.util.methodPrefix(.instance);
-                const destruct = @field(T, prefix ++ "__destruct");
-                errable(destruct(self.custom(), .{})) catch |err| {
-                    failure.show(err);
-                };
-            } else {
-                if (comptime php.util.hasPointer(T)) {
-                    php.util.freeAny(self.custom_struct);
-                }
+            // perform standard destruction process unless custom constructor is used
+            if (!@hasDecl(T, "getConstructor")) {
+                defer if (self.flags.initialized) destruct(obj);
             }
             return switch (@hasDecl(T, "freeObject")) {
-                true => self.custom.freeObject(),
+                true => T.freeObject(self.custom()),
                 false => {},
             };
         }
@@ -485,16 +585,7 @@ pub fn @"fn"(comptime T: type) type {
             // TODO: use key for case insensitivity
             _ = key;
             const self: *@This() = @ptrCast(obj_ptr.*);
-            if (methods.find(name)) |fn_ptr| {
-                inline for (.{ "__construct", "__destruct" }) |intern_fn_name| {
-                    if (comptime Methods.has(intern_fn_name)) {
-                        const construct = comptime methods.get(intern_fn_name);
-                        if (construct == fn_ptr) return error.CannotInvokeConstructOrDestructDirectly;
-                    }
-                }
-                return fn_ptr;
-            }
-            return switch (@hasDecl(T, "getMethod")) {
+            return methods.find(name) orelse switch (@hasDecl(T, "getMethod")) {
                 true => T.getMethod(self.custom(), name),
                 false => error.UndefinedMethod,
             };
@@ -510,13 +601,9 @@ pub fn @"fn"(comptime T: type) type {
 
         fn tryGetConstructor(obj: *Object) !?*const Function {
             const self: *@This() = @ptrCast(obj);
-            // return __construct if it's there
-            if (comptime Methods.has("__construct")) {
-                return methods.get("__construct");
-            }
             return switch (@hasDecl(T, "getConstructor")) {
                 true => T.getConstructor(self.custom()),
-                false => &default_constructor,
+                false => &constructor,
             };
         }
 
@@ -667,18 +754,6 @@ pub fn @"fn"(comptime T: type) type {
             return if (@typeInfo(PT) == .optional) set(self.custom(), null) else error.InvalidOperation;
         }
 
-        const getter_names = php.util.getterNames(T, .instance);
-        const setter_names = php.util.setterNames(T, .instance);
-        const method_names = php.util.methodNames(T, .instance);
-        const Methods = Object.MethodSet(method_names);
-        const ObjectLite = init: {
-            const st = @typeInfo(c.zend_object).@"struct";
-            const len = st.field_names.len;
-            const field_names = st.field_names[0 .. len - 1];
-            const field_types = st.field_types[0 .. len - 1];
-            const field_attrs = st.field_attrs[0 .. len - 1];
-            break :init @Struct(st.layout, null, field_names, field_types, field_attrs);
-        };
         const methods: Methods = .fromType(T, php.util.methodPrefix(.instance));
         const handlers: Object.Handlers = .{
             .free_obj = @ptrCast(&freeObject),
@@ -705,47 +780,17 @@ pub fn @"fn"(comptime T: type) type {
             .do_operation = @ptrCast(&doOperation),
             .compare = @ptrCast(&compareWith),
         };
-        const default_constructor = init: {
-            if (@hasDecl(T, "getConstructor") or Methods.has("__construct")) {
-                break :init {};
-            }
-            const len = setter_names.len;
-            const prefix = php.util.setterPrefix(.instance);
-            var field_names: [len][:0]const u8 = undefined;
-            var field_types: [len]type = undefined;
-            var field_attrs: [len]std.lang.Type.Struct.FieldAttributes = undefined;
-            for (setter_names, 0..) |setter_name, i| {
-                const set = @field(T, prefix ++ setter_name);
-                const Arg = php.util.ArgType(@TypeOf(set), 1);
-                field_names[i] = setter_name;
-                field_types[i] = switch (@typeInfo(Arg)) {
-                    .optional => Arg,
-                    else => ?Arg,
-                };
-                field_attrs[i] = .{};
-            }
-            const Args = @Struct(.auto, null, &field_names, &field_types, &field_attrs);
-            const ns = struct {
-                pub fn construct(self: *T, args: Args) !void {
-                    inline for (setter_names) |setter_name| {
-                        const set = @field(T, prefix ++ setter_name);
-                        const arg = @field(args, setter_name);
-                        const Arg = php.util.ArgType(@TypeOf(set), 1);
-                        if (Arg == @TypeOf(arg)) {
-                            try errable(set(self, arg));
-                        } else {
-                            // field is not nullable: skip if argument is null
-                            if (arg) |value| try errable(set(self, value));
-                        }
-                    }
-                }
-            };
-            const entry: Function = .fromHandler(ns.construct, .{ .this_object = T });
-            break :init entry;
+        const constructor = switch (@hasDecl(T, "getConstructor")) {
+            true => {},
+            false => Function.fromHandler(construct, .{ .this_object = Object }),
         };
 
         php_object: ObjectLite align(@max(@alignOf(ObjectLite), @alignOf(T))),
         custom_struct: T,
+        flags: switch (@hasDecl(T, "getConstructor")) {
+            true => void,
+            false => packed struct { initialized: bool },
+        },
 
         comptime {
             if (@offsetOf(@This(), "php_object") != 0) {

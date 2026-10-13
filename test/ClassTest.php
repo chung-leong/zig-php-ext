@@ -60,4 +60,17 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame("normal = 5", $lines[0]);
         $this->assertSame("template = Hi, \$name!", $lines[1]);
     }
+
+    public function testConstructor(): void
+    {
+        $lines = $this->runTest("classes", "constructor.php");
+        $this->assertSame(<<<OUTPUT
+        finalized => 0
+        finalized => 3
+        Cat (.pet)
+        Martin (.wild)
+        Croissant (.wild)
+        OUTPUT, implode("\n", $lines));
+    }
+
 }

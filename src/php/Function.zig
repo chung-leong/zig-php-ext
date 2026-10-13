@@ -186,9 +186,11 @@ pub fn zendInternalFunction(comptime func: anytype, comptime self_src: SelfSourc
             const arg0 = switch (self_src) {
                 .singleton => |T| Singleton(T).get(),
                 .this_object => |T| get: {
-                    // self is a custom object
                     const obj = iter.this.getObject() catch |err| return failure.throw(err);
-                    break :get obj.toCustom(Object.Custom(T));
+                    break :get switch (T) {
+                        Object => obj, // self is a standard object
+                        else => obj.toCustom(Object.Custom(T)), // self is a custom object
+                    };
                 },
                 .this_pointer => |T| get: {
                     // self is some data structure that we reference by a pointer
