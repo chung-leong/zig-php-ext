@@ -52,7 +52,7 @@ pub fn createClosure(self: *const @This(), scope: ?*Class, called_scope: ?*Class
 
 pub fn fromHandler(comptime func: anytype, comptime self_src: SelfSource) @This() {
     const handler_info = comptime handlerInfo(func, self_src);
-    const arg_info = emptyArgInfo(handler_info.arguments.len, handler_info.is_variadic);
+    const arg_info = argInfo(handler_info);
     const flags = c.ZEND_ACC_PUBLIC | switch (handler_info.is_variadic) {
         true => c.ZEND_ACC_VARIADIC,
         false => 0,
@@ -71,6 +71,23 @@ pub fn fromHandler(comptime func: anytype, comptime self_src: SelfSource) @This(
             },
         },
     };
+}
+
+fn argInfo(comptime info: HandlerInfo) []const c.zend_internal_arg_info {
+    const len = info.arguments.len + if (info.is_variadic) 1 else 0;
+    const array = init: {
+        var buffer: [len]c.zend_internal_arg_info = undefined;
+        for (info.arguments, 0..) |arg, i| {
+            buffer[i] = .{
+                .name = switch (c.zend_internal_function == c.zend_arg_info) {
+                    true => String.static(arg.name), // 8.6
+                    false => arg.name,
+                },
+            };
+        }
+        break :init buffer;
+    };
+    return &array;
 }
 
 pub fn handlerType(comptime F: type, comptime self_src: SelfSource) HandlerType {
@@ -249,29 +266,6 @@ pub const SelfSource = union(enum) {
         };
     }
 };
-
-fn emptyArgInfo(comptime count: usize, comptime is_variadic: bool) []const c.zend_internal_arg_info {
-    const len = count + if (is_variadic) 1 else 0;
-    const rem = @rem(len, 8);
-    if (rem > 0) {
-        // reuse the same list if the number of arguments is less than 8
-        const larger = emptyArgInfo(len + (8 - rem), false);
-        return larger[0..len];
-    } else {
-        const ns = struct {
-            const array = init: {
-                var buffer: [len]c.zend_internal_arg_info = undefined;
-                if (c.zend_internal_function == c.zend_arg_info) {
-                    for (&buffer) |*ptr| ptr.* = .{ .name = String.static("") }; // 8.6
-                } else {
-                    for (&buffer) |*ptr| ptr.* = .{ .name = "" };
-                }
-                break :init buffer;
-            };
-        };
-        return &ns.array;
-    }
-}
 
 const StdHandler = fn ([*c]c.zend_execute_data, [*c]c.zval) callconv(.c) void;
 const Handler = switch (builtin.target.os.tag) {

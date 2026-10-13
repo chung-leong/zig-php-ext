@@ -28,4 +28,27 @@ final class ClassTest extends ExtensionTestCase
         )
         OUTPUT, implode("\n", $lines));
     }
+
+    public function testDefaultConstructor(): void
+    {
+        $lines = $this->runTest("classes", "def-constructor.php");
+        $this->assertSame(<<<OUTPUT
+        Point Object
+        (
+            [x] => 200
+            [y] => 4000
+        )
+        Point Object
+        (
+            [x] => 123
+            [y] => 0
+        )
+        Point Object
+        (
+            [x] => 123
+            [y] => 456
+        )
+        OUTPUT, implode("\n", $lines));
+    }
+
 }

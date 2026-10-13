@@ -52,7 +52,7 @@ pub fn @"fn"(comptime names: anytype) type {
             const st = @typeInfo(Container).@"struct";
             for (st.field_names) |name| {
                 const func = @field(T, prefix ++ name);
-                @field(m, name) = Function.fromHandler(func, .{ .this_object = T });
+                @field(m, name) = .fromHandler(func, .{ .this_object = T });
             }
             return .{ .entries = m };
         }

@@ -1,5 +1,3 @@
-const std = @import("std");
-
 const php = @import("php/root.zig");
 const getter = php.Object.getter;
 const setter = php.Object.setter;

@@ -485,7 +485,16 @@ pub fn @"fn"(comptime T: type) type {
             // TODO: use key for case insensitivity
             _ = key;
             const self: *@This() = @ptrCast(obj_ptr.*);
-            return methods.find(name) orelse switch (@hasDecl(T, "getMethod")) {
+            if (methods.find(name)) |fn_ptr| {
+                inline for (.{ "__construct", "__destruct" }) |intern_fn_name| {
+                    if (comptime Methods.has(intern_fn_name)) {
+                        const construct = comptime methods.get(intern_fn_name);
+                        if (construct == fn_ptr) return error.CannotInvokeConstructOrDestructDirectly;
+                    }
+                }
+                return fn_ptr;
+            }
+            return switch (@hasDecl(T, "getMethod")) {
                 true => T.getMethod(self.custom(), name),
                 false => error.UndefinedMethod,
             };
@@ -507,7 +516,7 @@ pub fn @"fn"(comptime T: type) type {
             }
             return switch (@hasDecl(T, "getConstructor")) {
                 true => T.getConstructor(self.custom()),
-                false => null,
+                false => &default_constructor,
             };
         }
 
@@ -637,20 +646,23 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         fn callGetter(self: *@This(), comptime prop_name: []const u8) !Value {
-            const get = @field(T, "get " ++ prop_name);
+            const prefix = comptime php.util.getterPrefix(.instance);
+            const get = @field(T, prefix ++ prop_name);
             const payload = get(self.custom());
             return Value.fromAny(payload);
         }
 
         fn callSetter(self: *@This(), comptime prop_name: []const u8, value: *Value) !void {
-            const set = @field(T, "set " ++ prop_name);
+            const prefix = comptime php.util.setterPrefix(.instance);
+            const set = @field(T, prefix ++ prop_name);
             const PT = ArgType(@TypeOf(set), 1);
             const payload = try value.convertTo(PT);
             return set(self.custom(), payload);
         }
 
         fn callSetterWithNull(self: *@This(), comptime prop_name: []const u8) !void {
-            const set = @field(T, "set " ++ prop_name);
+            const prefix = comptime php.util.setterPrefix(.instance);
+            const set = @field(T, prefix ++ prop_name);
             const PT = ArgType(@TypeOf(set), 1);
             return if (@typeInfo(PT) == .optional) set(self.custom(), null) else error.InvalidOperation;
         }
@@ -692,6 +704,44 @@ pub fn @"fn"(comptime T: type) type {
             .get_gc = @ptrCast(&getGarbageCollection),
             .do_operation = @ptrCast(&doOperation),
             .compare = @ptrCast(&compareWith),
+        };
+        const default_constructor = init: {
+            if (@hasDecl(T, "getConstructor") or Methods.has("__construct")) {
+                break :init {};
+            }
+            const len = setter_names.len;
+            const prefix = php.util.setterPrefix(.instance);
+            var field_names: [len][:0]const u8 = undefined;
+            var field_types: [len]type = undefined;
+            var field_attrs: [len]std.lang.Type.Struct.FieldAttributes = undefined;
+            for (setter_names, 0..) |setter_name, i| {
+                const set = @field(T, prefix ++ setter_name);
+                const Arg = php.util.ArgType(@TypeOf(set), 1);
+                field_names[i] = setter_name;
+                field_types[i] = switch (@typeInfo(Arg)) {
+                    .optional => Arg,
+                    else => ?Arg,
+                };
+                field_attrs[i] = .{};
+            }
+            const Args = @Struct(.auto, null, &field_names, &field_types, &field_attrs);
+            const ns = struct {
+                pub fn construct(self: *T, args: Args) !void {
+                    inline for (setter_names) |setter_name| {
+                        const set = @field(T, prefix ++ setter_name);
+                        const arg = @field(args, setter_name);
+                        const Arg = php.util.ArgType(@TypeOf(set), 1);
+                        if (Arg == @TypeOf(arg)) {
+                            try errable(set(self, arg));
+                        } else {
+                            // field is not nullable: skip if argument is null
+                            if (arg) |value| try errable(set(self, value));
+                        }
+                    }
+                }
+            };
+            const entry: Function = .fromHandler(ns.construct, .{ .this_object = T });
+            break :init entry;
         };
 
         php_object: ObjectLite align(@max(@alignOf(ObjectLite), @alignOf(T))),
