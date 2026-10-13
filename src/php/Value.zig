@@ -324,7 +324,6 @@ pub fn cast(self: *const @This(), comptime desired_kind: Kind) @This() {
 }
 
 pub fn convertTo(self: *const @This(), comptime T: type) !T {
-    if (T == @This()) return self.*;
     return switch (@typeInfo(T)) {
         .bool => try self.getBoolean(),
         .int => |int| get: {
@@ -340,6 +339,7 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
             break :get @floatCast(float_value);
         },
         .@"enum" => try self.getEnum(T),
+        .optional => |opt| if (self.isNull()) null else try self.convertTo(opt.child),
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
                 String => try self.getString(),
@@ -361,8 +361,12 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
             },
             else => unsupported(T),
         },
-        .optional => |opt| if (self.isNull()) null else try self.convertTo(opt.child),
+        .array, .vector => get: {
+            const list = try self.getList();
+            break :get list.extract(T);
+        },
         .@"struct" => switch (T) {
+            @This() => self.*,
             Callable => try self.getCallable(),
             else => try self.getStruct(T),
         },
@@ -376,56 +380,54 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
                 false => @compileError("Union must be tagged"),
             },
         },
-        .array, .vector => get: {
-            const list = try self.getList();
-            break :get list.extract(T);
-        },
         else => unsupported(T),
     };
 }
 
-pub fn freeAny(arg: anytype) void {
+pub fn freeConverted(arg: anytype) void {
     const T = @TypeOf(arg);
-    if (T == @This()) return;
     return switch (@typeInfo(T)) {
-        .error_union => if (arg) |payload| freeAny(payload) else |_| {},
+        .optional => if (arg) |payload| freeConverted(payload),
+        .error_union => if (arg) |payload| freeConverted(payload) else |_| {},
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
-                String, Array, Object, Resource, Stream, Reference => {},
+                Array, Object, Reference, Resource, Stream, String => {},
                 else => {
-                    freeAny(arg.*);
+                    freeConverted(arg.*);
                     php_al.destroy(arg);
                 },
             },
             .slice => switch (pt.child) {
                 u8 => {},
                 else => {
-                    for (arg) |element| freeAny(element);
+                    for (arg) |element| freeConverted(element);
                     php_al.free(arg);
                 },
             },
             else => {},
         },
-        .optional => if (arg) |payload| freeAny(payload),
-        .@"struct" => |st| if (st.backing_integer == null) {
-            inline for (st.field_names, 0..) |field_name, i| {
-                const value = @field(arg, field_name);
-                const freeing = if (st.field_attrs[i].default_value_ptr) |opaque_ptr| check: {
-                    const FT = st.field_types[i];
-                    const value_ptr: *const FT = @ptrCast(@alignCast(opaque_ptr));
-                    const default_value = value_ptr.*;
-                    break :check !std.meta.eql(value, default_value);
-                } else true;
-                if (freeing) {
-                    freeAny(value);
+        .@"struct" => |st| switch (T) {
+            @This() => {},
+            else => if (st.backing_integer == null) {
+                inline for (st.field_names, 0..) |field_name, i| {
+                    const value = @field(arg, field_name);
+                    const freeing = if (st.field_attrs[i].default_value_ptr) |opaque_ptr| check: {
+                        const FT = st.field_types[i];
+                        const value_ptr: *const FT = @ptrCast(@alignCast(opaque_ptr));
+                        const default_value = value_ptr.*;
+                        break :check !std.meta.eql(value, default_value);
+                    } else true;
+                    if (freeing) {
+                        freeConverted(value);
+                    }
                 }
-            }
+            },
         },
         .@"union" => |un| switch (T) {
             Dictionary, List => {},
             else => switch (un.tag_type != null) {
                 true => switch (arg) {
-                    inline else => |payload| freeAny(payload),
+                    inline else => |payload| freeConverted(payload),
                 },
                 false => {},
             },

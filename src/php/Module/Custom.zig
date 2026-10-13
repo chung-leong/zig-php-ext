@@ -6,11 +6,12 @@ const pi = php.imports;
 const Allocator = php.Allocator;
 const Class = php.Class;
 const Constant = php.Constant;
+const errable = php.util.errable;
 const Function = php.Function;
 const failure = php.failure;
 const Module = php.Module;
 const Singleton = php.Singleton;
-const errable = php.util.errable;
+const String = php.String;
 const Dependency = php.Module.Dependency;
 const FunctionEntry = @import("Custom/FunctionEntry.zig");
 const IniEntryDef = @import("Custom/IniEntryDef.zig");
@@ -44,7 +45,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                         break :init &deps;
                     } else null,
                     .name = options.name.ptr,
-                    .functions = @ptrCast(&function_entries),
+                    .functions = @ptrCast(&functions),
                     .module_startup_func = @ptrCast(&onModuleStartup),
                     .module_shutdown_func = @ptrCast(&onModuleShutdown),
                     .request_startup_func = @ptrCast(&onRequestStartup),
@@ -78,6 +79,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             const self = CustomSingleton.get();
             try registerIniEntries(self, module_no);
             try registerConstants();
+            try registerClasses();
             if (!@hasDecl(T, "onModuleStartup")) return;
             return T.onModuleStartup(self, module_type, module_no);
         }
@@ -95,6 +97,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             Allocator.mode = .persistent;
             defer {
                 CustomSingleton.deinit();
+                unregisterClasses();
                 unregisterConstants();
                 unregisterIniEntries(module_no);
             }
@@ -174,6 +177,19 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             pi.zend_unregister_ini_entries(module_no);
         }
 
+        fn registerClasses() !void {
+            inline for (class_names) |class_name| {
+                @field(classes, class_name) = .init(String.static(class_name), null);
+                try @field(classes, class_name).register();
+            }
+        }
+
+        fn unregisterClasses() void {
+            inline for (class_names) |class_name| {
+                @field(classes, class_name).unregister();
+            }
+        }
+
         fn registerConstants() !void {
             for (&constants) |*ptr| try ptr.register();
         }
@@ -184,7 +200,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
 
         fn isCustomClass(comptime Decl: type) bool {
             return switch (@typeInfo(Decl)) {
-                .@"struct" => @hasField(Decl, "class") and @FieldType(Decl, "class") == Class,
+                .@"struct" => @hasField(Decl, "class_entry") and @FieldType(Decl, "class_entry") == Class,
                 else => false,
             };
         }
@@ -195,7 +211,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         const setter_names = php.util.setterNames(T, .instance);
         const method_names = php.util.methodNames(T, .instance);
         const export_names = php.util.exportNames(T);
-        const function_entries = init: {
+        const functions = init: {
             // create entries for them (extra entry for sentinel)
             var entries: [method_names.len + 1]FunctionEntry = undefined;
             var i: usize = 0;
@@ -207,6 +223,46 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             // list is terminated by an empty entry
             entries[i] = std.mem.zeroes(FunctionEntry);
             break :init entries;
+        };
+        const class_names = init: {
+            // get count first
+            const prefix = php.util.exportPrefix();
+            var count: usize = 0;
+            for (export_names) |export_name| {
+                const decl = @field(T, prefix ++ export_name);
+                if (@typeInfo(@TypeOf(decl)) == .type) {
+                    if (isCustomClass(decl)) count += 1;
+                }
+            }
+            var names: [count][:0]const u8 = undefined;
+            var index: usize = 0;
+            for (export_names) |export_name| {
+                const decl = @field(T, prefix ++ export_name);
+                if (@typeInfo(@TypeOf(decl)) == .type) {
+                    if (isCustomClass(decl)) {
+                        names[index] = export_name;
+                        index += 1;
+                    }
+                }
+            }
+            break :init names;
+        };
+        // class need to be initialized at runtime since symbols exported by PHP like stdclass
+        // aren't know at comptime
+        var classes = init: {
+            const count = class_names.len;
+            var field_names: [count][:0]const u8 = undefined;
+            var field_types: [count]type = undefined;
+            var field_attributes: [count]std.lang.Type.Struct.FieldAttributes = undefined;
+            for (class_names, 0..) |class_name, index| {
+                const prefix = php.util.exportPrefix();
+                field_names[index] = class_name;
+                field_types[index] = @field(T, prefix ++ class_name);
+                field_attributes[index] = .{};
+            }
+            const Container = @Struct(.auto, null, &field_names, &field_types, &field_attributes);
+            const container: Container = undefined;
+            break :init container;
         };
         const constants = init: {
             // get count first
@@ -301,7 +357,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             }
             break :init entries;
         };
-        //  ini entries need to be var because their values are determined at runtime
+        // ini entries need to be var because their values are determined at runtime
         const ini_count = if (getter_names.len > 0) getter_names.len + 1 else 0;
         var ini_entries: [ini_count]IniEntryDef = undefined;
 

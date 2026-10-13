@@ -182,21 +182,56 @@ pub fn getProperties(self: *const @This()) *Array {
 
 pub fn toCustom(self: *const @This(), comptime C: type) *C.Custom {
     if (C == @This()) return @constCast(self);
-    std.debug.assert(self.class() == C.class());
     const custom_obj: *C = @ptrCast(@constCast(self));
-    return &custom_obj.custom;
+    return custom_obj.custom();
 }
 
 pub fn fromCustom(self: anytype) *@This() {
     const T = @TypeOf(self.*);
     const C = *Custom(T);
     const custom_obj: *C = @ptrCast(@constCast(self));
-    std.debug.assert(custom_obj.object.class() == C.class());
-    return &custom_obj.object;
+    return custom_obj.object();
 }
 
 pub fn standardHandlers() *const Handlers {
     return deref(&pi.std_object_handlers);
+}
+
+pub fn getter(comptime T: type, field: std.meta.FieldEnum(T)) RT: {
+    const field_name = @tagName(field);
+    const FT = @FieldType(T, field_name);
+    break :RT fn (*const T) FT;
+} {
+    const field_name = @tagName(field);
+    const FT = @FieldType(T, field_name);
+    const ns = struct {
+        fn @"fn"(self: *const T) FT {
+            return @field(self, field_name);
+        }
+    };
+    return ns.@"fn";
+}
+
+pub fn setter(comptime T: type, field: std.meta.FieldEnum(T)) RT: {
+    const field_name = @tagName(field);
+    const FT = @FieldType(T, field_name);
+    break :RT fn (*T, FT) void;
+} {
+    const field_name = @tagName(field);
+    const FT = @FieldType(T, field_name);
+    const ns = struct {
+        fn @"fn"(self: *T, value: FT) void {
+            if (php.util.hasPointer(T)) {
+                if (!php.util.fieldHasDefaultValue(self, field_name)) {
+                    php.util.freeAny(@field(self, field_name));
+                }
+                @field(self, field_name) = php.util.retainAny(value);
+            } else {
+                @field(self, field_name) = value;
+            }
+        }
+    };
+    return ns.@"fn";
 }
 
 pub const GarbageCollectionResult = struct {

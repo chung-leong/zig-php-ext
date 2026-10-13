@@ -25,61 +25,45 @@ const errable = php.util.errable;
 
 pub fn @"fn"(comptime T: type) type {
     return struct {
-        pub fn class() *Class {
-            return class_entry;
+        pub fn object(self: *@This()) *Object {
+            return @ptrCast(&self.php_object);
         }
 
         pub fn custom(self: *@This()) *T {
             return &self.custom_struct;
         }
 
-        pub fn registerClass(name: *String, parent_class: ?*Class) !void {
-            const custom_ce: *Class.Custom(T) = try .create(name, parent_class);
-            errdefer custom_ce.release();
-            try custom_ce.register();
-            class_entry = @ptrCast(custom_ce);
-        }
-
-        pub fn unregisterClass() void {
-            const custom_ce: *Class.Custom(T) = @ptrCast(class_entry);
-            custom_ce.unregister();
-            custom_ce.release();
-        }
-
-        pub fn create() !*@This() {
+        pub fn create(class: *Class) !*@This() {
             const self = try php_al.create(@This());
             errdefer php_al.destroy(self);
             // initialize the PHP portion
-            pi.zend_object_std_init(@ptrCast(&self.php_object), @ptrCast(class_entry));
+            pi.zend_object_std_init(@ptrCast(&self.php_object), @ptrCast(class));
             // handlers need to be set after zend_object_std_init() due to change in PHP 8.3
-            self.object.impl.handlers = &handlers;
-            // initialize the custom part
-            if (@hasDecl(T, "init")) {
-                const Init = @TypeOf(T.init);
-                const f = @typeInfo(Init).@"fn";
-                if (f.param_types.len != 0) @compileError("init() for custom object have not accept arguments");
-                if (WithoutError(f.return_type.?) != T) @compileError("init() for custom object should return an instance of itself");
-                self.custom = try errable(T.init());
+            self.php_object.handlers = &handlers;
+            if (comptime !php.util.hasRequiredFields(T)) {
+                // use default values when there are no required fields
+                self.custom_struct = .{};
             } else {
-                self.custom = .{};
+                // __construct is required otherwise
+                if (!@hasDecl(T, "getConstructor") and comptime !Methods.has("__construct")) {
+                    @compileError("Object must have a constructor when it has fields without default value");
+                }
             }
             return self;
         }
 
-        pub fn getIterator(object: *Object) ?*Object.Iterator {
-            if (!@hasDecl(T, "init")) {
-                failure.throw(error.IllegalOperation);
-                return null;
-            }
-            const self: *@This() = @ptrCast(object);
+        pub fn getIterator(obj: *Object) ?*Object.Iterator {
+            const self: *@This() = @ptrCast(obj);
+            // TODO: allow allocator
+            // TODO: make sure option struct has no required fields
             const iter = switch (@hasDecl(T, "iterate")) {
-                true => switch (argCount(@TypeOf(self.iterate()))) {
+                true => switch (argCount(@TypeOf(T.iterate))) {
                     1 => self.iterate(),
                     2 => self.iterate(.{}),
                     else => @compileError("iterate() should have at most 1 argument containing options"),
                 },
                 false => switch (has_iterator) {
-                    true => Object.Iterator.Properties(T, getter_names).init(object),
+                    true => Object.Iterator.Properties(T, getter_names).init(obj),
                     false => return null,
                 },
             };
@@ -138,52 +122,81 @@ pub fn @"fn"(comptime T: type) type {
             .doOperation = fn (u8, Value, Value) Value,
         };
 
-        fn freeObject(object: *Object) callconv(.c) void {
-            tryFreeObject(object) catch |err| {
+        /// free_obj should release any resources the object holds, without freeing the
+        /// object structure itself. The object does not need to be in a valid state after
+        /// free_obj finishes running.
+        ///
+        /// free_obj will always be invoked, even if the object leaks or a fatal error
+        /// occurs. However, during shutdown it may be called once the executor is no
+        /// longer active, in which case execution of user code may be skipped.
+        fn freeObject(obj: *Object) callconv(.c) void {
+            tryFreeObject(obj) catch |err| {
                 failure.throw(err);
             };
         }
 
-        fn tryFreeObject(object: *Object) !void {
-            const self: *@This() = @ptrCast(object);
+        fn tryFreeObject(obj: *Object) !void {
+            const self: *@This() = @ptrCast(obj);
+            if (comptime Methods.has("__destruct")) {
+                // TODO: don't call if __construct failed
+                const prefix = comptime php.util.methodPrefix(.instance);
+                const destruct = @field(T, prefix ++ "__destruct");
+                errable(destruct(self.custom(), .{})) catch |err| {
+                    failure.show(err);
+                };
+            }
             return switch (@hasDecl(T, "freeObject")) {
                 true => self.custom.freeObject(),
-                false => {},
+                false => {
+                    // use freeAny() when the custom
+                    if (php.util.hasPointer(T)) {
+                        php.util.freeAny(self.custom_struct);
+                    }
+                },
             };
         }
 
-        fn destroyObject(object: *Object) callconv(.c) void {
-            tryDestroyObject(object) catch |err| {
+        /// destroyObject is called before free_obj. The object must remain in a valid state
+        /// after destroyObject finishes running. Unlike freeObject, it is run prior to
+        /// deactivation of the executor during shutdown, which allows user code to run.
+        /// This handler is not guaranteed to be called (e.g. on fatal error), and as
+        /// such should not be used to release resources or deallocate memory. Furthermore,
+        /// releasing resources in this handler can break detection of memory leaks, as
+        /// cycles may be broken early.
+        ///
+        /// destroyObject should be used *only* to call user destruction hooks, such as __destruct.
+        fn destroyObject(obj: *Object) callconv(.c) void {
+            tryDestroyObject(obj) catch |err| {
                 failure.throw(err);
             };
         }
 
-        fn tryDestroyObject(object: *Object) !void {
-            const self: *@This() = @ptrCast(object);
+        fn tryDestroyObject(obj: *Object) !void {
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "destroyObject")) {
-                true => self.custom.destroyObject(),
+                true => T.destroyObject(self.custom()),
                 false => {},
             };
         }
 
-        fn cloneObject(object: *Object) callconv(.c) ?*Object {
-            return tryCloneObject(object) catch |err| {
+        fn cloneObject(obj: *Object) callconv(.c) ?*Object {
+            return tryCloneObject(obj) catch |err| {
                 failure.throw(err);
                 return null;
             };
         }
 
-        fn tryCloneObject(object: *Object) !?*Object {
-            const self: *@This() = @ptrCast(object);
+        fn tryCloneObject(obj: *Object) !?*Object {
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "cloneObject")) {
-                true => self.custom.cloneObject(),
+                true => T.cloneObject(self.custom()),
                 false => error.InvalidOperation,
             };
         }
 
         // Cast an object to some other type.
-        fn castObject(object: *Object, retval: *Value, zv_type: c_int) callconv(.c) c.zend_result {
-            if (tryCastObject(object, zv_type)) |value| {
+        fn castObject(obj: *Object, retval: *Value, zv_type: c_int) callconv(.c) c.zend_result {
+            if (tryCastObject(obj, zv_type)) |value| {
                 retval.* = value;
                 return c.SUCCESS;
             } else |err| {
@@ -192,71 +205,71 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        fn tryCastObject(object: *Object, zv_type: c_int) !Value {
-            const self: *@This() = @ptrCast(object);
+        fn tryCastObject(obj: *Object, zv_type: c_int) !Value {
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "castObject")) {
-                true => self.custom.castObject(.fromZvalType(zv_type)),
+                true => T.castObject(self.custom(), .fromZvalType(zv_type)),
                 false => error.InvalidOperation,
             };
         }
 
-        fn readProperty(object: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque, retval: *Value) callconv(.c) *Value {
-            if (tryReadProperty(object, name, access, cache_slot)) |value| {
+        fn readProperty(obj: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque, retval: *Value) callconv(.c) *Value {
+            if (tryReadProperty(obj, name, access, cache_slot)) |value| {
                 retval.* = value;
             } else |err| {
-                failure.throw(fieldError(name, .read, err));
+                failure.throw(fieldError(obj, name, .read, err));
                 retval.* = .fromNull();
             }
             return retval;
         }
 
-        fn tryReadProperty(object: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque) !Value {
-            const self: *@This() = @ptrCast(object);
+        fn tryReadProperty(obj: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque) !Value {
+            const self: *@This() = @ptrCast(obj);
             return inline for (getter_names) |n| {
                 if (name.matchSlice(n)) break self.callGetter(n);
             } else switch (@hasDecl(T, "readProperty")) {
                 true => switch (argCount(@TypeOf(self.custom.readProperty))) {
-                    4 => self.custom.readProperty(name, access, cache_slot),
-                    3 => self.custom.readProperty(name, access),
+                    4 => T.readProperty(self.custom(), name, access, cache_slot),
+                    3 => T.readProperty(self.custom(), name, access),
                     else => unreachable,
                 },
                 false => error.UndefinedProperty,
             };
         }
 
-        fn writeProperty(object: *Object, name: *String, value: *Value, cache_slot: [*]*anyopaque) callconv(.c) *Value {
-            tryWriteProperty(object, name, value, cache_slot) catch |err| {
-                failure.throw(fieldError(name, .write, err));
+        fn writeProperty(obj: *Object, name: *String, value: *Value, cache_slot: [*]*anyopaque) callconv(.c) *Value {
+            tryWriteProperty(obj, name, value, cache_slot) catch |err| {
+                failure.throw(fieldError(obj, name, .write, err));
             };
             return value;
         }
 
-        fn tryWriteProperty(object: *Object, name: *String, value: *Value, cache_slot: [*]*anyopaque) !void {
-            const self: *@This() = @ptrCast(object);
+        fn tryWriteProperty(obj: *Object, name: *String, value: *Value, cache_slot: [*]*anyopaque) !void {
+            const self: *@This() = @ptrCast(obj);
             return inline for (setter_names) |n| {
                 if (name.matchSlice(n)) break self.callSetter(n, value);
             } else switch (@hasDecl(T, "writeProperty")) {
-                true => switch (argCount(@TypeOf(self.custom.readProperty))) {
-                    4 => self.custom.writeProperty(name, value.*, cache_slot),
-                    3 => self.custom.writeProperty(name, value.*),
+                true => switch (argCount(@TypeOf(T.writeProperty))) {
+                    4 => T.writeProperty(self.custom(), name, value.*, cache_slot),
+                    3 => T.writeProperty(self.custom(), name, value.*),
                     else => unreachable,
                 },
                 false => error.UndefinedProperty,
             };
         }
 
-        fn hasProperty(object: *Object, name: *String, state: State, cache_slot: [*]*anyopaque) callconv(.c) c_int {
-            if (tryHasProperty(object, name, cache_slot)) |found| {
+        fn hasProperty(obj: *Object, name: *String, state: State, cache_slot: [*]*anyopaque) callconv(.c) c_int {
+            if (tryHasProperty(obj, name, cache_slot)) |found| {
                 if (found) {
                     if (state == .not_null or state == .not_false) {
-                        if (tryReadProperty(object, name, .isset, cache_slot)) |value| {
+                        if (tryReadProperty(obj, name, .isset, cache_slot)) |value| {
                             if (state == .not_false) {
                                 if (value.cast(.boolean).boolean() == false) return c.FAILURE;
                             } else {
                                 if (value.isNull()) return c.FAILURE;
                             }
                         } else |err| {
-                            failure.throw(fieldError(name, .isset, err));
+                            failure.throw(fieldError(obj, name, .isset, err));
                             return c.FAILURE;
                         }
                     }
@@ -265,47 +278,47 @@ pub fn @"fn"(comptime T: type) type {
                     return c.FAILURE;
                 }
             } else |err| {
-                failure.throw(fieldError(name, .isset, err));
+                failure.throw(fieldError(obj, name, .isset, err));
                 return c.FAILURE;
             }
         }
 
-        fn tryHasProperty(object: *Object, name: *String, cache_slot: [*]*anyopaque) !bool {
-            const self: *@This() = @ptrCast(object);
+        fn tryHasProperty(obj: *Object, name: *String, cache_slot: [*]*anyopaque) !bool {
+            const self: *@This() = @ptrCast(obj);
             return inline for (setter_names) |n| {
                 if (name.matchSlice(n)) break true;
             } else switch (@hasDecl(T, "unsetProperty")) {
                 true => switch (argCount(@TypeOf(self.custom.hasProperty))) {
-                    3 => self.custom.hasProperty(name, cache_slot),
-                    2 => self.custom.hasProperty(name),
+                    3 => T.hasProperty(self.custom(), name, cache_slot),
+                    2 => T.hasProperty(self.custom(), name),
                     else => unreachable,
                 },
                 false => false,
             };
         }
 
-        fn unsetProperty(object: *Object, name: *String, cache_slot: [*]*anyopaque) callconv(.c) void {
-            return tryUnsetProperty(object, name, cache_slot) catch |err| {
-                failure.throw(fieldError(name, .unset, err));
+        fn unsetProperty(obj: *Object, name: *String, cache_slot: [*]*anyopaque) callconv(.c) void {
+            return tryUnsetProperty(obj, name, cache_slot) catch |err| {
+                failure.throw(fieldError(obj, name, .unset, err));
             };
         }
 
-        fn tryUnsetProperty(object: *Object, name: *String, cache_slot: [*]*anyopaque) !void {
-            const self: *@This() = @ptrCast(object);
+        fn tryUnsetProperty(obj: *Object, name: *String, cache_slot: [*]*anyopaque) !void {
+            const self: *@This() = @ptrCast(obj);
             return inline for (setter_names) |n| {
                 if (name.matchSlice(n)) break self.callSetterWithNull(n);
             } else switch (@hasDecl(T, "unsetProperty")) {
                 true => switch (argCount()) {
-                    3 => self.custom.unsetProperty(name, cache_slot),
-                    2 => self.custom.unsetProperty(name),
+                    3 => T.unsetProperty(self.custom(), name, cache_slot),
+                    2 => T.unsetProperty(self.custom(), name),
                     else => unreachable,
                 },
                 false => error.UndefinedProperty,
             };
         }
 
-        fn getProperties(object: *Object) callconv(.c) ?*Array {
-            const result = tryGetPropertiesFor(object, .default) catch |err| {
+        fn getProperties(obj: *Object) callconv(.c) ?*Array {
+            const result = tryGetPropertiesFor(obj, .default) catch |err| {
                 failure.throw(err);
                 return null;
             };
@@ -314,15 +327,15 @@ pub fn @"fn"(comptime T: type) type {
             return result;
         }
 
-        fn getPropertiesFor(object: *Object, purpose: PropertiesPurpose) callconv(.c) ?*Array {
-            return tryGetPropertiesFor(object, purpose) catch |err| {
+        fn getPropertiesFor(obj: *Object, purpose: PropertiesPurpose) callconv(.c) ?*Array {
+            return tryGetPropertiesFor(obj, purpose) catch |err| {
                 failure.throw(err);
                 return null;
             };
         }
 
-        fn tryGetPropertiesFor(object: *Object, purpose: PropertiesPurpose) !?*Array {
-            const self: *@This() = @ptrCast(object);
+        fn tryGetPropertiesFor(obj: *Object, purpose: PropertiesPurpose) !?*Array {
+            const self: *@This() = @ptrCast(obj);
             const Self = @This();
             const from = struct {
                 pub fn getters(s: *Self) !?*Array {
@@ -363,24 +376,24 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        fn getPropertyPointer(object: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque) callconv(.c) ?*Value {
-            return tryGetPropertyPointer(object, name, access, cache_slot) catch |err| {
+        fn getPropertyPointer(obj: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque) callconv(.c) ?*Value {
+            return tryGetPropertyPointer(obj, name, access, cache_slot) catch |err| {
                 failure.throw(err);
                 return null;
             };
         }
 
-        fn tryGetPropertyPointer(object: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque) !?*Value {
+        fn tryGetPropertyPointer(obj: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque) !?*Value {
             _ = cache_slot;
-            const self: *@This() = @ptrCast(object);
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "getPropertyPointer")) {
-                true => self.custom.getPropertyPointer(name, access),
+                true => T.getPropertyPointer(self.custom(), name, access),
                 false => error.InvalidOperation,
             };
         }
 
-        fn readDimension(object: *Object, offset: *Value, access: Value.Access, retval: *Value) callconv(.c) *Value {
-            if (tryReadDimension(object, offset, access)) |value| {
+        fn readDimension(obj: *Object, offset: *Value, access: Value.Access, retval: *Value) callconv(.c) *Value {
+            if (tryReadDimension(obj, offset, access)) |value| {
                 retval.* = value;
             } else |err| {
                 failure.throw(err);
@@ -389,30 +402,30 @@ pub fn @"fn"(comptime T: type) type {
             return retval;
         }
 
-        fn tryReadDimension(object: *Object, offset: *Value, access: Value.Access) !Value {
-            const self: *@This() = @ptrCast(object);
+        fn tryReadDimension(obj: *Object, offset: *Value, access: Value.Access) !Value {
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "readDimension")) {
-                true => self.custom.readDimension(offset.*, access),
+                true => T.readDimension(self.custom(), offset.*, access),
                 false => error.InvalidOperation,
             };
         }
 
-        fn writeDimension(object: *Object, offset: *Value, value: *Value) callconv(.c) void {
-            tryWriteDimension(object, offset, value) catch |err| {
+        fn writeDimension(obj: *Object, offset: *Value, value: *Value) callconv(.c) void {
+            tryWriteDimension(obj, offset, value) catch |err| {
                 failure.throw(err);
             };
         }
 
-        fn tryWriteDimension(object: *Object, offset: *Value, value: *Value) !void {
-            const self: *@This() = @ptrCast(object);
+        fn tryWriteDimension(obj: *Object, offset: *Value, value: *Value) !void {
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "writeDimension")) {
-                true => self.custom.writeDimension(offset.*, value.*),
+                true => T.writeDimension(self.custom(), offset.*, value.*),
                 false => error.InvalidOperation,
             };
         }
 
-        fn hasDimension(object: *Object, offset: *Value, check_empty: c_int) callconv(.c) c_int {
-            if (tryHasDimension(object, offset, check_empty)) |state| {
+        fn hasDimension(obj: *Object, offset: *Value, check_empty: c_int) callconv(.c) c_int {
+            if (tryHasDimension(obj, offset, check_empty)) |state| {
                 return if (state) 1 else 0;
             } else |err| {
                 failure.throw(err);
@@ -420,30 +433,30 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        fn tryHasDimension(object: *Object, offset: *Value, check_empty: c_int) !bool {
-            const self: *@This() = @ptrCast(object);
+        fn tryHasDimension(obj: *Object, offset: *Value, check_empty: c_int) !bool {
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "hasDimension")) {
-                true => self.custom.hasDimension(offset.*, check_empty != 0),
+                true => T.hasDimension(self.custom(), offset.*, check_empty != 0),
                 false => error.InvalidOperation,
             };
         }
 
-        fn unsetDimension(object: *Object, offset: *Value) callconv(.c) void {
-            tryUnsetDimension(object, offset) catch |err| {
+        fn unsetDimension(obj: *Object, offset: *Value) callconv(.c) void {
+            tryUnsetDimension(obj, offset) catch |err| {
                 failure.throw(err);
             };
         }
 
-        fn tryUnsetDimension(object: *Object, offset: *Value) !void {
-            const self: *@This() = @ptrCast(object);
+        fn tryUnsetDimension(obj: *Object, offset: *Value) !void {
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "unsetDimension")) {
-                true => self.custom.unsetDimension(offset),
+                true => T.unsetDimension(self.custom(), offset),
                 false => error.InvalidOperation,
             };
         }
 
-        fn countElements(object: *Object, count: *c_long) c.zend_result {
-            if (tryCountElements(object)) |num| {
+        fn countElements(obj: *Object, count: *c_long) c.zend_result {
+            if (tryCountElements(obj)) |num| {
                 count.* = @intCast(num);
                 return c.SUCCESS;
             } else |err| {
@@ -452,78 +465,86 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        fn tryCountElements(object: *Object) !usize {
-            const self: *@This() = @ptrCast(object);
+        fn tryCountElements(obj: *Object) !usize {
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "countElements")) {
-                true => self.custom.countElements(),
+                true => T.countElements(self.custom()),
                 false => error.InvalidOperation,
             };
         }
 
         /// Get method
-        fn getMethod(object_ptr: **Object, name: *String, key: *Value) callconv(.c) ?*const Function {
-            return tryGetMethod(object_ptr, name, key) catch |err| {
+        fn getMethod(obj_ptr: **Object, name: *String, key: *Value) callconv(.c) ?*const Function {
+            return tryGetMethod(obj_ptr, name, key) catch |err| {
                 failure.throw(err);
                 return null;
             };
         }
 
-        fn tryGetMethod(object_ptr: **Object, name: *String, key: *Value) !?*const Function {
+        fn tryGetMethod(obj_ptr: **Object, name: *String, key: *Value) !?*const Function {
             // TODO: use key for case insensitivity
             _ = key;
-            const self: *@This() = @ptrCast(object_ptr.*);
+            const self: *@This() = @ptrCast(obj_ptr.*);
             return methods.find(name) orelse switch (@hasDecl(T, "getMethod")) {
-                true => self.custom.getMethod(name),
+                true => T.getMethod(self.custom(), name),
                 false => error.UndefinedMethod,
             };
         }
 
         /// Get constructor
-        fn getConstructor(object: *Object) callconv(.c) ?*const Function {
-            return tryGetConstructor(object) catch |err| {
+        fn getConstructor(obj: *Object) callconv(.c) ?*const Function {
+            return tryGetConstructor(obj) catch |err| {
                 failure.throw(err);
                 return null;
             };
         }
 
-        fn tryGetConstructor(object: *Object) !?*const Function {
-            const self: *@This() = @ptrCast(object);
+        fn tryGetConstructor(obj: *Object) !?*const Function {
+            const self: *@This() = @ptrCast(obj);
+            // return __construct if it's there
+            if (comptime Methods.has("__construct")) {
+                return methods.get("__construct");
+            }
             return switch (@hasDecl(T, "getConstructor")) {
-                true => self.custom.getConstructor(),
+                true => T.getConstructor(self.custom()),
                 false => null,
             };
         }
 
         /// Get class name for display in var_dump and other debugging functions.
-        fn getClassName(object: *Object) callconv(.c) *String {
-            return tryGetClassName(object) catch |err| {
+        fn getClassName(obj: *Object) callconv(.c) *String {
+            return tryGetClassName(obj) catch |err| {
                 failure.throw(err);
                 return "(error)";
             };
         }
 
-        fn tryGetClassName(object: *Object) !*String {
-            const self: *@This() = @ptrCast(object);
+        fn tryGetClassName(obj: *Object) !*String {
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "getClassName")) {
-                true => self.custom.getClassName(),
-                false => class_entry.name(),
+                true => T.getClassName(self.custom()),
+                false => obj.class().name(),
             };
         }
 
         /// Compare object to value given
-        fn compareWith(value1: Value, value2: Value) c_int {
-            const object, const value, const multiplier: c_int = init: {
-                if (value1.kind() == .object) {
-                    const obj = value1.object();
-                    if (obj.isInstanceOf(class_entry)) break :init .{ obj, value2, 1 };
+        fn compareWith(value_ptr1: *Value, value_ptr2: *Value) callconv(.c) c_int {
+            const obj, const value, const multiplier: c_int = init: {
+                if (value_ptr1.kind() == .object) {
+                    const obj1 = value_ptr1.object();
+                    if (@intFromPtr(obj1.impl.handlers.*.compare) == @intFromPtr(&compareWith)) {
+                        break :init .{ obj1, value_ptr2.*, 1 };
+                    }
                 }
-                if (value2.kind() == .object) {
-                    const obj = value2.object();
-                    if (obj.isInstanceOf(class_entry)) break :init .{ obj, value1, -1 };
+                if (value_ptr2.kind() == .object) {
+                    const obj2 = value_ptr2.object();
+                    if (@intFromPtr(obj2.impl.handlers.*.compare) == @intFromPtr(&compareWith)) {
+                        break :init .{ obj2, value_ptr1.*, -1 };
+                    }
                 }
                 unreachable;
             };
-            if (tryCompareWith(object, value)) |result| {
+            if (tryCompareWith(obj, value)) |result| {
                 return result * multiplier;
             } else |err| {
                 failure.throw(err);
@@ -531,16 +552,16 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        fn tryCompareWith(object: *Object, value: Value) !c_int {
-            const self: *@This() = @ptrCast(object);
+        fn tryCompareWith(obj: *Object, value: Value) !c_int {
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "compareWith")) {
                 true => self.custom.compareWith(value),
                 false => error.IllegalOperation,
             };
         }
 
-        fn getClosure(object: *Object, class_ptr: *?*Class, func_ptr: *?*Function, obj_ptr: *?*Object, check_only: bool) callconv(.c) c.zend_result {
-            if (tryGetClosure(object, check_only)) |closure| {
+        fn getClosure(obj: *Object, class_ptr: *?*Class, func_ptr: *?*Function, obj_ptr: *?*Object, check_only: bool) callconv(.c) c.zend_result {
+            if (tryGetClosure(obj, check_only)) |closure| {
                 class_ptr.* = closure.class;
                 func_ptr.* = closure.function;
                 obj_ptr.* = closure.object;
@@ -551,16 +572,16 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        fn tryGetClosure(object: *Object, check_only: bool) !ClosureResult {
-            const self: *@This() = @ptrCast(object);
+        fn tryGetClosure(obj: *Object, check_only: bool) !ClosureResult {
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "getClosure")) {
                 true => self.custom.getClosure(check_only),
                 false => error.IllegalOperation,
             };
         }
 
-        fn getGarbageCollection(object: *Object, table: *?[*]const *Value, n: *c_int) callconv(.c) ?*const Array {
-            const gc = tryGetGarbageCollection(object) catch |err| get: {
+        fn getGarbageCollection(obj: *Object, table: *?[*]const *Value, n: *c_int) callconv(.c) ?*const Array {
+            const gc = tryGetGarbageCollection(obj) catch |err| get: {
                 failure.throw(err);
                 break :get .{};
             };
@@ -569,10 +590,10 @@ pub fn @"fn"(comptime T: type) type {
             return gc.array;
         }
 
-        fn tryGetGarbageCollection(object: *Object) !GarbageCollectionResult {
-            const self: *@This() = @ptrCast(object);
+        fn tryGetGarbageCollection(obj: *Object) !GarbageCollectionResult {
+            const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "getGarbageCollection")) {
-                true => self.custom.getGarbageCollection(&self.custom),
+                true => self.custom.getGarbageCollection(self.custom()),
                 false => GarbageCollectionResult{},
             };
         }
@@ -595,13 +616,13 @@ pub fn @"fn"(comptime T: type) type {
             };
         }
 
-        fn fieldError(name: *String, access: Value.Access, err: anytype) error{FailureReported} {
+        fn fieldError(obj: *Object, name: *String, access: Value.Access, err: anytype) error{FailureReported} {
             if (failure.match(err, error.FailureReported)) {
                 return error.FailureReported;
             } else if (failure.match(err, error.UndefinedProperty)) {
                 return failure.report("no field named '{s}' in {s}", .{
                     name.slice(),
-                    class_entry.name().slice(),
+                    obj.class().name().slice(),
                 });
             } else {
                 const message = failure.acquireMessage(err);
@@ -609,7 +630,7 @@ pub fn @"fn"(comptime T: type) type {
                 return failure.report("unable to {s} field '{s}' in {s}: {s}", .{
                     @tagName(access),
                     name.slice(),
-                    class_entry.name().slice(),
+                    obj.class().name().slice(),
                     message,
                 });
             }
@@ -617,21 +638,21 @@ pub fn @"fn"(comptime T: type) type {
 
         fn callGetter(self: *@This(), comptime prop_name: []const u8) !Value {
             const get = @field(T, "get " ++ prop_name);
-            const payload = get(&self.custom);
+            const payload = get(self.custom());
             return Value.fromAny(payload);
         }
 
         fn callSetter(self: *@This(), comptime prop_name: []const u8, value: *Value) !void {
             const set = @field(T, "set " ++ prop_name);
             const PT = ArgType(@TypeOf(set), 1);
-            const payload = value.convertTo(PT);
-            return set(&self.custom, payload);
+            const payload = try value.convertTo(PT);
+            return set(self.custom(), payload);
         }
 
         fn callSetterWithNull(self: *@This(), comptime prop_name: []const u8) !void {
             const set = @field(T, "set " ++ prop_name);
             const PT = ArgType(@TypeOf(set), 1);
-            return if (@typeInfo(PT) == .optional) set(&self.custom, null) else error.InvalidOperation;
+            return if (@typeInfo(PT) == .optional) set(self.custom(), null) else error.InvalidOperation;
         }
 
         const getter_names = php.util.getterNames(T, .instance);
@@ -672,9 +693,14 @@ pub fn @"fn"(comptime T: type) type {
             .do_operation = @ptrCast(&doOperation),
             .compare = @ptrCast(&compareWith),
         };
-        var class_entry: *Class = undefined;
 
-        php_object: ObjectLite align(@max(@alignOf(Object), @alignOf(T))),
+        php_object: ObjectLite align(@max(@alignOf(ObjectLite), @alignOf(T))),
         custom_struct: T,
+
+        comptime {
+            if (@offsetOf(@This(), "php_object") != 0) {
+                @compileError("php_object is in the wrong position");
+            }
+        }
     };
 }

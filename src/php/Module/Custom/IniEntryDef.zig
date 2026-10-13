@@ -2,20 +2,15 @@ const std = @import("std");
 
 const php = @import("../../root.zig");
 const c = php.c;
+const pi = php.imports;
 const Singleton = php.Singleton;
 const String = php.String;
 const Value = php.Value;
 const failure = php.failure;
-const pi = php.imports;
 const unsupported = failure.unsupported;
 const errable = php.util.errable;
 
-pub const Kind = enum(u8) {
-    user = c.ZEND_INI_USER,
-    per_dir = c.ZEND_INI_PERDIR,
-    system = c.ZEND_INI_SYSTEM,
-    all = c.ZEND_INI_ALL,
-};
+pub const Kind = php.IniEntry.Kind;
 
 pub fn init(allocator: std.mem.Allocator, container: anytype, comptime mod_name: [:0]const u8, comptime getter_name: [:0]const u8, comptime setter_name: [:0]const u8) @This() {
     const T = @TypeOf(container.*);

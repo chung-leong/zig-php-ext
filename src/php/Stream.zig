@@ -16,6 +16,14 @@ pub const Impl = c.php_stream;
 pub const Context = @import("Stream/Context.zig");
 pub const Wrapper = @import("Stream/Wrapper.zig");
 
+pub fn addRef(self: *const @This()) void {
+    self.resource().addRef();
+}
+
+pub fn release(self: *const @This()) void {
+    self.resource().release();
+}
+
 pub fn isStdIo(self: *const @This()) bool {
     const ops = c.get_stream_handlers(@ptrCast(self));
     return ops == deref(&pi.php_stream_stdio_ops);

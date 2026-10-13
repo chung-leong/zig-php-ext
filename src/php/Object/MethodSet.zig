@@ -29,6 +29,14 @@ pub fn @"fn"(comptime names: anytype) type {
         break :init .{ Container, CallCacheContainer, Name };
     };
     return struct {
+        pub fn has(comptime name: []const u8) bool {
+            return @hasField(Container, name);
+        }
+
+        pub fn get(self: *const @This(), comptime name: []const u8) *const Function {
+            return &@field(self.entries, name);
+        }
+
         pub fn find(self: *const @This(), name: *String) ?*const Function {
             return inline for (names) |n| {
                 const field_name = switch (@typeInfo(@TypeOf(n))) {

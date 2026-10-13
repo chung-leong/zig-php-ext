@@ -3,8 +3,8 @@ const std = @import("std");
 const php = @import("php/root.zig");
 const InfoTable = php.InfoTable;
 const Module = php.Module;
-const getter = php.util.getter;
-const setter = php.util.setter;
+const getter = php.IniEntry.getter;
+const setter = php.IniEntry.setter;
 
 pub const @"export SOME_CONSTANT" = "Hello world";
 pub const @"export SOME_ENUM" = enum { hello, world };

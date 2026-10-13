@@ -68,7 +68,7 @@ pub const @"union" = union(enum) {
             errdefer {
                 inline for (st.field_names, 0..) |field_name, i| {
                     if (i == failure_at) break;
-                    Value.freeAny(@field(s, field_name));
+                    Value.freeConverted(@field(s, field_name));
                 }
             }
             inline for (st.field_names, 0..) |field_name, i| {

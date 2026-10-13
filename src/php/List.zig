@@ -74,7 +74,7 @@ pub const @"union" = union(enum) {
                     errdefer {
                         for (0..ar.len) |i| {
                             if (i == failure_at) break;
-                            Value.freeAny(result[i]);
+                            Value.freeConverted(result[i]);
                         }
                     }
                     for (0..ar.len) |i| {
@@ -105,7 +105,7 @@ pub const @"union" = union(enum) {
                         errdefer {
                             for (0..len) |i| {
                                 if (i == failure_at) break;
-                                Value.freeAny(result[i]);
+                                Value.freeConverted(result[i]);
                             }
                         }
                         for (0..len) |i| {
