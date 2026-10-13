@@ -18,31 +18,31 @@ pub fn @"call greet"(self: *@This(), args: struct {
 pub const @"get greeting" = getter(@This(), .greeting);
 pub const @"set greeting" = setter(@This(), .greeting);
 
-pub fn onModuleStartup(self: *@This(), module_type: Module.Type, module_no: c_int) !void {
+pub fn moduleStartup(self: *@This(), module_type: Module.Type, module_no: c_int) !void {
     _ = self;
     _ = module_type;
     _ = module_no;
 }
 
-pub fn onModuleShutdown(self: *@This(), module_type: Module.Type, module_no: c_int) void {
+pub fn moduleShutdown(self: *@This(), module_type: Module.Type, module_no: c_int) void {
     _ = self;
     _ = module_type;
     _ = module_no;
 }
 
-pub fn onRequestStartup(self: *@This(), module_type: Module.Type, module_no: c_int) !void {
+pub fn requestStartup(self: *@This(), module_type: Module.Type, module_no: c_int) !void {
     _ = self;
     _ = module_type;
     _ = module_no;
 }
 
-pub fn onRequestShutdown(self: *@This(), module_type: Module.Type, module_no: c_int) void {
+pub fn requestShutdown(self: *@This(), module_type: Module.Type, module_no: c_int) void {
     _ = self;
     _ = module_type;
     _ = module_no;
 }
 
-pub fn onInfoRequest(self: *@This(), module: *Module) void {
+pub fn infoRequest(self: *@This(), module: *Module) void {
     _ = self;
     var tbl: InfoTable = .init();
     tbl.addTwoColumns("Version", module.version());

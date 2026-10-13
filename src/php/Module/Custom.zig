@@ -46,11 +46,11 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                     } else null,
                     .name = options.name.ptr,
                     .functions = @ptrCast(&functions),
-                    .module_startup_func = @ptrCast(&onModuleStartup),
-                    .module_shutdown_func = @ptrCast(&onModuleShutdown),
-                    .request_startup_func = @ptrCast(&onRequestStartup),
-                    .request_shutdown_func = @ptrCast(&onRequestShutdown),
-                    .info_func = @ptrCast(&onInfoRequest),
+                    .module_startup_func = @ptrCast(&moduleStartup),
+                    .module_shutdown_func = @ptrCast(&moduleShutdown),
+                    .request_startup_func = @ptrCast(&requestStartup),
+                    .request_shutdown_func = @ptrCast(&requestShutdown),
+                    .info_func = @ptrCast(&infoRequest),
                     .version = options.version.ptr,
                     .build_id = php.build_id,
                 }),
@@ -66,7 +66,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             @export(&export_ns.getModule, .{ .name = "get_module" });
         }
 
-        fn onModuleStartup(module_type: Module.Type, module_no: c_int) callconv(.c) c.zend_result {
+        fn moduleStartup(module_type: Module.Type, module_no: c_int) callconv(.c) c.zend_result {
             tryModuleStartup(module_type, module_no) catch |err| {
                 failure.show(err);
                 return c.FAILURE;
@@ -80,11 +80,11 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             try registerIniEntries(self, module_no);
             try registerConstants();
             try registerClasses();
-            if (!@hasDecl(T, "onModuleStartup")) return;
-            return T.onModuleStartup(self, module_type, module_no);
+            if (!@hasDecl(T, "moduleStartup")) return;
+            return T.moduleStartup(self, module_type, module_no);
         }
 
-        fn onModuleShutdown(module_type: Module.Type, module_no: c_int) callconv(.c) c.zend_result {
+        fn moduleShutdown(module_type: Module.Type, module_no: c_int) callconv(.c) c.zend_result {
             tryModuleShutdown(module_type, module_no) catch |err| {
                 failure.show(err);
                 return c.FAILURE;
@@ -101,12 +101,12 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                 unregisterConstants();
                 unregisterIniEntries(module_no);
             }
-            if (!@hasDecl(T, "onModuleShutdown")) return;
+            if (!@hasDecl(T, "moduleShutdown")) return;
             const self = CustomSingleton.get();
-            return T.onModuleShutdown(self, module_type, module_no);
+            return T.moduleShutdown(self, module_type, module_no);
         }
 
-        fn onRequestStartup(module_type: Module.Type, module_no: c_int) callconv(.c) c.zend_result {
+        fn requestStartup(module_type: Module.Type, module_no: c_int) callconv(.c) c.zend_result {
             tryRequestStartup(module_type, module_no) catch |err| {
                 failure.show(err);
                 return c.FAILURE;
@@ -116,12 +116,12 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
 
         fn tryRequestStartup(module_type: Module.Type, module_no: c_int) !void {
             Allocator.mode = .per_request;
-            if (!@hasDecl(T, "onRequestStartup")) return;
+            if (!@hasDecl(T, "requestStartup")) return;
             const self = CustomSingleton.get();
-            return T.onRequestStartup(self, module_type, module_no);
+            return T.requestStartup(self, module_type, module_no);
         }
 
-        fn onRequestShutdown(module_type: Module.Type, module_no: c_int) callconv(.c) c.zend_result {
+        fn requestShutdown(module_type: Module.Type, module_no: c_int) callconv(.c) c.zend_result {
             tryRequestShutdown(module_type, module_no) catch |err| {
                 failure.show(err);
                 return c.FAILURE;
@@ -131,12 +131,12 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
 
         fn tryRequestShutdown(module_type: Module.Type, module_no: c_int) !void {
             defer CustomSingleton.reset();
-            if (!@hasDecl(T, "onRequestShutdown")) return;
+            if (!@hasDecl(T, "requestShutdown")) return;
             const self = CustomSingleton.get();
-            return T.onRequestShutdown(self, module_type, module_no);
+            return T.requestShutdown(self, module_type, module_no);
         }
 
-        fn onInfoRequest(module: *Module) callconv(.c) void {
+        fn infoRequest(module: *Module) callconv(.c) void {
             tryInfoRequest(module) catch |err| {
                 failure.show(err);
             };
@@ -144,9 +144,9 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
 
         fn tryInfoRequest(module: *Module) !void {
             Allocator.mode = .per_request;
-            if (!@hasDecl(T, "onInfoRequest")) return;
+            if (!@hasDecl(T, "infoRequest")) return;
             const self = CustomSingleton.get();
-            return T.onInfoRequest(self, module);
+            return T.infoRequest(self, module);
         }
 
         fn registerIniEntries(self: *T, module_no: c_int) !void {
