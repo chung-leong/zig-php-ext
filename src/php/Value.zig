@@ -386,8 +386,11 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
 
 pub fn freeConverted(arg: anytype) void {
     const T = @TypeOf(arg);
+    if (comptime !php.util.hasPointer(T)) return;
     return switch (@typeInfo(T)) {
-        .optional => if (arg) |payload| freeConverted(payload),
+        .optional => {
+            if (arg) |payload| freeConverted(payload);
+        },
         .error_union => if (arg) |payload| freeConverted(payload) else |_| {},
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {

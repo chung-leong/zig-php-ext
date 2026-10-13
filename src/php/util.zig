@@ -98,7 +98,7 @@ pub fn fieldHasDefaultValue(arg: anytype, comptime field_name: []const u8) bool 
 
 pub fn retainAny(arg: anytype) @TypeOf(arg) {
     const T = @TypeOf(arg);
-    if (!hasPointer(T)) return arg;
+    if (comptime !php.util.hasPointer(T)) return arg;
     return switch (@typeInfo(T)) {
         .error_union => if (arg) |payload| retainAny(payload) else |err| err,
         .pointer => |pt| switch (pt.size) {
@@ -136,7 +136,7 @@ pub fn retainAny(arg: anytype) @TypeOf(arg) {
 
 pub fn freeAny(arg: anytype) void {
     const T = @TypeOf(arg);
-    if (!hasPointer(T)) return;
+    if (comptime !hasPointer(T)) return;
     return switch (@typeInfo(T)) {
         .error_union => if (arg) |payload| freeAny(payload) else |_| {},
         .pointer => |pt| switch (pt.size) {

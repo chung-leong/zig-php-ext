@@ -221,7 +221,7 @@ pub fn setter(comptime T: type, field: std.meta.FieldEnum(T)) RT: {
     const FT = @FieldType(T, field_name);
     const ns = struct {
         fn @"fn"(self: *T, value: FT) void {
-            if (php.util.hasPointer(T)) {
+            if (comptime php.util.hasPointer(T)) {
                 if (!php.util.fieldHasDefaultValue(self, field_name)) {
                     php.util.freeAny(@field(self, field_name));
                 }

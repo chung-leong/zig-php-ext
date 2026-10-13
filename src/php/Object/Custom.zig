@@ -144,15 +144,14 @@ pub fn @"fn"(comptime T: type) type {
                 errable(destruct(self.custom(), .{})) catch |err| {
                     failure.show(err);
                 };
+            } else {
+                if (comptime php.util.hasPointer(T)) {
+                    php.util.freeAny(self.custom_struct);
+                }
             }
             return switch (@hasDecl(T, "freeObject")) {
                 true => self.custom.freeObject(),
-                false => {
-                    // use freeAny() when the custom
-                    if (php.util.hasPointer(T)) {
-                        php.util.freeAny(self.custom_struct);
-                    }
-                },
+                false => {},
             };
         }
 
@@ -344,6 +343,7 @@ pub fn @"fn"(comptime T: type) type {
                             const list = Array.create();
                             inline for (getter_names) |n| {
                                 const result = try s.callGetter(n);
+                                defer result.release();
                                 list.set(String.static(n), result);
                             }
                             break :get list;
