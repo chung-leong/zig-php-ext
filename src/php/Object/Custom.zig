@@ -53,7 +53,7 @@ pub fn @"fn"(comptime T: type) type {
             // TODO: allow allocator
             // TODO: make sure option struct has no required fields
             const iter = switch (@hasDecl(T, "iterate")) {
-                true => switch (argCount(@TypeOf(T.iterate))) {
+                true => switch (comptime argCount(@TypeOf(T.iterate))) {
                     1 => self.iterate(),
                     2 => self.iterate(.{}),
                     else => @compileError("iterate() should have at most 1 argument containing options"),
@@ -132,13 +132,8 @@ pub fn @"fn"(comptime T: type) type {
                 inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
                     const set = @field(setters, setter_name);
                     const arg = @field(args, setter_name);
-                    const Arg = php.util.ArgType(@TypeOf(set), 1);
-                    if (Arg == @TypeOf(arg)) {
-                        try errable(set(self.custom(), arg));
-                    } else {
-                        // field is not nullable: skip if argument is null
-                        if (arg) |value| try errable(set(self.custom(), value));
-                    }
+                    // skip if argument is null (leaving default value intact)
+                    if (arg) |value| try errable(set(self.custom(), value));
                 }
             }
             self.flags.initialized = true;
@@ -247,7 +242,7 @@ pub fn @"fn"(comptime T: type) type {
             };
         }
 
-        fn readProperty(obj: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque, retval: *Value) callconv(.c) *Value {
+        fn readProperty(obj: *Object, name: *String, access: Access, cache_slot: ?[*]?*anyopaque, retval: *Value) callconv(.c) *Value {
             if (tryReadProperty(obj, name, access, cache_slot)) |value| {
                 retval.* = value;
             } else |err| {
@@ -257,46 +252,47 @@ pub fn @"fn"(comptime T: type) type {
             return retval;
         }
 
-        fn tryReadProperty(obj: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque) !Value {
+        fn tryReadProperty(obj: *Object, name: *String, access: Access, cache_slot: ?[*]?*anyopaque) !Value {
             const self: *@This() = @ptrCast(obj);
             return inline for (comptime std.meta.fieldNames(@TypeOf(getters))) |getter_name| {
                 if (name.matchSlice(getter_name)) break self.callGetter(getter_name);
             } else switch (@hasDecl(T, "readProperty")) {
-                true => switch (argCount(@TypeOf(self.custom.readProperty))) {
+                true => switch (comptime argCount(@TypeOf(T.readProperty))) {
                     4 => T.readProperty(self.custom(), name, access, cache_slot),
                     3 => T.readProperty(self.custom(), name, access),
                     else => unreachable,
                 },
-                false => error.UndefinedProperty,
+                false => error.Undefined,
             };
         }
 
-        fn writeProperty(obj: *Object, name: *String, value: *Value, cache_slot: [*]*anyopaque) callconv(.c) *Value {
+        fn writeProperty(obj: *Object, name: *String, value: *Value, cache_slot: ?[*]?*anyopaque) callconv(.c) ?*Value {
             tryWriteProperty(obj, name, value, cache_slot) catch |err| {
                 failure.throw(fieldError(obj, name, .write, err));
             };
             return value;
         }
 
-        fn tryWriteProperty(obj: *Object, name: *String, value: *Value, cache_slot: [*]*anyopaque) !void {
+        fn tryWriteProperty(obj: *Object, name: *String, value: *Value, cache_slot: ?[*]?*anyopaque) !void {
             const self: *@This() = @ptrCast(obj);
             return inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
                 if (name.matchSlice(setter_name)) break self.callSetter(setter_name, value.*);
             } else switch (@hasDecl(T, "writeProperty")) {
-                true => switch (argCount(@TypeOf(T.writeProperty))) {
+                true => switch (comptime argCount(@TypeOf(T.writeProperty))) {
                     4 => T.writeProperty(self.custom(), name, value.*, cache_slot),
                     3 => T.writeProperty(self.custom(), name, value.*),
                     else => unreachable,
                 },
-                false => error.UndefinedProperty,
+                false => error.Undefined,
             };
         }
 
-        fn hasProperty(obj: *Object, name: *String, state: State, cache_slot: [*]*anyopaque) callconv(.c) c_int {
+        fn hasProperty(obj: *Object, name: *String, state: State, cache_slot: ?[*]?*anyopaque) callconv(.c) c_int {
             if (tryHasProperty(obj, name, cache_slot)) |found| {
                 if (found) {
                     if (state == .not_null or state == .not_false) {
                         if (tryReadProperty(obj, name, .isset, cache_slot)) |value| {
+                            defer value.release();
                             if (state == .not_false) {
                                 if (value.cast(.boolean).boolean() == false) return c.FAILURE;
                             } else {
@@ -304,25 +300,25 @@ pub fn @"fn"(comptime T: type) type {
                             }
                         } else |err| {
                             failure.throw(fieldError(obj, name, .isset, err));
-                            return c.FAILURE;
+                            return 0;
                         }
                     }
-                    return c.SUCCESS;
+                    return 1;
                 } else {
-                    return c.FAILURE;
+                    return 0;
                 }
             } else |err| {
                 failure.throw(fieldError(obj, name, .isset, err));
-                return c.FAILURE;
+                return 0;
             }
         }
 
-        fn tryHasProperty(obj: *Object, name: *String, cache_slot: [*]*anyopaque) !bool {
+        fn tryHasProperty(obj: *Object, name: *String, cache_slot: ?[*]?*anyopaque) !bool {
             const self: *@This() = @ptrCast(obj);
             return inline for (comptime std.meta.fieldNames(@TypeOf(getters))) |getter_name| {
                 if (name.matchSlice(getter_name)) break true;
             } else switch (@hasDecl(T, "hasProperty")) {
-                true => switch (argCount(@TypeOf(self.custom.hasProperty))) {
+                true => switch (comptime argCount(@TypeOf(T.hasProperty))) {
                     3 => T.hasProperty(self.custom(), name, cache_slot),
                     2 => T.hasProperty(self.custom(), name),
                     else => unreachable,
@@ -331,23 +327,23 @@ pub fn @"fn"(comptime T: type) type {
             };
         }
 
-        fn unsetProperty(obj: *Object, name: *String, cache_slot: [*]*anyopaque) callconv(.c) void {
+        fn unsetProperty(obj: *Object, name: *String, cache_slot: ?[*]?*anyopaque) callconv(.c) void {
             return tryUnsetProperty(obj, name, cache_slot) catch |err| {
                 failure.throw(fieldError(obj, name, .unset, err));
             };
         }
 
-        fn tryUnsetProperty(obj: *Object, name: *String, cache_slot: [*]*anyopaque) !void {
+        fn tryUnsetProperty(obj: *Object, name: *String, cache_slot: ?[*]?*anyopaque) !void {
             const self: *@This() = @ptrCast(obj);
             return inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
                 if (name.matchSlice(setter_name)) break self.callSetterWithNull(setter_name);
             } else switch (@hasDecl(T, "unsetProperty")) {
-                true => switch (argCount()) {
+                true => switch (comptime argCount(@TypeOf(T.unsetProperty))) {
                     3 => T.unsetProperty(self.custom(), name, cache_slot),
                     2 => T.unsetProperty(self.custom(), name),
                     else => unreachable,
                 },
-                false => error.UndefinedProperty,
+                false => error.Undefined,
             };
         }
 
@@ -412,14 +408,14 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        fn getPropertyPointer(obj: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque) callconv(.c) ?*Value {
+        fn getPropertyPointer(obj: *Object, name: *String, access: Access, cache_slot: ?[*]?*anyopaque) callconv(.c) ?*Value {
             return tryGetPropertyPointer(obj, name, access, cache_slot) catch |err| {
                 failure.throw(err);
                 return null;
             };
         }
 
-        fn tryGetPropertyPointer(obj: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque) !?*Value {
+        fn tryGetPropertyPointer(obj: *Object, name: *String, access: Access, cache_slot: ?[*]?*anyopaque) !?*Value {
             _ = cache_slot;
             const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "getPropertyPointer")) {
@@ -651,7 +647,7 @@ pub fn @"fn"(comptime T: type) type {
         fn fieldError(obj: *Object, name: *String, access: Value.Access, err: anytype) error{FailureReported} {
             if (failure.match(err, error.FailureReported)) {
                 return error.FailureReported;
-            } else if (failure.match(err, error.UndefinedProperty)) {
+            } else if (failure.match(err, error.Undefined)) {
                 return failure.report("no field named '{s}' in {s}", .{
                     name.slice(),
                     obj.class().name().slice(),
@@ -684,7 +680,7 @@ pub fn @"fn"(comptime T: type) type {
         fn callSetterWithNull(self: *@This(), comptime setter_name: []const u8) !void {
             const set = @field(setters, setter_name);
             const PT = php.util.ArgType(@TypeOf(set), 1);
-            return if (@typeInfo(PT) == .optional) set(self.custom(), null) else error.InvalidOperation;
+            return if (@typeInfo(PT) == .optional) set(self.custom(), null) else error.CannotBeNull;
         }
 
         fn isCustomClass(comptime Decl: type) bool {

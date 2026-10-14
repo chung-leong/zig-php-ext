@@ -152,4 +152,56 @@ final class ClassTest extends ExtensionTestCase
         OUTPUT, implode("\n", $lines));
     }
 
+    public function testReadProperty(): void
+    {
+        $lines = $this->runTest("classes", "properties.php");
+        $this->assertSame("number = 2001", $lines[0]);
+        $this->assertSame("foo = (readProperty: foo) 4567", $lines[1]);
+        $this->assertSame("bar = (readProperty: bar) Rats live on no evil star", $lines[2]);
+        $this->assertSame("(writeProperty: foo)", $lines[3]);
+        $this->assertSame("number = 777", $lines[4]);
+        $this->assertSame("(readProperty: cow) unable to read field 'cow' in WithReadProperty: undefined", $lines[5]);
+        $this->assertSame("(writeProperty: cow)", $lines[6]);
+        $this->assertSame("unable to write field 'cow' in WithReadProperty: undefined", $lines[7]);
+        $this->assertSame("(writeProperty: bar)", $lines[8]);
+        $this->assertSame("unable to write field 'bar' in WithReadProperty: read only", $lines[9]);
+        $this->assertSame("true", $lines[10]);
+        $this->assertSame("(hasProperty: foo) (readProperty: foo) true", $lines[11]);
+        $this->assertSame("(hasProperty: bar) (readProperty: bar) true", $lines[12]);
+        $this->assertSame("(hasProperty: cow) false", $lines[13]);
+        $this->assertSame("optional = 789", $lines[14]);
+        $this->assertSame("optional =", $lines[15]);
+        $this->assertSame("(unsetProperty: foo)", $lines[16]);
+        $this->assertSame("foo = (readProperty: foo) -1", $lines[17]);
+        $this->assertSame("unable to unset field 'number' in WithReadProperty: cannot be null", $lines[18]);
+        $this->assertSame("(unsetProperty: cow)", $lines[19]);
+        $this->assertSame("unable to unset field 'cow' in WithReadProperty: undefined", $lines[20]);
+    }
+
+    public function testReadPropertyWithCache(): void
+    {
+        $lines = $this->runTest("classes", "properties-cache.php");
+        $this->assertSame("number = 2001", $lines[0]);
+        $this->assertSame("foo = (readProperty: foo) 4567", $lines[1]);
+        $this->assertSame("bar = (readProperty: bar) Rats live on no evil star", $lines[2]);
+        $this->assertSame("(writeProperty: foo)", $lines[3]);
+        $this->assertSame("number = 777", $lines[4]);
+        $this->assertSame("(readProperty: cow) unable to read field 'cow' in WithReadPropertyCache: undefined", $lines[5]);
+        $this->assertSame("(writeProperty: cow)", $lines[6]);
+        $this->assertSame("unable to write field 'cow' in WithReadPropertyCache: undefined", $lines[7]);
+        $this->assertSame("(writeProperty: bar)", $lines[8]);
+        $this->assertSame("unable to write field 'bar' in WithReadPropertyCache: read only", $lines[9]);
+        $this->assertSame("true", $lines[10]);
+        $this->assertSame("(hasProperty: foo) (readProperty: foo) true", $lines[11]);
+        $this->assertSame("(hasProperty: bar) (readProperty: bar) true", $lines[12]);
+        $this->assertSame("(hasProperty: cow) false", $lines[13]);
+        $this->assertSame("optional = 789", $lines[14]);
+        $this->assertSame("optional =", $lines[15]);
+        $this->assertSame("(unsetProperty: foo)", $lines[16]);
+        $this->assertSame("foo = (readProperty: foo) -1", $lines[17]);
+        $this->assertSame("unable to unset field 'number' in WithReadPropertyCache: cannot be null", $lines[18]);
+        $this->assertSame("(unsetProperty: cow)", $lines[19]);
+        $this->assertSame("unable to unset field 'cow' in WithReadPropertyCache: undefined", $lines[20]);
+    }
+
 }
