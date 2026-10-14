@@ -1,0 +1,3 @@
+<?php
+
+$object = new WithFreeObject();

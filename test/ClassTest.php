@@ -96,4 +96,27 @@ final class ClassTest extends ExtensionTestCase
         flag = 4
         OUTPUT, implode("\n", $lines));
     }
+
+    public function testFreeObject(): void
+    {
+        $lines = $this->runTest("classes", "free-object.php");
+        $this->assertSame(<<<OUTPUT
+        destroyObject
+        freeObject
+        OUTPUT, implode("\n", $lines));
+    }
+
+    public function testGetConstructor(): void
+    {
+        $lines = $this->runTest("classes", "get-constructor.php");
+        // no "init" or "deinit"
+        $this->assertSame(<<<OUTPUT
+        getConstructor
+        constructor: 1234, Hello world
+        destroyObject
+        freeObject
+        OUTPUT, implode("\n", $lines));
+        // echo implode("\n", $lines);
+    }
+
 }

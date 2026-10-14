@@ -320,7 +320,7 @@ foreach ($settings->versions as $version) {
             "-Doptimize=$settings->optimize",
             "-Dphp-include=$include_path",
             "-Dphp-extension=$so_dir",
-            "-freference-trace=18",
+            // "-freference-trace=18",
         ];
         if ($settings->debug) {
             $cmd[] = "-Dphp-debug";
