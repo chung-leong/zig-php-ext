@@ -93,9 +93,10 @@ pub fn @"fn"(comptime T: type) type {
                 0 => null,
                 else => @ptrCast(@constCast(&interfaces)),
             };
-            pi._zend_hash_init(&zce.properties_info, c.HT_MIN_SIZE, null, false);
-            pi._zend_hash_init(&zce.constants_table, c.HT_MIN_SIZE, null, false);
-            pi._zend_hash_init(&zce.function_table, c.HT_MIN_SIZE, deref(&pi.zend_function_dtor), false);
+            pi._zend_hash_init(&zce.properties_info, c.HT_MIN_SIZE, null, true);
+            pi._zend_hash_init(&zce.constants_table, c.HT_MIN_SIZE, null, true);
+            pi._zend_hash_init(&zce.function_table, c.HT_MIN_SIZE, deref(&pi.zend_function_dtor), true);
+            self.addConstants();
             return self;
         }
 
@@ -168,6 +169,13 @@ pub fn @"fn"(comptime T: type) type {
             return T.getStaticMethod(self.custom(), method_name);
         }
 
+        fn addConstants(self: *@This()) void {
+            const arr: *Array = @ptrCast(&self.class_entry.impl.constants_table);
+            for (&constants) |*constant| {
+                arr.set(constant.name(), .fromPointer(constant));
+            }
+        }
+
         pub const Instance = Object.Custom(T);
         pub const Static = init: {
             var S: ?type = null;
@@ -218,6 +226,7 @@ pub fn @"fn"(comptime T: type) type {
             }
             break :init result;
         };
+        var classes: php.util.symbol.ExportedClasses(T) = undefined;
 
         class_entry: Class align(@max(@alignOf(Class), @alignOf(Static))),
 

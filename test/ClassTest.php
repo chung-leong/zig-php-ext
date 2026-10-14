@@ -81,4 +81,19 @@ final class ClassTest extends ExtensionTestCase
         text = Chicken
         OUTPUT, implode("\n", $lines));
     }
+
+    public function testStaticConstant(): void
+    {
+        $lines = $this->runTest("classes", "static-constant.php");
+        $this->assertSame(<<<OUTPUT
+        number = 1234
+        text = Hello world
+        enum = 0
+        enum = 1
+        enum = 2
+        flag = 1
+        flag = 2
+        flag = 4
+        OUTPUT, implode("\n", $lines));
+    }
 }

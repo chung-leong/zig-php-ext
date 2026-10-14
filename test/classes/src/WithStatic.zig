@@ -14,5 +14,11 @@ pub fn @"static call print"(static: *Static, _: struct {}) !void {
     php.print("text = {s}\n", .{static.text});
 }
 
-pub const @"export number" = 1234;
-pub const @"export text" = "Hello world";
+pub const @"export NUMBER" = 1234;
+pub const @"export TEXT" = "Hello world";
+pub const @"export ENUM" = enum { cat, dog, monkey };
+pub const @"export FLAG" = packed struct {
+    chicken: bool,
+    beef: bool,
+    pork: bool,
+};
