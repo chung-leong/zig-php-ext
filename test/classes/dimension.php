@@ -2,6 +2,7 @@
 
 $object = new WithReadDimension();
 echo "len = ", $object->len, "\n";
+echo "count = ", count($object), "\n";
 
 echo $object[4], "\n";
 $object[4] = 1.25;

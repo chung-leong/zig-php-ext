@@ -5,7 +5,9 @@ const Object = php.Object;
 const getter = Object.getter;
 const Value = php.Value;
 
-pub fn @"get len"(self: *@This()) usize {
+pub const @"get len" = countElements;
+
+pub fn countElements(self: *@This()) usize {
     return self.items.len;
 }
 

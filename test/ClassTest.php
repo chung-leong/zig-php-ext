@@ -209,6 +209,7 @@ final class ClassTest extends ExtensionTestCase
         $lines = $this->runTest("classes", "dimension.php");
         $this->assertSame(<<<OUTPUT
         len = 8
+        count = 8
         (readDimension: 4) 0
         (writeDimension: 4) (readDimension: 4) 1.25
         (writeDimension: 5) (readDimension: 5) 8.8
