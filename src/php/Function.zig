@@ -24,9 +24,9 @@ pub fn name(self: *const @This()) *String {
     return @ptrCast(zstr);
 }
 
-pub fn create(comptime func: anytype, comptime self_src: SelfSource) *@This() {
+pub fn create(comptime func: anytype, comptime options: Options) *@This() {
     const self = php_al.create(@This());
-    self.* = .fromHandler(func, self_src);
+    self.* = .init(func, options);
 }
 
 pub fn register(self: *@This()) !void {
@@ -50,20 +50,19 @@ pub fn createClosure(self: *const @This(), scope: ?*Class, called_scope: ?*Class
     return .create(self, scope, called_scope, this);
 }
 
-pub fn fromHandler(comptime func: anytype, comptime self_src: SelfSource) @This() {
-    const handler_info = comptime handlerInfo(func, self_src);
+pub fn init(comptime func: anytype, comptime options: Options) @This() {
+    const handler_info = comptime handlerInfo(func, options.self_source);
     const arg_info = argInfo(handler_info);
-    const flags = c.ZEND_ACC_PUBLIC | switch (handler_info.is_variadic) {
-        true => c.ZEND_ACC_VARIADIC,
-        false => 0,
-    };
+    var flags = c.ZEND_ACC_PUBLIC;
+    if (options.is_static) flags |= c.ZEND_ACC_NEVER_CACHE | c.ZEND_ACC_STATIC;
+    if (handler_info.is_variadic) flags |= c.ZEND_ACC_VARIADIC;
     const func_name = String.static(extractName(func));
     return .{
         .impl = .{
             .internal_function = .{
                 .type = c.ZEND_INTERNAL_FUNCTION,
                 .function_name = @ptrCast(func_name),
-                .handler = &zendInternalFunction(func, self_src),
+                .handler = &internalFunction(func, options.self_source),
                 .num_args = handler_info.arguments.len,
                 .required_num_args = handler_info.required_count,
                 .arg_info = @constCast(arg_info.ptr),
@@ -71,23 +70,6 @@ pub fn fromHandler(comptime func: anytype, comptime self_src: SelfSource) @This(
             },
         },
     };
-}
-
-fn argInfo(comptime info: HandlerInfo) []const c.zend_internal_arg_info {
-    const len = info.arguments.len + if (info.is_variadic) 1 else 0;
-    const array = init: {
-        var buffer: [len]c.zend_internal_arg_info = undefined;
-        for (info.arguments, 0..) |arg, i| {
-            buffer[i] = .{
-                .name = switch (c.zend_internal_function == c.zend_arg_info) {
-                    true => String.static(arg.name), // 8.6
-                    false => arg.name,
-                },
-            };
-        }
-        break :init buffer;
-    };
-    return &array;
 }
 
 pub fn handlerType(comptime F: type, comptime self_src: SelfSource) HandlerType {
@@ -157,7 +139,7 @@ pub fn handlerInfo(comptime func: anytype, comptime self_src: SelfSource) Handle
     };
 }
 
-pub fn zendInternalFunction(comptime func: anytype, comptime self_src: SelfSource) Handler {
+pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) Handler {
     const F = @TypeOf(func);
     const handler_type = handlerType(F, self_src);
     const f = @typeInfo(F).@"fn";
@@ -268,6 +250,27 @@ pub const SelfSource = union(enum) {
         };
     }
 };
+pub const Options = struct {
+    self_source: SelfSource,
+    is_static: bool = false,
+};
+
+fn argInfo(comptime info: HandlerInfo) []const c.zend_internal_arg_info {
+    const len = info.arguments.len + if (info.is_variadic) 1 else 0;
+    const array = init: {
+        var buffer: [len]c.zend_internal_arg_info = undefined;
+        for (info.arguments, 0..) |arg, i| {
+            buffer[i] = .{
+                .name = switch (c.zend_internal_function == c.zend_arg_info) {
+                    true => String.static(arg.name), // 8.6
+                    false => arg.name,
+                },
+            };
+        }
+        break :init buffer;
+    };
+    return &array;
+}
 
 const StdHandler = fn ([*c]c.zend_execute_data, [*c]c.zval) callconv(.c) void;
 const Handler = switch (builtin.target.os.tag) {

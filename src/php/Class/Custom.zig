@@ -12,6 +12,7 @@ const Class = php.Class;
 const failure = php.failure;
 const Function = php.Function;
 const Object = php.Object;
+const Singleton = php.Singleton;
 const String = php.String;
 const Value = php.Value;
 const ReturnType = php.util.ReturnType;
@@ -23,8 +24,8 @@ pub fn @"fn"(comptime T: type) type {
             return self.class_entry.name();
         }
 
-        pub fn custom(self: *@This()) *T {
-            return &self.custom_struct;
+        pub fn custom(_: *@This()) *T {
+            return Singleton(T).get();
         }
 
         pub fn parent(self: *const @This()) *Class {
@@ -96,13 +97,6 @@ pub fn @"fn"(comptime T: type) type {
             pi._zend_hash_init(&zce.properties_info, c.HT_MIN_SIZE, null, false);
             pi._zend_hash_init(&zce.constants_table, c.HT_MIN_SIZE, null, false);
             pi._zend_hash_init(&zce.function_table, c.HT_MIN_SIZE, deref(&pi.zend_function_dtor), false);
-            self.custom_struct = switch (@hasDecl(T, "staticInit")) {
-                true => switch (@typeInfo(ReturnType(@TypeOf(T.staitcInit)))) {
-                    .error_union => try .staitcInit(),
-                    else => .staitcInit(),
-                },
-                false => if (Static == void) {} else .{},
-            };
             return self;
         }
 
@@ -135,7 +129,15 @@ pub fn @"fn"(comptime T: type) type {
             list.delete(lc_name);
         }
 
-        pub fn createObject(class: *Class) callconv(.c) ?*Object {
+        pub fn initStatic(_: *@This()) !void {
+            if (Static != NoStatic) try Singleton(Static).init();
+        }
+
+        pub fn deinitStatic(_: *@This()) void {
+            if (Static != NoStatic) Singleton(Static).deinit();
+        }
+
+        fn createObject(class: *Class) callconv(.c) ?*Object {
             const result = Instance.create(class);
             const custom_obj = switch (@typeInfo(@TypeOf(result))) {
                 .error_union => result catch |err| {
@@ -147,13 +149,13 @@ pub fn @"fn"(comptime T: type) type {
             return custom_obj.object();
         }
 
-        pub fn getIterator(class: *Class, this: *Value, by_ref: c_int) callconv(.c) ?*Object.Iterator {
+        fn getIterator(class: *Class, this: *Value, by_ref: c_int) callconv(.c) ?*Object.Iterator {
             _ = class;
             _ = by_ref;
             return Instance.getIterator(this.object());
         }
 
-        pub fn getMethod(class: *Class, method_name: *String) callconv(.c) ?*const Function {
+        fn getMethod(class: *Class, method_name: *String) callconv(.c) ?*const Function {
             return tryGetMethod(class, method_name) catch |err| throw: {
                 failure.throw(err);
                 break :throw null;
@@ -167,38 +169,67 @@ pub fn @"fn"(comptime T: type) type {
             return T.getStaticMethod(self.custom(), method_name);
         }
 
+        pub const Instance = Object.Custom(T);
         pub const Static = init: {
             var S: ?type = null;
-            for (.{
-                .{ .names = getter_names, .prefix = php.util.getterPrefix(.static) },
-                .{ .names = setter_names, .prefix = php.util.setterPrefix(.static) },
-                .{ .names = method_names, .prefix = php.util.methodPrefix(.static) },
-            }) |section| {
-                for (section.names) |n| {
-                    const Decl = @TypeOf(@field(T, section.prefix ++ n));
-                    const New = switch (@typeInfo(Decl)) {
-                        .pointer => |pt| pt.child,
-                        else => @compileError("Self must be a pointer, received: " ++ @typeName(Decl)),
+            const prefices = .{ php.util.getterPrefix(.static), php.util.setterPrefix(.static), php.util.methodPrefix(.static) };
+            for (decl_names) |decl_name| {
+                const match = for (prefices, 0..) |prefix, i| {
+                    if (std.mem.startsWith(u8, decl_name, prefix)) {
+                        if (i != 2) {
+                            const kind = if (i == 0) "getter" else "setter";
+                            @compileError("PHP currently does not support static " ++ kind ++ ": " ++ decl_name);
+                        }
+                        break true;
+                    }
+                } else false;
+                if (match) {
+                    const arg0_type: ?type = find: {
+                        const Decl = @TypeOf(@field(T, decl_name));
+                        switch (@typeInfo(Decl)) {
+                            .@"fn" => |func| if (func.param_types.len > 0) {
+                                if (func.param_types[0]) |PT| break :find PT;
+                            },
+                            else => {},
+                        }
+                        break :find null;
                     };
-                    if (S) |Current| {
-                        if (New != Current) @compileError("Multiple static type detected: " ++ @typeName(Current) ++ ", " ++ @typeName(New));
-                    } else {
-                        S = New;
+                    const arg0_target_type: ?type = find: {
+                        const Arg0 = arg0_type orelse break :find null;
+                        switch (@typeInfo(Arg0)) {
+                            .pointer => |pt| if (pt.size == .one) break :find pt.child,
+                            else => {},
+                        }
+                        break :find null;
+                    };
+                    if (arg0_target_type) |New| {
+                        if (S) |Current| {
+                            if (New != Current) @compileError("Multiple static type detected: " ++ @typeName(Current) ++ ", " ++ @typeName(New));
+                        } else {
+                            S = New;
+                        }
                     }
                 }
             }
-            break :init S orelse void;
+            break :init S orelse NoStatic;
         };
-        pub const Instance = Object.Custom(T);
-
-        const getter_names = php.util.getterNames(T, .static);
-        const setter_names = php.util.setterNames(T, .static);
+        const NoStatic = struct {};
         const method_names = php.util.methodNames(T, .static);
         const Methods = Object.MethodSet(method_names);
-        const methods: Methods = .fromType(T, php.util.methodPrefix(.static));
+        const methods = init: {
+            const prefix = php.util.methodPrefix(.static);
+            var result: Methods = undefined;
+            for (method_names) |method_name| {
+                const func = @field(T, prefix ++ method_name);
+                @field(result.entries, method_name) = .init(func, .{
+                    .self_source = .{ .singleton = Static },
+                    .is_static = true,
+                });
+            }
+            break :init result;
+        };
 
         class_entry: Class align(@max(@alignOf(Class), @alignOf(Static))),
-        custom_struct: Static,
 
         comptime {
             if (@offsetOf(@This(), "class_entry") != 0) {

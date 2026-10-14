@@ -6,16 +6,15 @@ pub fn @"fn"(comptime T: type) type {
     return struct {
         pub fn init() !void {
             if (@hasDecl(T, "init")) {
-                default = try errable(T.init());
+                value = try errable(T.init());
             } else {
-                default = .{};
+                value = .{};
             }
-            value = default;
         }
 
         pub fn deinit() void {
             if (@hasDecl(T, "deinit")) {
-                default.deinit();
+                value.deinit();
             }
         }
 
@@ -23,11 +22,10 @@ pub fn @"fn"(comptime T: type) type {
             return &value;
         }
 
-        pub fn reset() void {
-            value = default;
+        pub fn reset(default_value: T) void {
+            value = default_value;
         }
 
         threadlocal var value: T = undefined;
-        var default: T = undefined;
     };
 }

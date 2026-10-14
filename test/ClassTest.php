@@ -73,4 +73,12 @@ final class ClassTest extends ExtensionTestCase
         OUTPUT, implode("\n", $lines));
     }
 
+    public function testStaticMethod(): void
+    {
+        $lines = $this->runTest("classes", "static-method.php");
+        $this->assertSame(<<<OUTPUT
+        number = 123
+        text = Chicken
+        OUTPUT, implode("\n", $lines));
+    }
 }

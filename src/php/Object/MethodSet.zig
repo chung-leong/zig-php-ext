@@ -47,16 +47,6 @@ pub fn @"fn"(comptime names: anytype) type {
             } else null;
         }
 
-        pub fn fromType(comptime T: type, comptime prefix: []const u8) @This() {
-            var m: Container = undefined;
-            const st = @typeInfo(Container).@"struct";
-            for (st.field_names) |name| {
-                const func = @field(T, prefix ++ name);
-                @field(m, name) = .fromHandler(func, .{ .this_object = T });
-            }
-            return .{ .entries = m };
-        }
-
         pub const CallCache = struct {
             pub fn init(context: Value) !@This() {
                 var entries: CallCacheContainer = undefined;

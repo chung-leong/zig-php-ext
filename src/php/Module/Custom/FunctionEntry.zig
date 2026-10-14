@@ -6,7 +6,7 @@ const Function = php.Function;
 
 pub fn init(comptime T: type, comptime name: [:0]const u8, comptime func: anytype) @This() {
     const self_src: Function.SelfSource = .{ .singleton = T };
-    const handler = Function.zendInternalFunction(func, self_src);
+    const handler = Function.internalFunction(func, self_src);
     const handler_info = Function.handlerInfo(func, self_src);
     const zarg_info = arg_info_init: {
         const arg_count = 1 + handler_info.arguments.len + if (handler_info.is_variadic) 1 else 0;

@@ -4,6 +4,7 @@ const php = @import("root.zig");
 
 const Array = php.Array;
 const Dictionary = php.Dictionary;
+const Class = php.Class;
 const failure = php.failure;
 const unsupported = failure.unsupported;
 const List = php.List;
@@ -243,11 +244,23 @@ pub fn methodPrefix(comptime scope: Scope) []const u8 {
 pub fn methodNames(comptime T: type, comptime scope: Scope) []const [:0]const u8 {
     return nameList(T, struct {
         pub const prefix = methodPrefix(scope);
+        pub const Self = Target(T, scope);
 
         pub fn extract(comptime decl_name: [:0]const u8) ?[:0]const u8 {
             const Decl = @TypeOf(@field(T, decl_name));
             if (@typeInfo(Decl) == .@"fn") {
-                if (std.mem.startsWith(u8, decl_name, prefix)) return decl_name[prefix.len..];
+                if (std.mem.startsWith(u8, decl_name, prefix)) {
+                    const correct = check: {
+                        const f = @typeInfo(Decl).@"fn";
+                        // check self pointer
+                        switch (@typeInfo(f.param_types[0].?)) {
+                            .pointer => |pt| break :check pt.child == Self,
+                            else => break :check false,
+                        }
+                    };
+                    if (!correct) @compileError("Invalid method: @\"" ++ decl_name ++ "\": " ++ @typeName(Decl));
+                    return decl_name[prefix.len..];
+                }
             }
             return null;
         }
@@ -264,6 +277,7 @@ pub fn getterPrefix(comptime scope: Scope) []const u8 {
 pub fn getterNames(comptime T: type, comptime scope: Scope) []const [:0]const u8 {
     return nameList(T, struct {
         pub const prefix = getterPrefix(scope);
+        pub const Self = Target(T, scope);
 
         pub fn extract(comptime decl_name: [:0]const u8) ?[:0]const u8 {
             const Decl = @TypeOf(@field(T, decl_name));
@@ -275,7 +289,7 @@ pub fn getterNames(comptime T: type, comptime scope: Scope) []const [:0]const u8
                         if (f.param_types.len != 1) break :check false;
                         // check self pointer
                         switch (@typeInfo(f.param_types[0].?)) {
-                            .pointer => |pt| break :check pt.child == T,
+                            .pointer => |pt| break :check pt.child == Self,
                             else => break :check false,
                         }
                     };
@@ -298,6 +312,7 @@ pub fn setterPrefix(comptime scope: Scope) []const u8 {
 pub fn setterNames(comptime T: type, comptime scope: Scope) []const [:0]const u8 {
     return nameList(T, struct {
         pub const prefix = setterPrefix(scope);
+        pub const Self = Target(T, scope);
 
         pub fn extract(comptime decl_name: [:0]const u8) ?[:0]const u8 {
             const Decl = @TypeOf(@field(T, decl_name));
@@ -309,7 +324,7 @@ pub fn setterNames(comptime T: type, comptime scope: Scope) []const [:0]const u8
                         if (f.param_types.len != 2) break :check false;
                         // check self pointer
                         switch (@typeInfo(f.param_types[0].?)) {
-                            .pointer => |pt| if (pt.child != T) break :check false,
+                            .pointer => |pt| if (pt.child != Self) break :check false,
                             else => break :check false,
                         }
                         // check return value
@@ -363,4 +378,11 @@ fn nameList(comptime T: type, comptime criteria: type) []const [:0]const u8 {
         break :init names;
     };
     return &names;
+}
+
+fn Target(comptime T: type, comptime scope: Scope) type {
+    return switch (scope) {
+        .instance => T,
+        .static => Class.Custom(T).Static,
+    };
 }

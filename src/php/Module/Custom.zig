@@ -77,6 +77,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         fn tryModuleStartup(module_type: Module.Type, module_no: c_int) !void {
             try CustomSingleton.init();
             const self = CustomSingleton.get();
+            // save the default values used by the extension
+            ini_default_value = self.*;
             try registerIniEntries(self, module_no);
             try registerConstants();
             try registerClasses();
@@ -116,6 +118,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
 
         fn tryRequestStartup(module_type: Module.Type, module_no: c_int) !void {
             Allocator.mode = .per_request;
+            try initializeClassStatic();
             if (!@hasDecl(T, "requestStartup")) return;
             const self = CustomSingleton.get();
             return T.requestStartup(self, module_type, module_no);
@@ -130,7 +133,10 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         }
 
         fn tryRequestShutdown(module_type: Module.Type, module_no: c_int) !void {
-            defer CustomSingleton.reset();
+            defer {
+                CustomSingleton.reset(ini_default_value);
+                deinitializeClassStatic();
+            }
             if (!@hasDecl(T, "requestShutdown")) return;
             const self = CustomSingleton.get();
             return T.requestShutdown(self, module_type, module_no);
@@ -187,6 +193,18 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         fn unregisterClasses() void {
             inline for (class_names) |class_name| {
                 @field(classes, class_name).unregister();
+            }
+        }
+
+        fn initializeClassStatic() !void {
+            inline for (class_names) |class_name| {
+                try @field(classes, class_name).initStatic();
+            }
+        }
+
+        fn deinitializeClassStatic() void {
+            inline for (class_names) |class_name| {
+                @field(classes, class_name).deinitStatic();
             }
         }
 
@@ -360,7 +378,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         // ini entries need to be var because their values are determined at runtime
         const ini_count = if (getter_names.len > 0) getter_names.len + 1 else 0;
         var ini_entries: [ini_count]IniEntryDef = undefined;
+        var ini_default_value: T = undefined;
 
-        entry: Module,
+        entry: Module align(@max(@alignOf(Module), @alignOf(T))),
     };
 }
