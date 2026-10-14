@@ -224,6 +224,19 @@ final class ClassTest extends ExtensionTestCase
         (unsetDimension: 4) (readDimension: 4) NAN
         negative value
         OUTPUT, implode("\n", $lines));
+    }
+
+    public function testGetClassName(): void
+    {
+        $lines = $this->runTest("classes", "class-name.php");
+        $this->assertSame(<<<OUTPUT
+        getClassName
+        DingoPower Object
+        (
+            [number] => 787
+        )
+        OUTPUT, implode("\n", $lines));
         // echo implode("\n", $lines);
     }
+
 }

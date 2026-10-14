@@ -16,3 +16,4 @@ pub const @"export WithClone" = Class.Custom(@import("WithClone.zig"));
 pub const @"export WithReadProperty" = Class.Custom(@import("WithReadProperty.zig"));
 pub const @"export WithReadPropertyCache" = Class.Custom(@import("WithReadPropertyCache.zig"));
 pub const @"export WithReadDimension" = Class.Custom(@import("WithReadDimension.zig"));
+pub const @"export WithGetClassName" = Class.Custom(@import("WithGetClassName.zig"));

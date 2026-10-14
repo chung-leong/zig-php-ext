@@ -1,6 +1,6 @@
 <?php
 
-$object = new WithReadDimension();
+$object = new WithGetClassName();
 echo "len = ", $object->len, "\n";
 echo "count = ", count($object), "\n";
 
