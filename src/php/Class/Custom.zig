@@ -18,7 +18,6 @@ const Value = php.Value;
 const ReturnType = php.util.ReturnType;
 
 pub fn @"fn"(comptime T: type) type {
-    const decl_names = std.meta.declarations(T);
     return struct {
         pub fn name(self: *const @This()) *String {
             return self.class_entry.name();
@@ -76,7 +75,7 @@ pub fn @"fn"(comptime T: type) type {
                 .resolved_interfaces = true,
                 .resolved_parent = true,
                 .not_serializable = !@hasDecl(T, "serialize"),
-                .abstract = decl_names.len == 0,
+                .abstract = std.meta.declarations(T).len == 0,
             };
             const class_pce = parent_class orelse Class.builtin(.standard);
             const zce = &self.class_entry.impl;
@@ -164,7 +163,7 @@ pub fn @"fn"(comptime T: type) type {
 
         fn tryGetMethod(class: *Class, method_name: *String) !?*const Function {
             const self: *@This() = @ptrCast(class);
-            if (methods.find(method_name)) |func| return func;
+            if (method_set.find(method_name)) |func| return func;
             if (!@hasDecl(T, "getStaticMethod")) return null;
             return T.getStaticMethod(self.custom(), method_name);
         }
@@ -172,41 +171,32 @@ pub fn @"fn"(comptime T: type) type {
         pub const Instance = Object.Custom(T);
         pub const Static = init: {
             var S: ?type = null;
-            const prefices = .{ php.util.getterPrefix(.static), php.util.setterPrefix(.static), php.util.methodPrefix(.static) };
+            const decl_names = std.meta.declarations(T);
             for (decl_names) |decl_name| {
-                const match = for (prefices, 0..) |prefix, i| {
-                    if (std.mem.startsWith(u8, decl_name, prefix)) {
-                        if (i != 2) {
-                            const kind = if (i == 0) "getter" else "setter";
-                            @compileError("PHP currently does not support static " ++ kind ++ ": " ++ decl_name);
-                        }
-                        break true;
-                    }
-                } else false;
-                if (match) {
-                    const arg0_type: ?type = find: {
-                        const Decl = @TypeOf(@field(T, decl_name));
-                        switch (@typeInfo(Decl)) {
-                            .@"fn" => |func| if (func.param_types.len > 0) {
-                                if (func.param_types[0]) |PT| break :find PT;
-                            },
-                            else => {},
-                        }
-                        break :find null;
-                    };
-                    const arg0_target_type: ?type = find: {
-                        const Arg0 = arg0_type orelse break :find null;
-                        switch (@typeInfo(Arg0)) {
-                            .pointer => |pt| if (pt.size == .one) break :find pt.child,
-                            else => {},
-                        }
-                        break :find null;
-                    };
-                    if (arg0_target_type) |New| {
-                        if (S) |Current| {
-                            if (New != Current) @compileError("Multiple static type detected: " ++ @typeName(Current) ++ ", " ++ @typeName(New));
-                        } else {
-                            S = New;
+                if (std.mem.startsWith(u8, decl_name, "static ")) {
+                    const Decl = @TypeOf(@field(T, decl_name));
+                    if (@typeInfo(Decl) == .@"fn") {
+                        const f = @typeInfo(Decl).@"fn";
+                        const arg0_type: ?type = find: {
+                            if (f.param_types.len > 0) {
+                                if (f.param_types[0]) |PT| break :find PT;
+                            }
+                            break :find null;
+                        };
+                        const arg0_target_type: ?type = find: {
+                            const Arg0 = arg0_type orelse break :find null;
+                            switch (@typeInfo(Arg0)) {
+                                .pointer => |pt| if (pt.size == .one) break :find pt.child,
+                                else => {},
+                            }
+                            break :find null;
+                        };
+                        if (arg0_target_type) |New| {
+                            if (S) |Current| {
+                                if (New != Current) @compileError("Multiple static type detected: " ++ @typeName(Current) ++ ", " ++ @typeName(New));
+                            } else {
+                                S = New;
+                            }
                         }
                     }
                 }
@@ -214,14 +204,14 @@ pub fn @"fn"(comptime T: type) type {
             break :init S orelse NoStatic;
         };
         const NoStatic = struct {};
-        const method_names = php.util.methodNames(T, .static);
-        const Methods = Object.MethodSet(method_names);
-        const methods = init: {
-            const prefix = php.util.methodPrefix(.static);
-            var result: Methods = undefined;
+        const constants = php.util.symbol.ExportedConstants(T).get();
+        const methods = php.util.symbol.Extractor(T, .method, .static).get();
+        const method_set = init: {
+            const method_names = std.meta.fieldNames(@TypeOf(methods));
+            var result: Object.MethodSet(method_names) = undefined;
             for (method_names) |method_name| {
-                const func = @field(T, prefix ++ method_name);
-                @field(result.entries, method_name) = .init(func, .{
+                const method = @field(methods, method_name);
+                @field(result.entries, method_name) = .init(method, .{
                     .self_source = .{ .singleton = Static },
                     .is_static = true,
                 });

@@ -80,26 +80,6 @@ pub fn exceptionThrown() bool {
     return eg.exception != null;
 }
 
-pub fn zendCast(ptr: anytype) ZendTypePointer(@TypeOf(ptr)) {
-    return @ptrCast(ptr);
-}
-
-fn ZendTypePointer(comptime Ptr: type) type {
-    switch (@typeInfo(Ptr)) {
-        .pointer => |pt| {
-            const Impl = switch (@typeInfo(pt.child)) {
-                .@"struct" => |st| get: {
-                    if (st.field_types.len != 1) @compileError("Pointer to struct type with a single field expected, received: " ++ @typeName(Ptr));
-                    break :get st.field_types[0];
-                },
-                else => @compileError("Pointer to struct type expected, received: " ++ @typeName(Ptr)),
-            };
-            return @Pointer(pt.size, pt.attrs, Impl, null);
-        },
-        else => @compileError("Pointer expected, received: " ++ @typeName(Ptr)),
-    }
-}
-
 pub fn write(bytes: []const u8) void {
     _ = imports.php_write(@ptrCast(@constCast(bytes.ptr)), bytes.len);
 }

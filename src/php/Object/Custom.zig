@@ -60,7 +60,7 @@ pub fn @"fn"(comptime T: type) type {
                     else => @compileError("iterate() should have at most 1 argument containing options"),
                 },
                 false => switch (has_iterator) {
-                    true => Object.Iterator.Properties(T, getter_names).init(obj),
+                    true => Object.Iterator.Properties(T, std.meta.fieldNames(@TypeOf(getters))).init(obj),
                     false => return null,
                 },
             };
@@ -73,7 +73,7 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         pub const Custom = T;
-        pub const has_iterator = @hasDecl(T, "iterate") and getter_names.len > 0;
+        pub const has_iterator = @hasDecl(T, "iterate") and std.meta.fieldNames(@TypeOf(getters)).len > 0;
         pub const handler_protypes = .{
             .freeObject = fn (*T) void,
             .destroyObject = fn (*T) void,
@@ -128,9 +128,8 @@ pub fn @"fn"(comptime T: type) type {
                 };
             } else {
                 self.custom_struct = .{};
-                const prefix = comptime php.util.setterPrefix(.instance);
-                inline for (setter_names) |setter_name| {
-                    const set = @field(T, prefix ++ setter_name);
+                inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
+                    const set = @field(setters, setter_name);
                     const arg = @field(args, setter_name);
                     const Arg = php.util.ArgType(@TypeOf(set), 1);
                     if (Arg == @TypeOf(arg)) {
@@ -255,7 +254,7 @@ pub fn @"fn"(comptime T: type) type {
 
         fn tryReadProperty(obj: *Object, name: *String, access: Access, cache_slot: [*]*anyopaque) !Value {
             const self: *@This() = @ptrCast(obj);
-            return inline for (getter_names) |getter_name| {
+            return inline for (comptime std.meta.fieldNames(@TypeOf(getters))) |getter_name| {
                 if (name.matchSlice(getter_name)) break self.callGetter(getter_name);
             } else switch (@hasDecl(T, "readProperty")) {
                 true => switch (argCount(@TypeOf(self.custom.readProperty))) {
@@ -276,7 +275,7 @@ pub fn @"fn"(comptime T: type) type {
 
         fn tryWriteProperty(obj: *Object, name: *String, value: *Value, cache_slot: [*]*anyopaque) !void {
             const self: *@This() = @ptrCast(obj);
-            return inline for (setter_names) |setter_name| {
+            return inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
                 if (name.matchSlice(setter_name)) break self.callSetter(setter_name, value.*);
             } else switch (@hasDecl(T, "writeProperty")) {
                 true => switch (argCount(@TypeOf(T.writeProperty))) {
@@ -315,7 +314,7 @@ pub fn @"fn"(comptime T: type) type {
 
         fn tryHasProperty(obj: *Object, name: *String, cache_slot: [*]*anyopaque) !bool {
             const self: *@This() = @ptrCast(obj);
-            return inline for (getter_names) |getter_name| {
+            return inline for (comptime std.meta.fieldNames(@TypeOf(getters))) |getter_name| {
                 if (name.matchSlice(getter_name)) break true;
             } else switch (@hasDecl(T, "hasProperty")) {
                 true => switch (argCount(@TypeOf(self.custom.hasProperty))) {
@@ -335,7 +334,7 @@ pub fn @"fn"(comptime T: type) type {
 
         fn tryUnsetProperty(obj: *Object, name: *String, cache_slot: [*]*anyopaque) !void {
             const self: *@This() = @ptrCast(obj);
-            return inline for (setter_names) |setter_name| {
+            return inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
                 if (name.matchSlice(setter_name)) break self.callSetterWithNull(setter_name);
             } else switch (@hasDecl(T, "unsetProperty")) {
                 true => switch (argCount()) {
@@ -367,15 +366,16 @@ pub fn @"fn"(comptime T: type) type {
         fn tryGetPropertiesFor(obj: *Object, purpose: PropertiesPurpose) !?*Array {
             const self: *@This() = @ptrCast(obj);
             const Self = @This();
+            const getter_names = comptime std.meta.fieldNames(@TypeOf(getters));
             const from = struct {
                 pub fn getters(s: *Self) !?*Array {
                     return switch (getter_names.len > 0) {
                         true => get: {
                             const list = Array.create();
-                            inline for (getter_names) |n| {
-                                const result = try s.callGetter(n);
+                            inline for (getter_names) |getter_name| {
+                                const result = try s.callGetter(getter_name);
                                 defer result.release();
-                                list.set(String.static(n), result);
+                                list.set(String.static(getter_name), result);
                             }
                             break :get list;
                         },
@@ -516,7 +516,7 @@ pub fn @"fn"(comptime T: type) type {
             // TODO: use key for case insensitivity
             _ = key;
             const self: *@This() = @ptrCast(obj_ptr.*);
-            return methods.find(name) orelse switch (@hasDecl(T, "getMethod")) {
+            return method_set.find(name) orelse switch (@hasDecl(T, "getMethod")) {
                 true => T.getMethod(self.custom(), name),
                 false => error.UndefinedMethod,
             };
@@ -663,32 +663,32 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        fn callGetter(self: *@This(), comptime prop_name: []const u8) !Value {
-            const prefix = comptime php.util.getterPrefix(.instance);
-            const get = @field(T, prefix ++ prop_name);
+        fn callGetter(self: *@This(), comptime getter_name: []const u8) !Value {
+            const get = @field(getters, getter_name);
             const payload = get(self.custom());
             return Value.fromAny(payload);
         }
 
-        fn callSetter(self: *@This(), comptime prop_name: []const u8, value: Value) !void {
-            const prefix = comptime php.util.setterPrefix(.instance);
-            const set = @field(T, prefix ++ prop_name);
+        fn callSetter(self: *@This(), comptime setter_name: []const u8, value: Value) !void {
+            const set = @field(setters, setter_name);
             const PT = php.util.ArgType(@TypeOf(set), 1);
             const payload = try value.convertTo(PT);
             return set(self.custom(), payload);
         }
 
-        fn callSetterWithNull(self: *@This(), comptime prop_name: []const u8) !void {
-            const prefix = comptime php.util.setterPrefix(.instance);
-            const set = @field(T, prefix ++ prop_name);
+        fn callSetterWithNull(self: *@This(), comptime setter_name: []const u8) !void {
+            const set = @field(setters, setter_name);
             const PT = php.util.ArgType(@TypeOf(set), 1);
             return if (@typeInfo(PT) == .optional) set(self.custom(), null) else error.InvalidOperation;
         }
 
-        const getter_names = php.util.getterNames(T, .instance);
-        const setter_names = php.util.setterNames(T, .instance);
-        const method_names = php.util.methodNames(T, .instance);
-        const Methods = Object.MethodSet(method_names);
+        fn isCustomClass(comptime Decl: type) bool {
+            return switch (@typeInfo(Decl)) {
+                .@"struct" => @hasField(Decl, "class_entry") and @FieldType(Decl, "class_entry") == Class,
+                else => false,
+            };
+        }
+
         const ObjectLite = init: {
             const st = @typeInfo(c.zend_object).@"struct";
             const len = st.field_names.len;
@@ -696,6 +696,20 @@ pub fn @"fn"(comptime T: type) type {
             const field_types = st.field_types[0 .. len - 1];
             const field_attrs = st.field_attrs[0 .. len - 1];
             break :init @Struct(st.layout, null, field_names, field_types, field_attrs);
+        };
+        const getters = php.util.symbol.Extractor(T, .getter, .instance).get();
+        const setters = php.util.symbol.Extractor(T, .setter, .instance).get();
+        const methods = php.util.symbol.Extractor(T, .method, .instance).get();
+        const method_set = init: {
+            const method_names = std.meta.fieldNames(@TypeOf(methods));
+            var result: Object.MethodSet(method_names) = undefined;
+            for (method_names) |method_name| {
+                const method = @field(methods, method_name);
+                @field(result.entries, method_name) = .init(method, .{
+                    .self_source = .{ .this_object = T },
+                });
+            }
+            break :init result;
         };
         const init_fn = init: {
             if (@hasDecl(T, "init")) {
@@ -712,13 +726,13 @@ pub fn @"fn"(comptime T: type) type {
                 break :init .{ .exists = true, .Args = Arg0, .uses_args = arg_count > 0 };
             } else {
                 // use setters to initialize custom struct
+                const setter_names = std.meta.fieldNames(@TypeOf(setters));
                 const len = setter_names.len;
-                const prefix = php.util.setterPrefix(.instance);
                 var field_names: [len][:0]const u8 = undefined;
                 var field_types: [len]type = undefined;
                 var field_attrs: [len]std.lang.Type.Struct.FieldAttributes = undefined;
                 for (setter_names, 0..) |setter_name, i| {
-                    const set = @field(T, prefix ++ setter_name);
+                    const set = @field(setters, setter_name);
                     const Arg = php.util.ArgType(@TypeOf(set), 1);
                     field_names[i] = setter_name;
                     field_types[i] = switch (@typeInfo(Arg)) {
@@ -752,17 +766,6 @@ pub fn @"fn"(comptime T: type) type {
             } else {
                 break :init .{ .exists = false };
             }
-        };
-        const methods = init: {
-            const prefix = php.util.methodPrefix(.instance);
-            var result: Methods = undefined;
-            for (method_names) |method_name| {
-                const func = @field(T, prefix ++ method_name);
-                @field(result.entries, method_name) = .init(func, .{
-                    .self_source = .{ .this_object = T },
-                });
-            }
-            break :init result;
         };
         const handlers: Object.Handlers = .{
             .free_obj = @ptrCast(&freeObject),
