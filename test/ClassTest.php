@@ -65,8 +65,6 @@ final class ClassTest extends ExtensionTestCase
     {
         $lines = $this->runTest("classes", "constructor.php");
         $this->assertSame(<<<OUTPUT
-        finalized => 0
-        finalized => 3
         Cat (.pet)
         Martin (.wild)
         Croissant (.wild)
@@ -116,7 +114,42 @@ final class ClassTest extends ExtensionTestCase
         destroyObject
         freeObject
         OUTPUT, implode("\n", $lines));
-        // echo implode("\n", $lines);
+    }
+
+    public function testCloneObject(): void
+    {
+        $lines = $this->runTest("classes", "clone-object.php");
+        $this->assertSame(<<<OUTPUT
+        WithCloneObject Object
+        (
+            [number] => 4567
+            [text] => I am Groot
+        )
+        cloneObject
+        WithCloneObject Object
+        (
+            [number] => 4567
+            [text] => I am Groot
+        )
+        OUTPUT, implode("\n", $lines));
+    }
+
+    public function testClone(): void
+    {
+        $lines = $this->runTest("classes", "clone.php");
+        $this->assertSame(<<<OUTPUT
+        WithClone Object
+        (
+            [number] => 4567
+            [text] => I am Groot
+        )
+        clone
+        WithClone Object
+        (
+            [number] => 4567
+            [text] => I am Groot
+        )
+        OUTPUT, implode("\n", $lines));
     }
 
 }

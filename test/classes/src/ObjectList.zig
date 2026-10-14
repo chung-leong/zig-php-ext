@@ -14,10 +14,6 @@ pub fn init(args: struct {
     return .{ .list = php.util.retainAny(args.list) };
 }
 
-pub fn finalizeObject(self: *@This()) void {
-    php.print("finalized => {d}\n", .{self.list.len});
-}
-
 pub fn deinit(self: *@This()) void {
     php.util.freeAny(self.list);
 }

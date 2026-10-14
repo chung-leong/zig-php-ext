@@ -12,7 +12,7 @@
             "args": [
                 "-d",
                 "extension='/home/cleong/zig-php-ext/test/classes/extensions/8.1/php_classes.so'",
-                "static-constant.php",
+                "clone-object.php",
             ],
             "cwd": "/home/cleong/zig-php-ext/test/classes",
             "stopOnEntry": false,

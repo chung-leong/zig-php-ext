@@ -32,14 +32,13 @@ pub fn @"fn"(comptime T: type) type {
             return &self.custom_struct;
         }
 
-        pub fn create(class: *Class) !*@This() {
+        pub fn create(class: *const Class) !*@This() {
             const self = try php_al.create(@This());
             errdefer php_al.destroy(self);
             // initialize the PHP portion
-            pi.zend_object_std_init(@ptrCast(&self.php_object), @ptrCast(class));
+            pi.zend_object_std_init(@ptrCast(&self.php_object), @ptrCast(@constCast(class)));
             // handlers need to be set after zend_object_std_init() due to change in PHP 8.3
             self.php_object.handlers = &handlers;
-            // custom
             // set fields of custom struct to their default values (when available)
             inline for (comptime std.meta.fieldNames(T)) |field_name| {
                 if (php.util.getFieldDefaultValue(T, field_name)) |def_value| {
@@ -77,7 +76,7 @@ pub fn @"fn"(comptime T: type) type {
         pub const handler_protypes = .{
             .freeObject = fn (*T) void,
             .destroyObject = fn (*T) void,
-            .cloneObject = fn (*T) ?*Object,
+            .cloneObject = fn (*T) *Object,
             .castObject = fn (*T, Kind) ?*Object,
             .readProperty = .{
                 fn (*T, *String, Access) Value,
@@ -122,10 +121,12 @@ pub fn @"fn"(comptime T: type) type {
         fn construct(obj: *Object, args: init_fn.Args) !void {
             const self: *@This() = @ptrCast(obj);
             if (init_fn.exists) {
-                self.custom_struct = switch (init_fn.uses_args) {
-                    true => try errable(T.init(args)),
-                    false => try errable(T.init()),
-                };
+                if (init_fn.by_value) {
+                    self.custom_struct = try errable(if (init_fn.uses_args) T.init(args) else T.init());
+                } else {
+                    const ptr = &self.custom_struct;
+                    try errable(if (init_fn.uses_args) T.initSelf(ptr, args) else T.initSelf(ptr));
+                }
             } else {
                 self.custom_struct = .{};
                 inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
@@ -141,10 +142,6 @@ pub fn @"fn"(comptime T: type) type {
                 }
             }
             self.flags.initialized = true;
-            return switch (@hasDecl(T, "finalizeObject")) {
-                true => T.finalizeObject(self.custom()),
-                false => {},
-            };
         }
 
         fn destruct(obj: *Object) void {
@@ -219,7 +216,15 @@ pub fn @"fn"(comptime T: type) type {
             const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "cloneObject")) {
                 true => T.cloneObject(self.custom()),
-                false => error.InvalidOperation,
+                false => switch (@hasDecl(T, "clone")) {
+                    true => clone: {
+                        const copy = try create(obj.class());
+                        copy.custom_struct = try T.clone(self.custom());
+                        copy.flags.initialized = true;
+                        break :clone copy.object();
+                    },
+                    false => error.InvalidOperation,
+                },
             };
         }
 
@@ -723,7 +728,19 @@ pub fn @"fn"(comptime T: type) type {
                 if (@typeInfo(Arg0) != .@"struct") {
                     @compileError("init() should accept a single struct as its sole argument");
                 }
-                break :init .{ .exists = true, .Args = Arg0, .uses_args = arg_count > 0 };
+                break :init .{ .exists = true, .Args = Arg0, .uses_args = arg_count > 0, .by_value = true };
+            } else if (@hasDecl(T, "initSelf")) {
+                const InitSelf = @TypeOf(T.initSelf);
+                const arg_count = php.util.argCount(InitSelf);
+                const Arg0 = switch (arg_count) {
+                    1 => struct {},
+                    2 => php.util.ArgType(InitSelf, 0),
+                    else => void,
+                };
+                if (@typeInfo(Arg0) != .@"struct") {
+                    @compileError("initSelf() should accept a single struct as its sole argument");
+                }
+                break :init .{ .exists = true, .Args = Arg0, .uses_args = arg_count > 1, .by_value = false };
             } else {
                 // use setters to initialize custom struct
                 const setter_names = std.meta.fieldNames(@TypeOf(setters));

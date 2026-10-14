@@ -188,8 +188,7 @@ pub fn toCustom(self: *const @This(), comptime C: type) *C.Custom {
 
 pub fn fromCustom(self: anytype) *@This() {
     const T = @TypeOf(self.*);
-    const C = *Custom(T);
-    const custom_obj: *C = @ptrCast(@constCast(self));
+    const custom_obj: *Custom(T) = @constCast(@fieldParentPtr("custom_struct", self));
     return custom_obj.object();
 }
 
