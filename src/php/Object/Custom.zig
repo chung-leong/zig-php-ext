@@ -482,7 +482,7 @@ pub fn @"fn"(comptime T: type) type {
         fn tryUnsetDimension(obj: *Object, offset: *Value) !void {
             const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "unsetDimension")) {
-                true => T.unsetDimension(self.custom(), offset),
+                true => T.unsetDimension(self.custom(), offset.*),
                 false => error.InvalidOperation,
             };
         }

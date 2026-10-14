@@ -204,4 +204,25 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame("unable to unset field 'cow' in WithReadPropertyCache: undefined", $lines[20]);
     }
 
+    public function testReadDimension(): void
+    {
+        $lines = $this->runTest("classes", "dimension.php");
+        $this->assertSame(<<<OUTPUT
+        len = 8
+        (readDimension: 4) 0
+        (writeDimension: 4) (readDimension: 4) 1.25
+        (writeDimension: 5) (readDimension: 5) 8.8
+        (readDimension: 8) out of bound
+        negative value
+        not numeric
+        (writeDimension: 3) not numeric
+        (hasDimension: 4) true
+        false
+        (hasDimension: 8) false
+        false
+        (unsetDimension: 4) (readDimension: 4) NAN
+        negative value
+        OUTPUT, implode("\n", $lines));
+        // echo implode("\n", $lines);
+    }
 }
