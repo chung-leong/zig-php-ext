@@ -77,7 +77,7 @@ pub fn build(b: *std.Build) !void {
     const options = b.addOptions();
     options.addOption([:0]const u8, "app_name", app.name);
     options.addOption([:0]const u8, "app_version", app.version);
-    lib.root_module.addOptions("options", options);
+    lib.root_module.addOptions("config", options);
 
     const wf = b.addUpdateSourceFiles();
     const ext = if (target.result.os.tag == .linux)

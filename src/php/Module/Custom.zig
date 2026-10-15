@@ -7,11 +7,14 @@ const Allocator = php.Allocator;
 const Class = php.Class;
 const Constant = php.Constant;
 const errable = php.util.errable;
-const Function = php.Function;
 const failure = php.failure;
+const unsupported = failure.unsupported;
+const Function = php.Function;
+const IniEntry = php.IniEntry;
 const Module = php.Module;
 const Singleton = php.Singleton;
 const String = php.String;
+const Value = php.Value;
 const Dependency = php.Module.Dependency;
 const FunctionEntry = @import("Custom/FunctionEntry.zig");
 const IniEntryDef = @import("Custom/IniEntryDef.zig");
@@ -161,15 +164,37 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             var arena: std.heap.ArenaAllocator = .init(php.allocator);
             defer arena.deinit();
             const allocator = arena.allocator();
-            inline for (comptime std.meta.fieldNames(@TypeOf(getters)), 0..) |getter_name, index| {
-                const setter_name = comptime for (std.meta.fieldNames(setters)) |name| {
-                    if (std.mem.startsWith(u8, name, getter_name)) {
-                        if (name.len == getter_name.len or name[getter_name.len] == ' ') {
-                            break name;
+            const getter_names = comptime std.meta.fieldNames(@TypeOf(getters));
+            const setter_names = comptime std.meta.fieldNames(@TypeOf(setters));
+            inline for (getter_names, 0..) |getter_name, index| {
+                const getter = @field(getters, getter_name);
+                const setter, const kind: IniEntry.Kind = comptime for (setter_names) |setter_name| {
+                    if (std.mem.startsWith(u8, setter_name, getter_name)) {
+                        if (setter_name.len == getter_name.len) {
+                            break .{ @field(setters, setter_name), .all };
+                        } else if (setter_name[getter_name.len] == ' ') {
+                            const suffix = setter_name[getter_name.len + 1 ..];
+                            const kind: IniEntry.Kind = for (std.meta.fieldNames(IniEntry.Kind)) |kind_name| {
+                                if (std.mem.eql(u8, suffix, "(" ++ kind_name ++ ")")) {
+                                    break @field(IniEntry.Kind, kind_name);
+                                }
+                            } else @compileError("Not a valid ini field suffix: " ++ suffix);
+                            break .{ @field(setters, setter_name), kind };
                         }
                     }
                 } else @compileError("Missing setter: " ++ getter_name);
-                ini_entries[index] = .init(allocator, self, options.name, getter_name, setter_name);
+                const updater = struct {
+                    pub fn onModify(_: *IniEntry, text: *String) !void {
+                        const container = Singleton(T).get();
+                        const Arg = php.util.ArgType(@TypeOf(setter), 1);
+                        const new_value = try fromIniString(Arg, text);
+                        return setter(container, new_value);
+                    }
+                };
+                const ini_name = options.name ++ "." ++ getter_name;
+                const default_value = try errable(getter(self));
+                const default_value_str = try toIniString(allocator, default_value);
+                ini_entries[index] = .init(ini_name, kind, default_value_str, updater.onModify);
             }
             // last entry is delimiter
             ini_entries[ini_entries.len - 1] = std.mem.zeroes(IniEntryDef);
@@ -181,6 +206,44 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         fn unregisterIniEntries(module_no: c_int) void {
             if (ini_entries.len == 0) return;
             pi.zend_unregister_ini_entries(module_no);
+        }
+
+        fn toIniString(allocator: std.mem.Allocator, arg: anytype) ![:0]const u8 {
+            const Arg = @TypeOf(arg);
+            return switch (@typeInfo(Arg)) {
+                .bool => if (arg) "On" else "Off",
+                .int, .float => try std.fmt.allocPrintSentinel(allocator, "{d}", 0, .{arg}),
+                .pointer => |pt| switch (pt.child) {
+                    u8 => if (pt.sentinel() == 0)
+                        arg
+                    else
+                        try std.fmt.allocPrintSentinel(allocator, "{s}", 0, .{arg}),
+                    String => arg.slice(),
+                    else => unsupported(Arg),
+                },
+                else => get: {
+                    var value: Value = .fromAny(arg).cast(.string);
+                    const slice = value.string().slice();
+                    break :get slice.ptr;
+                },
+            };
+        }
+
+        fn fromIniString(comptime Arg: type, str: *String) !Arg {
+            return switch (@typeInfo(Arg)) {
+                .bool => pi.zend_ini_parse_bool(@ptrCast(str)),
+                .int => pi.zend_atol(@ptrCast(str)),
+                .float => pi.zend_strtod(@ptrCast(str)),
+                .pointer => |pt| switch (pt.child) {
+                    u8 => str.slice(),
+                    String => str.retain(),
+                    else => unsupported(Arg),
+                },
+                else => get: {
+                    const value: Value = .fromString(str);
+                    break :get value.convertTo(Arg);
+                },
+            };
         }
 
         fn registerClasses() !void {

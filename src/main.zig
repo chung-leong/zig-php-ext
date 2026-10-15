@@ -1,13 +1,13 @@
 const std = @import("std");
-const options = @import("options");
+const config = @import("config");
 
 const php = @import("php/root.zig");
 const Module = php.Module;
 
 var module: Module.Custom(@import("extension.zig"), .{
     // app name and version are extract from composer.json by build.zig
-    .name = options.app_name,
-    .version = options.app_version,
+    .name = config.app_name,
+    .version = config.app_version,
 }) = .init();
 comptime {
     module.register();

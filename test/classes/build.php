@@ -186,7 +186,9 @@ $menu = (new CliMenuBuilder)
         }
         $build = true;
         $menu->close();
-    })
+    });
+    
+$menu    
     ->setMarginAuto()
     ->setBackgroundColour(220, 'yellow')
     ->setForegroundColour(0, 'black')
