@@ -180,15 +180,19 @@ pub fn getProperties(self: *const @This()) *Array {
     return @ptrCast(ht);
 }
 
-pub fn toCustom(self: *const @This(), comptime C: type) *C.Custom {
-    if (C == @This()) return @constCast(self);
-    const custom_obj: *C = @ptrCast(@constCast(self));
+pub fn getCustom(self: *const @This(), comptime T: type, err: anytype) !*T {
+    return if (Custom(T).is(self)) self.custom(T) else err;
+}
+
+pub fn custom(self: *const @This(), comptime T: type) *T {
+    std.debug.assert(Custom(T).is(self));
+    const custom_obj: *Custom(T) = @ptrCast(@constCast(self));
     return custom_obj.custom();
 }
 
-pub fn fromCustom(self: anytype) *@This() {
-    const T = @TypeOf(self.*);
-    const custom_obj: *Custom(T) = @constCast(@fieldParentPtr("custom_struct", self));
+pub fn fromCustom(custom_ptr: anytype) *@This() {
+    const T = @TypeOf(custom_ptr.*);
+    const custom_obj = Custom(T).fromCustom(custom_ptr);
     return custom_obj.object();
 }
 

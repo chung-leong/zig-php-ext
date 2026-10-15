@@ -24,12 +24,22 @@ const errable = php.util.errable;
 
 pub fn @"fn"(comptime T: type) type {
     return struct {
-        pub fn object(self: *@This()) *Object {
-            return @ptrCast(&self.php_object);
+        pub fn object(self: *const @This()) *Object {
+            return @ptrCast(@constCast(&self.php_object));
         }
 
-        pub fn custom(self: *@This()) *T {
-            return &self.custom_struct;
+        pub fn custom(self: *const @This()) *T {
+            return @constCast(&self.custom_struct);
+        }
+
+        pub fn fromCustom(custom_ptr: *const T) *@This() {
+            const self: *const @This() = @fieldParentPtr("custom_struct", custom_ptr);
+            std.debug.assert(is(self.object()));
+            return @constCast(self);
+        }
+
+        pub fn is(obj: *const Object) bool {
+            return @intFromPtr(obj.impl.handlers) == @intFromPtr(&handlers);
         }
 
         pub fn create(class: *const Class) !*@This() {
@@ -65,10 +75,6 @@ pub fn @"fn"(comptime T: type) type {
             };
             const Iterator = @TypeOf(iter);
             return Object.Iterator.Custom(Iterator).create(iter);
-        }
-
-        pub fn fromCustom(ptr: *T) *@This() {
-            return @fieldParentPtr("custom_struct", ptr);
         }
 
         pub const Custom = T;
@@ -560,13 +566,13 @@ pub fn @"fn"(comptime T: type) type {
             const obj, const value, const multiplier: c_int = init: {
                 if (value_ptr1.kind() == .object) {
                     const obj1 = value_ptr1.object();
-                    if (@intFromPtr(obj1.impl.handlers.*.compare) == @intFromPtr(&compareWith)) {
+                    if (is(obj1)) {
                         break :init .{ obj1, value_ptr2.*, 1 };
                     }
                 }
                 if (value_ptr2.kind() == .object) {
                     const obj2 = value_ptr2.object();
-                    if (@intFromPtr(obj2.impl.handlers.*.compare) == @intFromPtr(&compareWith)) {
+                    if (is(obj2)) {
                         break :init .{ obj2, value_ptr1.*, -1 };
                     }
                 }

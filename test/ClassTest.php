@@ -313,6 +313,22 @@ final class ClassTest extends ExtensionTestCase
         to string => castObject
         '3.141592653589793'
         OUTPUT, implode("\n", $lines));
+    }
+
+    public function testWithDoOperation(): void
+    {
+        $lines = $this->runTest("classes", "operation.php");        
+        $this->assertSame(<<<OUTPUT
+        doOperation: .add 3.141592653589793 2
+        5.1415926535898
+        doOperation: .sub 3.141592653589793 2
+        1.1415926535898
+        doOperation: .mul 3.141592653589793 2
+        6.2831853071796
+        doOperation: .div 3.141592653589793 2
+        1.5707963267949
+        OUTPUT, implode("\n", $lines));
         // echo implode("\n", $lines);
     }
+
 }

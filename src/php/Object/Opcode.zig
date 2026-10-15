@@ -11,13 +11,13 @@ pub const @"enum" = enum(u8) {
     sub = c.ZEND_SUB,
     mul = c.ZEND_MUL,
     div = c.ZEND_DIV,
-    MOD = c.ZEND_MOD,
-    POW = c.ZEND_POW,
+    mod = c.ZEND_MOD,
+    pow = c.ZEND_POW,
     _,
 
     pub fn perform(self: @This(), op1: Value, op2: Value) !Value {
         var value: Value = undefined;
-        const opcode = @intFromEnum(self);
+        const opcode = @backingInt(self);
         const zval1: *c.zval = @ptrCast(@constCast(&op1));
         const zval2: *c.zval = @ptrCast(@constCast(&op2));
         const zrv: *c.zval = @ptrCast(&value);

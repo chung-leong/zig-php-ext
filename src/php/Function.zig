@@ -171,7 +171,7 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
                     const obj = iter.this.getObject() catch |err| return failure.throw(err);
                     break :get switch (T) {
                         Object => obj, // self is a standard object
-                        else => obj.toCustom(Object.Custom(T)), // self is a custom object
+                        else => obj.custom(T), // self is a custom object
                     };
                 },
                 .this_pointer => |T| get: {
