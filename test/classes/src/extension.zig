@@ -21,3 +21,4 @@ pub const @"export WithGetProperties" = Class.Custom(@import("WithGetProperties.
 pub const @"export WithGetPropertiesNoGetters" = Class.Custom(@import("WithGetPropertiesNoGetters.zig"));
 pub const @"export WithGetMethod" = Class.Custom(@import("WithGetMethod.zig"));
 pub const @"export WithCompareWith" = Class.Custom(@import("WithCompareWith.zig"));
+pub const @"export WithGetClosure" = Class.Custom(@import("WithGetClosure.zig"));

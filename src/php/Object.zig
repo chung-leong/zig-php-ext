@@ -238,9 +238,9 @@ pub const GarbageCollectionResult = struct {
     array: ?*Array = null,
 };
 pub const ClosureResult = struct {
-    class: ?*Class = null,
-    function: ?*Function = null,
-    object: ?*Object = null,
+    class: ?*const Class = null,
+    function: ?*const Function = null,
+    object: ?*const Object = null,
 };
 /// Purpose the data to be returned by getProperties()
 pub const PropertiesPurpose = enum(c_int) {

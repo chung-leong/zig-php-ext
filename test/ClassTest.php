@@ -288,6 +288,16 @@ final class ClassTest extends ExtensionTestCase
         equals 3
         not numeric
         OUTPUT, implode("\n", $lines));
+    }
+
+    public function testWithGetClosure(): void
+    {
+        $lines = $this->runTest("classes", "closure.php");        
+        $this->assertSame(<<<OUTPUT
+        getClosure: false
+        .{ .number1 = 2.5, .number2 = 10 }
+        result = 12.5
+        OUTPUT, implode("\n", $lines));
         // echo implode("\n", $lines);
     }
 

@@ -588,7 +588,7 @@ pub fn @"fn"(comptime T: type) type {
             };
         }
 
-        fn getClosure(obj: *Object, class_ptr: *?*Class, func_ptr: *?*Function, obj_ptr: *?*Object, check_only: bool) callconv(.c) c.zend_result {
+        fn getClosure(obj: *Object, class_ptr: *?*const Class, func_ptr: *?*const Function, obj_ptr: *?*const Object, check_only: bool) callconv(.c) c.zend_result {
             if (tryGetClosure(obj, check_only)) |closure| {
                 class_ptr.* = closure.class;
                 func_ptr.* = closure.function;
@@ -603,7 +603,7 @@ pub fn @"fn"(comptime T: type) type {
         fn tryGetClosure(obj: *Object, check_only: bool) !ClosureResult {
             const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "getClosure")) {
-                true => T.getClosure(self.custom, check_only),
+                true => T.getClosure(self.custom(), check_only),
                 false => error.IllegalOperation,
             };
         }
