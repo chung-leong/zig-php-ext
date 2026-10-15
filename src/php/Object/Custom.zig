@@ -386,7 +386,7 @@ pub fn @"fn"(comptime T: type) type {
 
                 pub fn handler(s: *Self, p: PropertiesPurpose) !?*Array {
                     return switch (@hasDecl(T, "getProperties")) {
-                        true => s.custom.getProperties(p),
+                        true => T.getProperties(s.custom(), p),
                         false => null,
                     };
                 }

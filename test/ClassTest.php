@@ -236,7 +236,34 @@ final class ClassTest extends ExtensionTestCase
             [number] => 787
         )
         OUTPUT, implode("\n", $lines));
-        // echo implode("\n", $lines);
     }
 
+    public function testGetProperties(): void
+    {
+        $lines = $this->runTest("classes", "property-array.php");
+        $this->assertSame(<<<OUTPUT
+        (getProperties: .debug) WithGetProperties Object
+        (
+            [number] => 1979
+            [optional] =>
+            [foo] => cowboy
+            [bar] => mleczny
+            [17] => 3.1415926535898
+        )
+        OUTPUT, implode("\n", $lines));
+    }
+
+    public function testGetPropertiesNoGetter(): void
+    {
+        $lines = $this->runTest("classes", "property-array-no-getters.php");
+        $this->assertSame(<<<OUTPUT
+        (getProperties: .debug) WithGetPropertiesNoGetters Object
+        (
+            [foo] => cowboy
+            [bar] => mleczny
+            [17] => 3.1415926535898
+        )
+        OUTPUT, implode("\n", $lines));
+        // echo implode("\n", $lines);
+    }
 }
