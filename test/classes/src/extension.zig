@@ -24,3 +24,4 @@ pub const @"export WithCompareWith" = Class.Custom(@import("WithCompareWith.zig"
 pub const @"export WithGetClosure" = Class.Custom(@import("WithGetClosure.zig"));
 pub const @"export WithCastObject" = Class.Custom(@import("WithCastObject.zig"));
 pub const @"export WithDoOperation" = Class.Custom(@import("WithDoOperation.zig"));
+pub const @"export WithGetGarbageCollection" = Class.Custom(@import("WithGetGarbageCollection.zig"));

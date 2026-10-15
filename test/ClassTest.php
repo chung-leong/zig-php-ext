@@ -290,7 +290,7 @@ final class ClassTest extends ExtensionTestCase
         OUTPUT, implode("\n", $lines));
     }
 
-    public function testWithGetClosure(): void
+    public function testGetClosure(): void
     {
         $lines = $this->runTest("classes", "closure.php");        
         $this->assertSame(<<<OUTPUT
@@ -300,7 +300,7 @@ final class ClassTest extends ExtensionTestCase
         OUTPUT, implode("\n", $lines));
     }
 
-    public function testWithCastObject(): void
+    public function testCastObject(): void
     {
         $lines = $this->runTest("classes", "cast.php");        
         $this->assertSame(<<<OUTPUT
@@ -315,7 +315,7 @@ final class ClassTest extends ExtensionTestCase
         OUTPUT, implode("\n", $lines));
     }
 
-    public function testWithDoOperation(): void
+    public function testDoOperation(): void
     {
         $lines = $this->runTest("classes", "operation.php");        
         $this->assertSame(<<<OUTPUT
@@ -331,4 +331,9 @@ final class ClassTest extends ExtensionTestCase
         // echo implode("\n", $lines);
     }
 
+    public function testGetGarbageCollection(): void
+    {
+        $lines = $this->runTest("classes", "gc.php");
+        $this->assertSame("getGarbageCollection", $lines[0]);
+    }
 }
