@@ -106,10 +106,7 @@ pub fn @"fn"(comptime T: type) type {
             .hasDimension = fn (*T, Value, bool) void,
             .unsetDimension = fn (*T, Value) void,
             .countElements = fn (*T, Value) usize,
-            .getMethod = .{
-                fn (*T, *String) usize,
-                fn (*T, *String, Value) usize,
-            },
+            .getMethod = fn (*T, *String) *const Function,
             .getConstructor = fn (*T) *Function,
             .getClassName = fn (*T) *String,
             .compareWith = fn (*T, Value) c_int,
@@ -508,18 +505,21 @@ pub fn @"fn"(comptime T: type) type {
         /// Get method
         fn getMethod(obj_ptr: **Object, name: *String, key: *Value) callconv(.c) ?*const Function {
             return tryGetMethod(obj_ptr, name, key) catch |err| {
-                failure.throw(err);
+                // throw the error unless it's `Undefined`
+                if (!failure.match(err, error.Undefined)) {
+                    failure.throw(err);
+                }
                 return null;
             };
         }
 
-        fn tryGetMethod(obj_ptr: **Object, name: *String, key: *Value) !?*const Function {
+        fn tryGetMethod(obj_ptr: **Object, name: *String, key: *Value) !*const Function {
             // TODO: use key for case insensitivity
             _ = key;
             const self: *@This() = @ptrCast(obj_ptr.*);
             return method_set.find(name) orelse switch (@hasDecl(T, "getMethod")) {
                 true => T.getMethod(self.custom(), name),
-                false => error.UndefinedMethod,
+                false => error.Undefined,
             };
         }
 

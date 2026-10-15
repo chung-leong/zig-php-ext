@@ -85,9 +85,9 @@ pub fn errorMessage(err: anytype) [:0]const u8 {
 }
 
 pub fn match(err: anytype, other_err: anytype) bool {
-    const E1 = @TypeOf(err);
+    const E1 = @TypeOf(err) || error{};
     const E2 = @TypeOf(other_err);
-    return (E1 || E2 == E1 and err == other_err);
+    return if (E1 || E2 == E1) err == other_err else false;
 }
 
 pub fn throw(err: anytype) void {

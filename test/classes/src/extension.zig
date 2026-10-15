@@ -19,3 +19,4 @@ pub const @"export WithReadDimension" = Class.Custom(@import("WithReadDimension.
 pub const @"export WithGetClassName" = Class.Custom(@import("WithGetClassName.zig"));
 pub const @"export WithGetProperties" = Class.Custom(@import("WithGetProperties.zig"));
 pub const @"export WithGetPropertiesNoGetters" = Class.Custom(@import("WithGetPropertiesNoGetters.zig"));
+pub const @"export WithGetMethod" = Class.Custom(@import("WithGetMethod.zig"));

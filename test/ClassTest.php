@@ -264,6 +264,17 @@ final class ClassTest extends ExtensionTestCase
             [17] => 3.1415926535898
         )
         OUTPUT, implode("\n", $lines));
+    }
+
+    public function testGetMethod(): void
+    {
+        $lines = $this->runTest("classes", "method.php");        
+        $this->assertSame(<<<OUTPUT
+        foo
+        getMethod
+        bar
+        OUTPUT, implode("\n", $lines));
         // echo implode("\n", $lines);
     }
+
 }
