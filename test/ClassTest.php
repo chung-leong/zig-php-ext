@@ -298,7 +298,21 @@ final class ClassTest extends ExtensionTestCase
         .{ .number1 = 2.5, .number2 = 10 }
         result = 12.5
         OUTPUT, implode("\n", $lines));
-        // echo implode("\n", $lines);
     }
 
+    public function testWithCastObject(): void
+    {
+        $lines = $this->runTest("classes", "cast.php");        
+        $this->assertSame(<<<OUTPUT
+        to bool => castObject
+        true
+        to int => castObject
+        3
+        to float => castObject
+        3.141592653589793
+        to string => castObject
+        '3.141592653589793'
+        OUTPUT, implode("\n", $lines));
+        // echo implode("\n", $lines);
+    }
 }
