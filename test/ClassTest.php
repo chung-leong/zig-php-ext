@@ -274,6 +274,20 @@ final class ClassTest extends ExtensionTestCase
         getMethod
         bar
         OUTPUT, implode("\n", $lines));
+    }
+
+    public function testCompareWith(): void
+    {
+        $lines = $this->runTest("classes", "compare.php");        
+        $this->assertSame(<<<OUTPUT
+        compareWith: 4
+        less than 4
+        compareWith: 2.9
+        greater than 2.9
+        compareWith: 3
+        equals 3
+        not numeric
+        OUTPUT, implode("\n", $lines));
         // echo implode("\n", $lines);
     }
 

@@ -583,7 +583,7 @@ pub fn @"fn"(comptime T: type) type {
         fn tryCompareWith(obj: *Object, value: Value) !c_int {
             const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "compareWith")) {
-                true => self.custom.compareWith(value),
+                true => T.compareWith(self.custom(), value),
                 false => error.IllegalOperation,
             };
         }
@@ -603,7 +603,7 @@ pub fn @"fn"(comptime T: type) type {
         fn tryGetClosure(obj: *Object, check_only: bool) !ClosureResult {
             const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "getClosure")) {
-                true => self.custom.getClosure(check_only),
+                true => T.getClosure(self.custom, check_only),
                 false => error.IllegalOperation,
             };
         }
@@ -621,7 +621,7 @@ pub fn @"fn"(comptime T: type) type {
         fn tryGetGarbageCollection(obj: *Object) !GarbageCollectionResult {
             const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "getGarbageCollection")) {
-                true => self.custom.getGarbageCollection(self.custom()),
+                true => T.getGarbageCollection(self.custom()),
                 false => GarbageCollectionResult{},
             };
         }
