@@ -72,6 +72,12 @@ pub fn createFromStruct(arg: anytype) *@This() {
     return obj;
 }
 
+pub fn createFromArray(arr: *Array) *@This() {
+    const obj: Object = .createStandard();
+    obj.properties = arr;
+    return obj;
+}
+
 pub fn retain(self: *@This()) *@This() {
     self.addRef();
     return self;

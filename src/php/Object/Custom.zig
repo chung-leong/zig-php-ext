@@ -9,6 +9,7 @@ const Class = php.Class;
 const failure = php.failure;
 const Function = php.Function;
 const Object = php.Object;
+const Iterator = Object.Iterator;
 const ClosureResult = Object.ClosureResult;
 const GarbageCollectionResult = Object.GarbageCollectionResult;
 const Opcode = Object.Opcode;
@@ -58,27 +59,45 @@ pub fn @"fn"(comptime T: type) type {
             return self;
         }
 
-        pub fn getIterator(obj: *Object) ?*Object.Iterator {
+        pub fn getIterator(obj: *Object) ?*Iterator {
+            return tryGetIterator(obj) catch |err| {
+                failure.throw(err);
+                return null;
+            };
+        }
+
+        fn tryGetIterator(obj: *Object) !?*Iterator {
             const self: *@This() = @ptrCast(obj);
-            // TODO: allow allocator
-            // TODO: make sure option struct has no required fields
-            const iter = switch (@hasDecl(T, "iterate")) {
+            if (!has_iterator) return null;
+            if (@hasDecl(T, "getIterator")) {
+                return T.getIterator(self.custom());
+            }
+            const result = switch (@hasDecl(T, "iterate")) {
                 true => switch (comptime argCount(@TypeOf(T.iterate))) {
-                    1 => self.iterate(),
-                    2 => self.iterate(.{}),
+                    1 => T.iterate(self.custom()),
+                    // TODO: make sure option struct has no required fields
+                    2 => T.iterate(self.custom(), .{}),
                     else => @compileError("iterate() should have at most 1 argument containing options"),
                 },
-                false => switch (has_iterator) {
-                    true => Object.Iterator.Properties(T, std.meta.fieldNames(@TypeOf(getters))).init(obj),
-                    false => return null,
+                false => create: {
+                    const arr = getPropertiesFor(obj, .default) orelse return null;
+                    defer arr.release();
+                    break :create PropertyIterator.init(arr);
                 },
             };
-            const Iterator = @TypeOf(iter);
-            return Object.Iterator.Custom(Iterator).create(iter);
+            const iter = try errable(result);
+            const custom_iter = try Iterator.Custom(@TypeOf(iter)).create(iter);
+            return custom_iter.iterator();
         }
 
         pub const Custom = T;
-        pub const has_iterator = @hasDecl(T, "iterate") and std.meta.fieldNames(@TypeOf(getters)).len > 0;
+        pub const has_iterator = init: {
+            if (@hasDecl(T, "getIterator")) break :init true;
+            if (@hasDecl(T, "iterate")) break :init true;
+            if (@hasDecl(T, "getProperties")) break :init true;
+            if (std.meta.fieldNames(@TypeOf(getters)).len > 0) break :init true;
+            break :init false;
+        };
         pub const handler_protypes = .{
             .freeObject = fn (*T) void,
             .destroyObject = fn (*T) void,
@@ -832,3 +851,29 @@ pub fn @"fn"(comptime T: type) type {
         }
     };
 }
+
+pub const PropertyIterator = struct {
+    pub fn init(array: *Array) @This() {
+        return .{
+            .array = array.retain(),
+            .iter = array.iterate(.{}),
+        };
+    }
+
+    pub fn deinit(self: *@This()) void {
+        self.array.release();
+    }
+
+    pub fn next(self: *@This()) ?@Tuple(&.{ Value, Value }) {
+        const value = self.iter.next() orelse return null;
+        const key = self.iter.key();
+        return .{ key, value };
+    }
+
+    pub fn reset(self: *@This()) void {
+        self.iter.reset();
+    }
+
+    array: *Array,
+    iter: Array.Iterator,
+};

@@ -25,3 +25,5 @@ pub const @"export WithGetClosure" = Class.Custom(@import("WithGetClosure.zig"))
 pub const @"export WithCastObject" = Class.Custom(@import("WithCastObject.zig"));
 pub const @"export WithDoOperation" = Class.Custom(@import("WithDoOperation.zig"));
 pub const @"export WithGetGarbageCollection" = Class.Custom(@import("WithGetGarbageCollection.zig"));
+pub const @"export WithGetIterator" = Class.Custom(@import("WithGetIterator.zig"));
+pub const @"export WithIterate" = Class.Custom(@import("WithIterate.zig"));

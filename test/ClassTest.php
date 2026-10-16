@@ -160,9 +160,9 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame("bar = (readProperty: bar) Rats live on no evil star", $lines[2]);
         $this->assertSame("(writeProperty: foo)", $lines[3]);
         $this->assertSame("number = 777", $lines[4]);
-        $this->assertSame("(readProperty: cow) unable to read field 'cow' in WithReadProperty: undefined", $lines[5]);
+        $this->assertSame("(readProperty: cow) no field named 'cow' in WithReadProperty", $lines[5]);
         $this->assertSame("(writeProperty: cow)", $lines[6]);
-        $this->assertSame("unable to write field 'cow' in WithReadProperty: undefined", $lines[7]);
+        $this->assertSame("no field named 'cow' in WithReadProperty", $lines[7]);
         $this->assertSame("(writeProperty: bar)", $lines[8]);
         $this->assertSame("unable to write field 'bar' in WithReadProperty: read only", $lines[9]);
         $this->assertSame("true", $lines[10]);
@@ -175,7 +175,7 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame("foo = (readProperty: foo) -1", $lines[17]);
         $this->assertSame("unable to unset field 'number' in WithReadProperty: cannot be null", $lines[18]);
         $this->assertSame("(unsetProperty: cow)", $lines[19]);
-        $this->assertSame("unable to unset field 'cow' in WithReadProperty: undefined", $lines[20]);
+        $this->assertSame("no field named 'cow' in WithReadProperty", $lines[20]);
     }
 
     public function testReadPropertyWithCache(): void
@@ -186,9 +186,9 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame("bar = (readProperty: bar) Rats live on no evil star", $lines[2]);
         $this->assertSame("(writeProperty: foo)", $lines[3]);
         $this->assertSame("number = 777", $lines[4]);
-        $this->assertSame("(readProperty: cow) unable to read field 'cow' in WithReadPropertyCache: undefined", $lines[5]);
+        $this->assertSame("(readProperty: cow) no field named 'cow' in WithReadPropertyCache", $lines[5]);
         $this->assertSame("(writeProperty: cow)", $lines[6]);
-        $this->assertSame("unable to write field 'cow' in WithReadPropertyCache: undefined", $lines[7]);
+        $this->assertSame("no field named 'cow' in WithReadPropertyCache", $lines[7]);
         $this->assertSame("(writeProperty: bar)", $lines[8]);
         $this->assertSame("unable to write field 'bar' in WithReadPropertyCache: read only", $lines[9]);
         $this->assertSame("true", $lines[10]);
@@ -201,7 +201,7 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame("foo = (readProperty: foo) -1", $lines[17]);
         $this->assertSame("unable to unset field 'number' in WithReadPropertyCache: cannot be null", $lines[18]);
         $this->assertSame("(unsetProperty: cow)", $lines[19]);
-        $this->assertSame("unable to unset field 'cow' in WithReadPropertyCache: undefined", $lines[20]);
+        $this->assertSame("no field named 'cow' in WithReadPropertyCache", $lines[20]);
     }
 
     public function testReadDimension(): void
@@ -328,7 +328,6 @@ final class ClassTest extends ExtensionTestCase
         doOperation: .div 3.141592653589793 2
         1.5707963267949
         OUTPUT, implode("\n", $lines));
-        // echo implode("\n", $lines);
     }
 
     public function testGetGarbageCollection(): void
@@ -336,4 +335,33 @@ final class ClassTest extends ExtensionTestCase
         $lines = $this->runTest("classes", "gc.php");
         $this->assertSame("getGarbageCollection", $lines[0]);
     }
+
+    public function testIterate(): void
+    {
+        $lines = $this->runTest("classes", "iterate.php");
+        $this->assertSame(<<<OUTPUT
+        iterate
+        0: 0
+        1: 1
+        2: 2
+        3: 3
+        4: 4
+        greeting: Hello
+        template: Hello, \$name!
+        OUTPUT, implode("\n", $lines));
+        // echo implode("\n", $lines);
+    }
+
+    public function testGetIterator(): void
+    {
+        $lines = $this->runTest("classes", "get-iterator.php");
+        $this->assertSame(<<<OUTPUT
+        getIterator
+        0: 0
+        1: 1
+        2: 2
+        3: 3
+        4: 4
+        OUTPUT, implode("\n", $lines));
+    }   
 }
