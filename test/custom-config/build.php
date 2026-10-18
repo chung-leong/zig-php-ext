@@ -214,6 +214,7 @@ $builder->addSubMenu($title, function ($b) use($settings) {
         }
         $b->addMenuItem($item);
     }
+    $b->addLineBreak('-');
 });
 $title = "Operation system: " . implode(", ", $settings->targets);
 $builder->addSubMenu($title, function ($b) use($settings) {
@@ -261,6 +262,7 @@ $builder->addSubMenu($title, function ($b) use($settings) {
         }
         $b->addMenuItem($item);
     }
+    $b->addLineBreak('-');
 });
 $builder->addLineBreak('-');
 
@@ -273,6 +275,7 @@ if ($settings->zig_config) {
             if (is_array($current_value)) {
                 $title = "$entry->title: " . implode(", ", $current_value);
                 $builder->addSubMenu($title, function ($b) use($settings, $name, $entry, $current_value) {
+                    $b->setTitle($entry->title);
                     foreach ($entry->choices as $item_name => $label) {
                         $cb = function($menu) use($settings, $name, $item_name, $entry) {
                             $item = $menu->getSelectedItem();
@@ -294,6 +297,7 @@ if ($settings->zig_config) {
             } else {
                 $title = "$entry->title: $current_value";
                 $builder->addSubMenu($title, function ($b) use($settings, $name, $entry, $current_value) {
+                    $b->setTitle($entry->title);
                     foreach ($entry->choices as $item_name => $label) {
                         $cb = function($menu) use($settings, $name, $item_name, $entry) {
                             $item = $menu->getSelectedItem();
