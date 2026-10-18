@@ -29,7 +29,18 @@ class Meta {
         if ($this->zig_config) {
             $config = new stdclass;
             foreach ($this->zig_config as $name => $item) {
-                $config->$name = $item->default;
+                $default_value = $item->default;
+                if (isset($item->type)) {
+                    // make sure float values are floats when default values are whole
+                    switch ($item->type) {
+                        case 'f16':
+                        case 'f32':
+                        case 'f64': 
+                            $default_value = (float) $default_value;
+                            break;
+                    }
+                }
+                $config->$name = $default_value;
             }
             return $config;
         }

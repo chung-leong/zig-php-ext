@@ -17,48 +17,5 @@
         "revolt/event-loop": "^1.0",
         "php-school/cli-menu": "^4.3",
         "nelexa/zip": "^4.0"
-    },
-    "zig": {
-        "config": {
-            "something": { 
-                "title": "Test string",
-                "prompt": "Enter something",
-                "default": "Hello world"
-            },
-            "something_int": { 
-                "title": "Test integer",
-                "prompt": "Enter some integer",
-                "default": 1234
-            },
-            "something_bool": { 
-                "title": "Test boolean",
-                "prompt": "Enter some integer",
-                "default": false
-            },
-            "some_flag": { 
-                "title": "Test flag set",
-                "description": "Some flags",
-                "prompt": "Set one or more",
-                "type" : "Flag",
-                "choices": { 
-                    "alpha": "Alpha",
-                    "beta": "Beta",
-                    "gamma": "Gamma"
-                },
-                "default": [ "alpha" ]
-            },
-            "some_enum": { 
-                "title": "Test enum",
-                "description": "Some enum",
-                "prompt": "Select one",
-                "type" : "Enum",
-                "choices": {
-                    "apple": "You like apple",
-                    "banana": "You like banana", 
-                    "cantaloupe": "You hate cantaloupe" 
-                },
-                "default": "cantaloupe"
-            }
-        }
     }
 }
