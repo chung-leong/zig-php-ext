@@ -4,10 +4,116 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
+    // standard options
     const php_include = b.option([]const u8, "php-include", "Directory containing PHP header files") orelse "php-devel";
     const php_extension = b.option([]const u8, "php-extension", "Directory where the extension will be saved") orelse "extensions";
     const php_debug = b.option(bool, "php-debug", "Whether PHP executable has debug enabled") orelse false;
     const php_ts = b.option(bool, "php-ts", "Whether PHP executable was compiled with thread-safety enabled") orelse false;
+
+    // extra options from composer.json
+    var ext = try std.json.parseFromSliceLeaky(struct {
+        name: [:0]const u8,
+        version: [:0]const u8,
+        zig: ?struct {
+            config: ?std.json.Value = null,
+        } = null,
+    }, b.allocator, @embedFile("composer.json"), .{ .ignore_unknown_fields = true });
+    if (std.mem.indexOfScalar(u8, ext.name, '/')) |index| {
+        ext.name = ext.name[index + 1 ..];
+    }
+    const options = b.addOptions();
+    options.addOption([:0]const u8, "ext_name", ext.name);
+    options.addOption([:0]const u8, "ext_version", ext.version);
+    if (ext.zig) |zig| {
+        if (zig.config) |config| {
+            switch (config) {
+                .object => |map| {
+                    var iter = map.iterator();
+                    while (iter.next()) |entry| {
+                        const name = entry.key_ptr.*;
+                        const info = switch (entry.value_ptr.*) {
+                            .object => |obj| obj,
+                            else => |_, tag| {
+                                std.debug.print("config entries are expected to be objects, found: {}", .{tag});
+                                return error.UnexpectedType;
+                            },
+                        };
+                        const description = init: {
+                            const desc_value = info.get("description") orelse info.get("prompt") orelse break :init "[description]";
+                            switch (desc_value) {
+                                .string => |str| break :init try b.allocator.dupeSentinel(u8, str, 0),
+                                else => return error.StringExpected,
+                            }
+                        };
+                        const type_name = init: {
+                            const type_value = info.get("type") orelse {
+                                // infer the value type from the default value
+                                const def_value = info.get("default") orelse return error.MissingDefaultValue;
+                                break :init switch (def_value) {
+                                    .bool => "bool",
+                                    .integer => "i64",
+                                    .float => "f64",
+                                    .string => "[]const u8",
+                                    else => return error.MissingTypeName,
+                                };
+                            };
+                            break :init switch (type_value) {
+                                .string => |str| str,
+                                else => return error.StringExpected,
+                            };
+                        };
+                        // check types defined in composer.zig first
+                        const composer = @import("composer.zig");
+                        inline for (comptime std.meta.declarations(composer)) |decl_name| {
+                            if (std.mem.eql(u8, type_name, decl_name)) {
+                                const T = @field(composer, decl_name);
+                                switch (@typeInfo(T)) {
+                                    .@"enum" => {
+                                        if (b.option(T, name, description)) |value| {
+                                            options.addOption(T, name, value);
+                                        }
+                                    },
+                                    .@"struct" => |st| switch (st.layout) {
+                                        .@"packed" => {
+                                            var value: T = undefined;
+                                            inline for (comptime std.meta.fieldNames(T)) |field_name| {
+                                                const item_name = try std.fmt.allocPrint(b.allocator, "{s}_{s}", .{ name, field_name });
+                                                const item_desc = try std.fmt.allocPrint(b.allocator, "{s}: {s}", .{ description, field_name });
+                                                @field(value, field_name) = b.option(bool, item_name, item_desc) orelse false;
+                                            }
+                                            options.addOption(T, name, value);
+                                        },
+                                        else => {},
+                                    },
+                                    else => {},
+                                }
+                                break;
+                            }
+                        } else inline for (.{ bool, c_int, c_uint, c_long, c_ulong, usize, isize, i8, i16, i32, i64, u8, u16, u32, u64, f16, f32, f64, []const u8 }) |T| {
+                            if (std.mem.eql(u8, type_name, @typeName(T))) {
+                                if (b.option(T, name, description)) |value| {
+                                    if (T == []const u8) {
+                                        // always use strings with sentinel
+                                        options.addOption([:0]const u8, name, try b.allocator.dupeSentinel(u8, value, 0));
+                                    } else {
+                                        options.addOption(T, name, value);
+                                    }
+                                }
+                                break;
+                            }
+                        } else {
+                            std.debug.print("Unknown type: {s}\n", .{type_name});
+                            return error.UnknownType;
+                        }
+                    }
+                },
+                else => |_, tag| {
+                    std.debug.print("'config' is expected to be an object, found: {}", .{tag});
+                    return error.UnexpectedType;
+                },
+            }
+        }
+    }
 
     const translate_c = b.addTranslateC(.{
         .root_source_file = b.path("src/include/c.h"),
@@ -33,19 +139,11 @@ pub fn build(b: *std.Build) !void {
         mod.linkSystemLibrary("dbghelp", .{});
     }
 
-    var app = try std.json.parseFromSliceLeaky(struct {
-        name: [:0]const u8,
-        version: [:0]const u8,
-    }, b.allocator, @embedFile("composer.json"), .{ .ignore_unknown_fields = true });
-    if (std.mem.indexOfScalar(u8, app.name, '/')) |index| {
-        app.name = app.name[index + 1 ..];
-    }
-
     const lib = b.addLibrary(.{
         .linkage = .dynamic,
-        .name = try std.fmt.allocPrint(b.allocator, "php_{s}", .{app.name}),
+        .name = try std.fmt.allocPrint(b.allocator, "php_{s}", .{ext.name}),
         .root_module = mod,
-        .version = try std.SemanticVersion.parse(app.version),
+        .version = try std.SemanticVersion.parse(ext.version),
         .use_llvm = true,
     });
     var c_flags: std.ArrayList([]const u8) = .empty;
@@ -57,6 +155,7 @@ pub fn build(b: *std.Build) !void {
         // allow symbols from php executable to be undefined
         lib.linker_allow_shlib_undefined = true;
     }
+    lib.root_module.addOptions("config", options);
 
     inline for (.{ translate_c, mod }) |c| {
         const os_specific = if (target.result.os.tag == .linux)
@@ -74,13 +173,8 @@ pub fn build(b: *std.Build) !void {
         c.addIncludePath(.{ .cwd_relative = try std.fs.path.join(b.allocator, &.{ php_include, "Zend" }) });
     }
 
-    const options = b.addOptions();
-    options.addOption([:0]const u8, "app_name", app.name);
-    options.addOption([:0]const u8, "app_version", app.version);
-    lib.root_module.addOptions("config", options);
-
     const wf = b.addUpdateSourceFiles();
-    const ext = if (target.result.os.tag == .linux)
+    const file_ext = if (target.result.os.tag == .linux)
         "so"
     else if (target.result.os.tag.isDarwin())
         "dylib"
@@ -88,10 +182,10 @@ pub fn build(b: *std.Build) !void {
         "dll"
     else
         unreachable;
-    const filename = try std.fmt.allocPrint(b.allocator, "php_{s}.{s}", .{ app.name, ext });
+    const filename = try std.fmt.allocPrint(b.allocator, "php_{s}.{s}", .{ ext.name, file_ext });
     wf.addCopyFileToSource(lib.getEmittedBin(), try std.fs.path.join(b.allocator, &.{ php_extension, filename }));
     if (target.result.os.tag == .windows and optimize == .debug) {
-        const pdb_filename = try std.fmt.allocPrint(b.allocator, "php_{s}.pdb", .{app.name});
+        const pdb_filename = try std.fmt.allocPrint(b.allocator, "php_{s}.pdb", .{ext.name});
         wf.addCopyFileToSource(lib.getEmittedPdb(), try std.fs.path.join(b.allocator, &.{ php_extension, pdb_filename }));
     }
     wf.step.dependOn(&lib.step);

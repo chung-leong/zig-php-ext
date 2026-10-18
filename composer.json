@@ -37,7 +37,9 @@
             },
             "some_flag": { 
                 "title": "Test flag set",
+                "description": "Some flags",
                 "prompt": "Set one or more",
+                "type" : "Flag",
                 "choices": { 
                     "alpha": "Alpha",
                     "beta": "Beta",
@@ -47,7 +49,9 @@
             },
             "some_enum": { 
                 "title": "Test enum",
+                "description": "Some enum",
                 "prompt": "Select one",
+                "type" : "Enum",
                 "choices": {
                     "apple": "You like apple",
                     "banana": "You like banana", 

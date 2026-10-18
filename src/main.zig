@@ -5,9 +5,9 @@ const php = @import("php/root.zig");
 const Module = php.Module;
 
 var module: Module.Custom(@import("extension.zig"), .{
-    // app name and version are extract from composer.json by build.zig
-    .name = config.app_name,
-    .version = config.app_version,
+    // ext name and version are extract from composer.json by build.zig
+    .name = config.ext_name,
+    .version = config.ext_version,
 }) = .init();
 comptime {
     module.register();

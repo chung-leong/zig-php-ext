@@ -479,7 +479,7 @@ foreach ($settings->versions as $version) {
             case 'macos': $so_ext = 'dylib'; break;
             default: $so_ext = 'so'; break;
         }
-        $so_name = "php_$app_name.$so_ext";
+        $so_name = "php_{$meta->ext_name}.$so_ext";
         $so_path = join(DIRECTORY_SEPARATOR, [ $so_dir, $so_name ]);
         $cmd = [ 
             'zig',
@@ -500,13 +500,13 @@ foreach ($settings->versions as $version) {
             foreach ($settings->zig_config as $name => $value) {
                 if (is_array($value)) {
                     foreach ($value as $item) {
-                        $cmd = "-D{$name}_{$item}";
+                        $cmd[] = "-D{$name}_{$item}";
                     }
                 } else {
                     if (gettype($value) === 'boolean') {
-                        $cmd = "-D{$name}";
+                        $cmd[] = "-D{$name}";
                     } else {
-                        $cmd = "-D{$name}={$value}";
+                        $cmd[] = "-D{$name}={$value}";
                     }
                 }
             }
