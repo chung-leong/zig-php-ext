@@ -16,7 +16,12 @@ pub fn init(comptime T: type, comptime name: [:0]const u8, comptime func: anytyp
         fn_info_ptr.* = .{ .required_num_args = handler_info.required_count };
         var j: usize = 1;
         for (handler_info.arguments) |a| {
-            arg_entries[j] = .{ .name = a.name };
+            arg_entries[j] = .{
+                .name = a.name,
+                .type = .{
+                    .type_mask = if (a.by_ref) 1 << c._ZEND_SEND_MODE_SHIFT else 0,
+                },
+            };
             j += 1;
         }
         if (handler_info.is_variadic) {

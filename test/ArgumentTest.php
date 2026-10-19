@@ -82,4 +82,14 @@ final class ArgumentTest extends ExtensionTestCase
         $this->assertSame("int = 100, float1 = 42.5, float2 = 8.88", $lines[0]);
         $this->assertSame("string = Dingo ate my baby!", $lines[1]);
     }
+
+    public function testByRefArgs(): void
+    {
+        $lines = $this->runTest("arguments", "ref.php");
+        $this->assertSame(<<<OUTPUT
+        Hello world
+        Hello world
+        This is a test
+        OUTPUT, implode("\n", $lines));
+    }
 }

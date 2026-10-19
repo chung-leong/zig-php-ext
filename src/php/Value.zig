@@ -73,6 +73,11 @@ pub fn retain(self: *const @This()) @This() {
     return self.*;
 }
 
+pub fn replace(self: *@This(), new_value: @This()) void {
+    self.release();
+    self.* = new_value;
+}
+
 pub fn addRef(self: *const @This()) void {
     const zval = &self.impl;
     // persistent value
@@ -185,7 +190,7 @@ pub fn getResource(self: *const @This()) !*Resource {
 
 pub fn getReference(self: *const @This()) !*Reference {
     return switch (self.kind()) {
-        .reference => self.resource(),
+        .reference => self.reference(),
         else => error.NotReference,
     };
 }
@@ -346,8 +351,12 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
                 Array => try self.getArray(),
                 Object => try self.getObject(),
                 Resource => try self.getResource(),
+                @This() => get: {
+                    const ref = try self.getReference();
+                    break :get ref.target();
+                },
                 else => {
-                    const result = try convertTo(pt.child);
+                    const result = try self.convertTo(pt.child);
                     const target = php_al.create(T);
                     target.* = result;
                 },
@@ -394,7 +403,7 @@ pub fn freeConverted(arg: anytype) void {
         .error_union => if (arg) |payload| freeConverted(payload) else |_| {},
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
-                Array, Object, Reference, Resource, Stream, String => {},
+                Array, Object, Reference, Resource, Stream, String, @This() => {},
                 else => {
                     freeConverted(arg.*);
                     php_al.destroy(arg);

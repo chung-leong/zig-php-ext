@@ -254,6 +254,7 @@ fn valueTypeName(comptime T: type) []const u8 {
                 Array => "array",
                 Object => "object",
                 Resource => "resource",
+                Value => "reference",
                 else => unsupported(T),
             },
             .slice => switch (pt.child) {

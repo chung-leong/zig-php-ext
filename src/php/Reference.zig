@@ -3,6 +3,7 @@ pub const std = @import("std");
 const php = @import("root.zig");
 const php_al = php.allocator;
 const c = php.c;
+const pi = php.imports;
 const Value = php.Value;
 
 pub fn create(value: Value) *@This() {
@@ -17,12 +18,29 @@ pub fn create(value: Value) *@This() {
     return ref;
 }
 
-pub fn target(self: *const @This()) Value {
-    return .fromZval(self.impl.val);
+pub fn retain(self: *@This()) *@This() {
+    self.addRef();
+    return self;
 }
 
-pub fn setTarget(self: *const @This(), value: Value) Value {
-    self.impl = value.toZval();
+pub fn addRef(self: *@This()) void {
+    self.impl.gc.refcount += 1;
+}
+
+pub fn release(self: *@This()) void {
+    const zres = &self.impl;
+    self.impl.gc.refcount -= 1;
+    if (self.impl.gc.refcount == 0) {
+        _ = pi.zend_reference_destroy(zres);
+    }
+}
+
+pub fn subtractRef(self: *@This()) void {
+    self.impl.gc.refcount -= 1;
+}
+
+pub fn target(self: *@This()) *Value {
+    return @ptrCast(&self.impl.val);
 }
 
 const Reference = @This();

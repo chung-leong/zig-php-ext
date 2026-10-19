@@ -123,10 +123,15 @@ pub fn handlerInfo(comptime func: anytype, comptime self_src: SelfSource) Handle
                     else => true,
                 },
             };
+            const by_ref = switch (arg_types[i]) {
+                *Value, ?*Value => true,
+                else => false,
+            };
             if (required) required_count += 1;
             arguments[i] = .{
                 .name = arg_name,
                 .required = required,
+                .by_ref = by_ref,
             };
         }
         break :init .{ &arguments, required_count };
@@ -226,6 +231,7 @@ pub const HandlerInfo = struct {
 pub const ArgumentInfo = struct {
     name: [:0]const u8,
     required: bool,
+    by_ref: bool,
 };
 pub const HandlerType = enum { handler, raw, method };
 pub const SelfSource = union(enum) {
@@ -265,6 +271,7 @@ fn argInfo(comptime info: HandlerInfo) []const c.zend_internal_arg_info {
                     true => String.static(arg.name), // 8.6
                     false => arg.name,
                 },
+                .type = if (arg.by_ref) 1 << c._ZEND_SEND_MODE_SHIFT else 0,
             };
         }
         break :init buffer;

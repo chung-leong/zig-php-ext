@@ -2,6 +2,7 @@ const std = @import("std");
 
 const php = @import("php/root.zig");
 const Module = php.Module;
+const Value = php.Value;
 
 pub fn @"call printBool"(_: *@This(), args: struct {
     boolean: bool,
@@ -102,4 +103,17 @@ pub fn @"call printVector"(_: *@This(), args: struct {
     vector: @Vector(3, f64),
 }) void {
     php.print("vector = {d}\n", .{args.vector});
+}
+
+pub fn @"call setStrings"(
+    _: *@This(),
+    args: struct {
+        value_ptr: *Value,
+        optional_value_ptr: ?*Value,
+    },
+) void {
+    args.value_ptr.replace(.fromString(.static("Hello world")));
+    if (args.optional_value_ptr) |ptr| {
+        ptr.replace(.fromString(.create("This is a test")));
+    }
 }
