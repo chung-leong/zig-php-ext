@@ -3,11 +3,12 @@ const std = @import("std");
 const php = @import("../../root.zig");
 const Array = php.Array;
 const c = php.c;
-const Arguments = php.Function.Arguments;
+const php_al = php.allocator;
 const Callable = php.Callable;
 const Dictionary = php.Dictionary;
 const failure = php.failure;
 const Function = php.Function;
+const Arguments = Function.Arguments;
 const unsupported = failure.unsupported;
 const Object = php.Object;
 const Resource = php.Resource;
@@ -18,13 +19,11 @@ pub fn init(args: *const Arguments) @This() {
     var info: c.arg_extra_info = undefined;
     c.get_argument_info(@ptrCast(args), &info);
     var len = info.len;
-    var total = len;
     const named = get: {
         if (info.extra) {
             // extra_named_params contains bogus values when it's not used
             if (args.getExtraNamed()) |arr| {
                 len += 1;
-                total += arr.length();
                 break :get arr.toValue();
             }
         }
@@ -33,7 +32,6 @@ pub fn init(args: *const Arguments) @This() {
     return .{
         .arg_ptr = @ptrCast(info.ptr),
         .len = len,
-        .total = total,
         .this = args.this(),
         .named_params = named,
         .callee = args.callee(),
@@ -71,6 +69,15 @@ pub fn peek(self: *@This(), index: usize) ?Value {
     }
 }
 
+pub fn remaining(self: *@This()) []const Value {
+    const offset: usize = if (self.use_this_first) 1 else 0;
+    const index = self.index;
+    var len = self.len;
+    if (self.named_params != null) len -= 1;
+    self.index = self.len;
+    return self.arg_ptr[index - offset .. len];
+}
+
 pub fn reset(self: *@This()) void {
     self.index = 0;
 }
@@ -94,46 +101,70 @@ pub fn extract(self: *@This(), comptime T: type) !T {
     // make sure T is a struct/tuple
     if (@typeInfo(T) != .@"struct") @compileError("Struct type expected, received: " ++ @typeName(T));
     // check argument count
-    const min, const max = init: {
-        const field_types = @typeInfo(T).@"struct".field_types;
+    const st = @typeInfo(T).@"struct";
+    const min, const max = comptime init: {
         var required: usize = 0;
-        inline for (0..field_types.len) |i| {
-            if (!isFieldOptional(T, i)) required += 1;
+        var has_extra = false;
+        var count: usize = 0;
+        for (st.field_names, 0..) |arg_name, i| {
+            const AT = st.field_types[i];
+            if (Function.isExtraArg(arg_name)) |variadic_type| {
+                has_extra = true;
+                switch (variadic_type) {
+                    .named => if (AT != ?*Array) @compileError("Argument @\"???\" must be ?*Array"),
+                    .unnamed => {
+                        if (AT != []const Value) @compileError("Argument @\"...\" must be []const Value");
+                        count = std.math.maxInt(usize);
+                    },
+                }
+            } else {
+                if (has_extra) @compileError("Named arguments must be ahead of @\"...\" and @\"???\": " ++ arg_name);
+                if (!isFieldOptional(T, i)) required += 1;
+                count += 1;
+            }
         }
-        break :init .{ required, field_types.len };
+        break :init .{ required, count };
     };
     try self.verifyCount(min, max);
     var set: T = undefined;
     var mismatch: ?Mismatch = null;
     var required_remaining = min;
-    inline for (@typeInfo(T).@"struct".field_names, 0..) |arg_name, i| {
-        const FT = @TypeOf(@field(set, arg_name));
-        const optional = comptime isFieldOptional(T, i);
-        // take value for optional argument only when there're enough left to satistfy
-        // remaining required ones
-        if (!optional or i + required_remaining < self.len) {
-            const arg = self.next().?;
-            const value = arg.convertTo(FT) catch |err| report: {
-                if (mismatch == null) {
-                    // remember the first mismatch
-                    mismatch = .{
-                        .fn_name = self.callee.name(),
-                        .arg_name = arg_name,
-                        .value_type = valueTypeName(FT),
-                        .index = i,
-                        .value = arg,
-                        .err = err,
-                    };
-                }
-                self.index -= 1;
-                // break out of for loop if argument is required
-                if (!optional) break;
-                break :report fieldDefaultValue(T, i);
+    inline for (st.field_names, 0..) |arg_name, i| {
+        if (comptime Function.isExtraArg(arg_name)) |variadic_type| {
+            @field(set, arg_name) = switch (variadic_type) {
+                .named => if (self.named_params) |np| np.array() else null,
+                // need to duplicate the list because freeConverted() will free it
+                .unnamed => php_al.dupe(Value, self.remaining()) catch unreachable,
             };
-            @field(set, arg_name) = value;
-            if (!optional) required_remaining -= 1;
         } else {
-            @field(set, arg_name) = fieldDefaultValue(T, i);
+            const FT = @TypeOf(@field(set, arg_name));
+            const optional = comptime isFieldOptional(T, i);
+            // take value for optional argument only when there're enough left to satistfy
+            // remaining required ones
+            if (!optional or i + required_remaining < self.len) {
+                const arg = self.next().?;
+                const value = arg.convertTo(FT) catch |err| report: {
+                    if (mismatch == null) {
+                        // remember the first mismatch
+                        mismatch = .{
+                            .fn_name = self.callee.name(),
+                            .arg_name = arg_name,
+                            .value_type = valueTypeName(FT),
+                            .index = i,
+                            .value = arg,
+                            .err = err,
+                        };
+                    }
+                    self.index -= 1;
+                    // break out of for loop if argument is required
+                    if (!optional) break;
+                    break :report fieldDefaultValue(T, i);
+                };
+                @field(set, arg_name) = value;
+                if (!optional) required_remaining -= 1;
+            } else {
+                @field(set, arg_name) = fieldDefaultValue(T, i);
+            }
         }
     }
     if (mismatch) |m| {
@@ -207,16 +238,17 @@ pub fn extractNamed(self: *@This(), comptime T: type) !T {
 
 pub fn verifyCount(self: *const @This(), min: usize, max: usize) !void {
     if (self.len < min or self.len > max) {
+        const desc, const count = if (max == min)
+            .{ "exactly", min }
+        else if (self.len > max)
+            .{ "at most", max }
+        else
+            .{ "at least", min };
         return failure.report("{s}() expects {s} {d} argument{s}, {d} given{s}", .{
             self.callee.name().slice(),
-            if (max > min)
-                "at most"
-            else if (self.len < min)
-                "at least"
-            else
-                "exactly",
-            if (max > min) max else min,
-            if (min != 1) "s" else "",
+            desc,
+            count,
+            if (count != 1) "s" else "",
             self.len,
             if (self.hasNamed()) " (the last being named arguments)" else "",
         });
@@ -357,6 +389,5 @@ this: Value,
 use_this_first: bool = false,
 named_params: ?Value,
 len: usize,
-total: usize,
 index: usize = 0,
 callee: *Function,

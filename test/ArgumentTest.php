@@ -92,4 +92,32 @@ final class ArgumentTest extends ExtensionTestCase
         This is a test
         OUTPUT, implode("\n", $lines));
     }
+
+    public function testVariadicFunction(): void
+    {
+        $lines = $this->runTest("arguments", "many-unnamed.php");
+        $this->assertSame(<<<OUTPUT
+        arg1 = 1234
+        extra = 4
+        0 = 4567
+        1 = Hello world
+        2 = 3.1415926535898
+        3 = Cow
+        OUTPUT, implode("\n", $lines));
+    }
+
+    public function testVariadicFunctionWithNamedArguments(): void
+    {
+        $lines = $this->runTest("arguments", "many-named.php");
+        $this->assertSame(<<<OUTPUT
+        arg1 = 1234
+        extra = 4
+        0 = 4567
+        1 = Hello world
+        2 = 3.1415926535898
+        3 = Cow
+        hello = world
+        chicken = 12345
+        OUTPUT, implode("\n", $lines));
+    }
 }

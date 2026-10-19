@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const php = @import("php/root.zig");
+const Array = php.Array;
 const Module = php.Module;
 const Value = php.Value;
 
@@ -115,5 +116,47 @@ pub fn @"call setStrings"(
     args.value_ptr.replace(.fromString(.static("Hello world")));
     if (args.optional_value_ptr) |ptr| {
         ptr.replace(.fromString(.create("This is a test")));
+    }
+}
+
+pub fn @"call acceptMany"(
+    _: *@This(),
+    args: struct {
+        arg1: c_long,
+        @"...": []const Value,
+    },
+) void {
+    php.print("arg1 = {d}\n", .{args.arg1});
+    php.print("extra = {d}\n", .{args.@"...".len});
+    for (args.@"...", 0..) |arg, i| {
+        const str = arg.cast(.string).string();
+        defer str.release();
+        php.print("{d} = {s}\n", .{ i, str.slice() });
+    }
+}
+
+pub fn @"call acceptManyNamed"(
+    _: *@This(),
+    args: struct {
+        arg1: c_long,
+        @"...": []const Value,
+        @"???": ?*Array,
+    },
+) void {
+    php.print("arg1 = {d}\n", .{args.arg1});
+    php.print("extra = {d}\n", .{args.@"...".len});
+    for (args.@"...", 0..) |arg, i| {
+        const str = arg.cast(.string).string();
+        defer str.release();
+        php.print("{d} = {s}\n", .{ i, str.slice() });
+    }
+    if (args.@"???") |named| {
+        var iter = named.iterate(.{});
+        while (iter.next()) |arg| {
+            const name = iter.key().string();
+            const str = arg.cast(.string).string();
+            defer str.release();
+            php.print("{s} = {s}\n", .{ name.slice(), str.slice() });
+        }
     }
 }

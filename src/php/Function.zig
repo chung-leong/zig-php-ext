@@ -90,6 +90,15 @@ pub fn handlerType(comptime F: type, comptime self_src: SelfSource) HandlerType 
     @compileError("Improper function handler: " ++ @typeName(F));
 }
 
+pub fn isExtraArg(comptime arg_name: []const u8) ?enum { named, unnamed } {
+    return if (std.mem.eql(u8, arg_name, "..."))
+        .unnamed
+    else if (std.mem.eql(u8, arg_name, "???"))
+        .named
+    else
+        null;
+}
+
 pub fn handlerInfo(comptime func: anytype, comptime self_src: SelfSource) HandlerInfo {
     const F = @TypeOf(func);
     const handler_type = handlerType(F, self_src);
@@ -104,7 +113,19 @@ pub fn handlerInfo(comptime func: anytype, comptime self_src: SelfSource) Handle
             break :init .{ st.field_names, st.field_types, st.field_attrs, false };
         },
     };
-    const is_variadic = is_raw or check: {
+    const arg_count, const has_extra = init: {
+        var count: usize = 0;
+        var extra = false;
+        inline for (arg_names) |arg_name| {
+            if (comptime isExtraArg(arg_name)) |_| {
+                extra = true;
+            } else {
+                count += 1;
+            }
+        }
+        break :init .{ count, extra };
+    };
+    const is_variadic = is_raw or has_extra or check: {
         if (arg_types.len > 0) {
             // see if last argument is a dictionary
             const LT = arg_types[arg_types.len - 1];
@@ -113,9 +134,10 @@ pub fn handlerInfo(comptime func: anytype, comptime self_src: SelfSource) Handle
         break :check false;
     };
     const arguments, const required_count = init: {
-        var arguments: [arg_types.len]ArgumentInfo = undefined;
+        var arguments: [arg_count]ArgumentInfo = undefined;
         var required_count: usize = 0;
-        inline for (arg_names, 0..) |arg_name, i| {
+        inline for (0..arg_count) |i| {
+            const arg_name = arg_names[i];
             const required = switch (arg_attrs[i].default_value_ptr != null) {
                 true => false,
                 false => switch (@typeInfo(arg_types[i])) {
@@ -271,7 +293,9 @@ fn argInfo(comptime info: HandlerInfo) []const c.zend_internal_arg_info {
                     true => String.static(arg.name), // 8.6
                     false => arg.name,
                 },
-                .type = if (arg.by_ref) 1 << c._ZEND_SEND_MODE_SHIFT else 0,
+                .type = .{
+                    .type_mask = if (arg.by_ref) 1 << c._ZEND_SEND_MODE_SHIFT else 0,
+                },
             };
         }
         break :init buffer;
