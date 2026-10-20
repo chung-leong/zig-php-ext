@@ -9,6 +9,8 @@ pub const @"export CONST_BOOL" = true;
 pub const @"export CONST_INT" = 1234;
 pub const @"export CONST_FLOAT" = std.math.pi;
 pub const @"export CONST_STRING" = "Hello world";
+pub const @"export CONST_ARRAY" = [4]i32{ 1, 2, 3, 4 };
+pub const @"export CONST_STRING_ARRAY" = [2][]const u8{ "Hello", "world" };
 
 pub const @"export CONST_ENUM" = enum { hello, world };
 pub const @"export CONST_FLAG" = packed struct {

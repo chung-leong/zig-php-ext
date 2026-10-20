@@ -602,8 +602,11 @@ pub fn fromAny(arg: anytype) switch (@typeInfo(@TypeOf(arg))) {
                 Stream => .fromStream(arg),
                 Reference => .fromReference(arg),
                 else => switch (@typeInfo(pt.child)) {
-                    .array => |ar| switch (@inComptime() and ar.child == u8) {
-                        true => .fromString(.static(arg)),
+                    .array => |ar| switch (ar.child == u8) {
+                        true => switch (@inComptime()) {
+                            true => .fromString(.static(arg)),
+                            false => .fromString(.create(arg)),
+                        },
                         false => unsupported(T),
                     },
                     else => unsupported(T),

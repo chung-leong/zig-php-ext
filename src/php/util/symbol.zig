@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const php = @import("../root.zig");
-
+const Array = php.Array;
 const Class = php.Class;
 const Constant = php.Constant;
 const ReturnType = php.util.ReturnType;
@@ -105,101 +105,169 @@ pub fn ExportedClasses(comptime T: type) type {
 pub fn ExportedConstants(comptime T: type) type {
     const exports = Extractor(T, .@"export", .static).get();
     const export_names = comptime std.meta.fieldNames(@TypeOf(exports));
-    // get count first
-    var count: usize = 0;
-    for (export_names) |name| {
-        const decl = @field(exports, name);
-        switch (@typeInfo(@TypeOf(decl))) {
-            .type => if (!isCustomClass(decl)) {
-                const len = get: {
-                    switch (@typeInfo(decl)) {
-                        .@"struct" => |st| if (st.backing_integer != null) {
-                            var bool_count: usize = 0;
-                            for (st.field_types) |FT| {
-                                if (FT == bool) bool_count += 1;
-                            }
-                            break :get bool_count;
-                        },
-                        .@"enum" => |en| break :get en.field_names.len,
-                        else => {},
-                    }
-                    @compileError("Expected a custom class, enum, or packed struct, received: " ++ @typeName(decl));
-                };
-                count += len;
-            },
-            else => {
-                count += 1;
-            },
-        }
-    }
-    const entries = init: {
-        var entries: [count]Constant = undefined;
-        var index: usize = 0;
+    const len = comptime init: {
+        var count: usize = 0;
         for (export_names) |name| {
             const decl = @field(exports, name);
             switch (@typeInfo(@TypeOf(decl))) {
+                .array, .vector => {
+                    // array constant need to be dealt with separately
+                },
                 .type => if (!isCustomClass(decl)) {
-                    // see if export_name is all-cap, then the rest of the name will be capitalized as well
-                    const use_uppercase = for (name) |ch| {
-                        if (std.ascii.isLower(ch)) break false;
-                    } else true;
-                    const item_names, const item_values = switch (@typeInfo(decl)) {
-                        .@"struct" => |st| get: {
-                            var bool_count: usize = 0;
-                            for (st.field_types) |FT| {
-                                if (FT == bool) bool_count += 1;
-                            }
-                            var names: [bool_count][:0]const u8 = undefined;
-                            var values: [bool_count]c_long = undefined;
-                            var value_index: usize = 0;
-                            for (st.field_names, 0..) |field_name, i| {
-                                if (st.field_types[i] == bool) {
-                                    names[value_index] = field_name;
-                                    values[value_index] = @intCast(1 << @bitOffsetOf(decl, field_name));
-                                    value_index += 1;
+                    const len = get: {
+                        switch (@typeInfo(decl)) {
+                            .@"struct" => |st| if (st.backing_integer != null) {
+                                var bool_count: usize = 0;
+                                for (st.field_types) |FT| {
+                                    if (FT == bool) bool_count += 1;
                                 }
-                            }
-                            break :get .{ names, values };
-                        },
-                        .@"enum" => |en| get: {
-                            var names: [en.field_values.len][:0]const u8 = undefined;
-                            var values: [en.field_values.len]c_long = undefined;
-                            for (en.field_names, 0..) |field_name, i| {
-                                names[i] = field_name;
-                                values[i] = en.field_values[i];
-                            }
-                            break :get .{ names, values };
-                        },
-                        else => unreachable,
+                                break :get bool_count;
+                            },
+                            .@"enum" => |en| break :get en.field_names.len,
+                            else => {},
+                        }
+                        @compileError("Expected a custom class, enum, or packed struct, received: " ++ @typeName(decl));
                     };
-                    for (item_names, 0..) |item_name, i| {
-                        const constant_name = create: {
-                            const p_len = name.len;
-                            var buffer: [p_len + 1 + item_name.len]u8 = undefined;
-                            @memcpy(buffer[0..p_len], name);
-                            buffer[p_len] = '_';
-                            for (item_name, 0..) |ch, j| buffer[p_len + 1 + j] = switch (use_uppercase) {
-                                true => std.ascii.toUpper(ch),
-                                false => ch,
-                            };
-                            break :create buffer;
-                        };
-                        entries[index] = .fromAny(.static(&constant_name), item_values[i]);
-                        index += 1;
-                    }
+                    count += len;
                 },
                 else => {
-                    entries[index] = .fromAny(.static(name), decl);
-                    index += 1;
+                    count += 1;
                 },
             }
         }
-        break :init entries;
+        break :init count;
     };
     return struct {
-        pub fn get() @TypeOf(entries) {
-            return entries;
+        pub fn init() @This() {
+            var entries: [len]Constant = undefined;
+            var index: usize = 0;
+            for (export_names) |name| {
+                const decl = @field(exports, name);
+                switch (@typeInfo(@TypeOf(decl))) {
+                    .array, .vector => {},
+                    .type => if (!isCustomClass(decl)) {
+                        // see if export_name is all-cap, then the rest of the name will be capitalized as well
+                        const use_uppercase = comptime for (name) |ch| {
+                            if (std.ascii.isLower(ch)) break false;
+                        } else true;
+                        const item_names, const item_values = comptime switch (@typeInfo(decl)) {
+                            .@"struct" => |st| get: {
+                                var bool_count: usize = 0;
+                                for (st.field_types) |FT| {
+                                    if (FT == bool) bool_count += 1;
+                                }
+                                var names: [bool_count][:0]const u8 = undefined;
+                                var values: [bool_count]c_long = undefined;
+                                var value_index: usize = 0;
+                                for (st.field_names, 0..) |field_name, i| {
+                                    if (st.field_types[i] == bool) {
+                                        names[value_index] = field_name;
+                                        values[value_index] = @intCast(1 << @bitOffsetOf(decl, field_name));
+                                        value_index += 1;
+                                    }
+                                }
+                                break :get .{ names, values };
+                            },
+                            .@"enum" => |en| get: {
+                                var names: [en.field_values.len][:0]const u8 = undefined;
+                                var values: [en.field_values.len]c_long = undefined;
+                                for (en.field_names, 0..) |field_name, i| {
+                                    names[i] = field_name;
+                                    values[i] = en.field_values[i];
+                                }
+                                break :get .{ names, values };
+                            },
+                            else => unreachable,
+                        };
+                        for (item_names, 0..) |item_name, i| {
+                            const constant_name = comptime create: {
+                                const p_len = name.len;
+                                var buffer: [p_len + 1 + item_name.len]u8 = undefined;
+                                @memcpy(buffer[0..p_len], name);
+                                buffer[p_len] = '_';
+                                for (item_name, 0..) |ch, j| buffer[p_len + 1 + j] = switch (use_uppercase) {
+                                    true => std.ascii.toUpper(ch),
+                                    false => ch,
+                                };
+                                break :create buffer;
+                            };
+                            entries[index] = .static(&constant_name, item_values[i]);
+                            index += 1;
+                        }
+                    },
+                    else => {
+                        entries[index] = .static(name, decl);
+                        index += 1;
+                    },
+                }
+            }
+            return .{ .entries = entries };
         }
+
+        pub fn register(self: *const @This()) !void {
+            for (self.entries) |entry| try entry.register();
+        }
+
+        pub fn unregister(self: *const @This()) void {
+            for (self.entries) |entry| entry.unregister();
+        }
+
+        pub fn attach(self: *const @This(), arr: *Array) void {
+            for (&self.entries) |*ptr| {
+                arr.set(ptr.name(), .fromPointer(ptr));
+            }
+        }
+
+        entries: [len]Constant,
+    };
+}
+
+pub fn ExportedConstantArrays(comptime T: type) type {
+    const exports = Extractor(T, .@"export", .static).get();
+    const export_names = comptime std.meta.fieldNames(@TypeOf(exports));
+    const len = comptime init: {
+        var count: usize = 0;
+        for (export_names) |name| {
+            const decl = @field(exports, name);
+            switch (@typeInfo(@TypeOf(decl))) {
+                .array, .vector => count += 1,
+                else => {},
+            }
+        }
+        break :init count;
+    };
+    return struct {
+        pub fn init() @This() {
+            var entries: [len]Constant = undefined;
+            var index: usize = 0;
+            inline for (export_names) |name| {
+                const decl = @field(exports, name);
+                switch (@typeInfo(@TypeOf(decl))) {
+                    .array, .vector => {
+                        entries[index] = .init(.create(name), decl);
+                        index += 1;
+                    },
+                    else => {},
+                }
+            }
+            return .{ .entries = entries };
+        }
+
+        pub fn register(self: *const @This()) !void {
+            for (self.entries) |entry| try entry.register();
+        }
+
+        pub fn unregister(self: *const @This()) void {
+            for (self.entries) |entry| entry.unregister();
+        }
+
+        pub fn attach(self: *const @This(), arr: *Array) void {
+            for (&self.entries) |*ptr| {
+                arr.set(ptr.name(), .fromPointer(ptr));
+            }
+        }
+
+        entries: [len]Constant,
     };
 }
 

@@ -82,8 +82,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             const self = Singleton(T).get();
             // save the default values used by the extension
             ini_default_value = self.*;
+            try constants.register();
             try registerIniEntries(self, module_no);
-            try registerConstants();
             try registerClasses();
             if (!@hasDecl(T, "moduleStartup")) return;
             return T.moduleStartup(self, module_type, module_no);
@@ -103,8 +103,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             defer {
                 Singleton(T).deinit();
                 unregisterClasses();
-                unregisterConstants();
                 unregisterIniEntries(module_no);
+                constants.unregister();
             }
             if (!@hasDecl(T, "moduleShutdown")) return;
             const self = Singleton(T).get();
@@ -121,6 +121,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
 
         fn tryRequestStartup(module_type: Module.Type, module_no: c_int) !void {
             Allocator.mode = .per_request;
+            constant_arrays = .init();
+            try constant_arrays.register();
             try initializeClassStatic();
             if (!@hasDecl(T, "requestStartup")) return;
             const self = Singleton(T).get();
@@ -271,15 +273,6 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             }
         }
 
-        fn registerConstants() !void {
-            for (&constants) |*ptr| try ptr.register();
-        }
-
-        fn unregisterConstants() void {
-            for (&constants) |*ptr| ptr.unregister();
-        }
-
-        const constants = php.util.symbol.ExportedConstants(T).get();
         const getters = php.util.symbol.Extractor(T, .getter, .instance).get();
         const setters = php.util.symbol.Extractor(T, .setter, .instance).get();
         const functions = php.util.symbol.Extractor(T, .method, .instance).get();
@@ -297,6 +290,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             entries[i] = std.mem.zeroes(FunctionEntry);
             break :init entries;
         };
+        const constants: php.util.symbol.ExportedConstants(T) = .init();
+        var constant_arrays: php.util.symbol.ExportedConstantArrays(T) = undefined;
         // class need to be initialized at runtime since symbols exported by PHP like stdclass
         // aren't known at comptime
         var classes: php.util.symbol.ExportedClasses(T) = undefined;

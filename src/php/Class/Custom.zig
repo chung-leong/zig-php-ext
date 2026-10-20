@@ -96,7 +96,7 @@ pub fn @"fn"(comptime T: type) type {
             pi._zend_hash_init(&zce.properties_info, c.HT_MIN_SIZE, null, true);
             pi._zend_hash_init(&zce.constants_table, c.HT_MIN_SIZE, null, true);
             pi._zend_hash_init(&zce.function_table, c.HT_MIN_SIZE, deref(&pi.zend_function_dtor), true);
-            self.addConstants();
+            constants.attach(@ptrCast(&self.class_entry.impl.constants_table));
             return self;
         }
 
@@ -169,13 +169,6 @@ pub fn @"fn"(comptime T: type) type {
             return T.getStaticMethod(self.custom(), method_name);
         }
 
-        fn addConstants(self: *@This()) void {
-            const arr: *Array = @ptrCast(&self.class_entry.impl.constants_table);
-            for (&constants) |*constant| {
-                arr.set(constant.name(), .fromPointer(constant));
-            }
-        }
-
         pub const Instance = Object.Custom(T);
         pub const Static = init: {
             var S: ?type = null;
@@ -212,7 +205,6 @@ pub fn @"fn"(comptime T: type) type {
             break :init S orelse NoStatic;
         };
         const NoStatic = struct {};
-        const constants = php.util.symbol.ExportedConstants(T).get();
         const methods = php.util.symbol.Extractor(T, .method, .static).get();
         const method_set = init: {
             const method_names = std.meta.fieldNames(@TypeOf(methods));
@@ -226,6 +218,7 @@ pub fn @"fn"(comptime T: type) type {
             }
             break :init result;
         };
+        const constants: php.util.symbol.ExportedConstants(T) = .init();
         var classes: php.util.symbol.ExportedClasses(T) = undefined;
 
         class_entry: Class align(@max(@alignOf(Class), @alignOf(Static))),

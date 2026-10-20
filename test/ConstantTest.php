@@ -36,6 +36,12 @@ final class ConstantTest extends ExtensionTestCase
         $this->assertSame("_ => undefined", $lines[5]);
     }
 
+    public function testArrayConstant(): void
+    {
+        $lines = $this->runTest("constants", "array.php");
+        echo implode("\n", $lines);
+    }
+
     public function testFindConstant(): void
     {
         $lines = $this->runTest("constants", "show.php");

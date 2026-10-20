@@ -23,12 +23,23 @@ pub fn find(n: *String) ?*@This() {
     return v.getPointerOf(@This()) catch return null;
 }
 
-pub fn fromAny(n: *String, arg: anytype) @This() {
+pub fn init(n: *String, arg: anytype) @This() {
+    var v: Value = .fromAny(arg);
+    return .{
+        .impl = .{
+            .name = @ptrCast(n),
+            .value = v.toZval(),
+        },
+    };
+}
+
+pub fn static(comptime n: []const u8, arg: anytype) @This() {
+    const n_str: *String = .static(n);
     var v: Value = .fromAny(arg);
     v.impl.u2.constant_flags = c.CONST_PERSISTENT;
     return .{
         .impl = .{
-            .name = @ptrCast(n),
+            .name = @ptrCast(n_str),
             .value = v.toZval(),
         },
     };
