@@ -5,10 +5,11 @@ const c = php.c;
 const deref = php.deref;
 const pi = php.imports;
 const php_al = php.allocator;
-const errable = php.errable;
 const Array = php.Array;
 const Allocator = php.Allocator;
 const Class = php.Class;
+const Constant = php.Constant;
+const errable = php.errable;
 const failure = php.failure;
 const Function = php.Function;
 const Object = php.Object;
@@ -23,6 +24,10 @@ pub fn @"fn"(comptime T: type) type {
             return self.class_entry.name();
         }
 
+        pub fn class(self: *const @This()) *Class {
+            return @ptrCast(@constCast(self));
+        }
+
         pub fn custom(_: *@This()) *T {
             return Singleton(T).get();
         }
@@ -35,14 +40,9 @@ pub fn @"fn"(comptime T: type) type {
             return self.class_entry.flags();
         }
 
-        pub fn create(class_name: *String, parent_class: ?*Class) *@This() {
+        pub fn create(class_name: []const u8, parent_class: ?*Class) *@This() {
             const self = php_al.create(@This()) catch unreachable;
             errdefer php_al.destroy(self);
-            self.* = try init(class_name, parent_class);
-            return self;
-        }
-
-        pub fn init(class_name: *String, parent_class: ?*Class) @This() {
             // determine what interfaces the class supports based on implementation of certain methods
             const interfaces = init: {
                 const has_array_access = @hasDecl(T, "readDimension") or @hasDecl(T, "writeDimension");
@@ -68,7 +68,6 @@ pub fn @"fn"(comptime T: type) type {
                 }
                 break :init &interfaces;
             };
-            var self: @This() = undefined;
             const class_flags: Class.Flags = .{
                 .linked = true,
                 .no_dynamic_properties = true,
@@ -79,10 +78,11 @@ pub fn @"fn"(comptime T: type) type {
             };
             const class_pce = parent_class orelse Class.builtin(.standard);
             const zce = &self.class_entry.impl;
+            const name_str: *String = .create(class_name);
             zce.* = .{};
             zce.type = c.ZEND_INTERNAL_CLASS;
             zce.refcount = 1;
-            zce.name = @ptrCast(class_name);
+            zce.name = @ptrCast(name_str);
             zce.ce_flags = @bitCast(class_flags);
             zce.num_interfaces = @intCast(interfaces.len);
             zce.unnamed_0.parent = @ptrCast(@constCast(class_pce));
@@ -94,9 +94,9 @@ pub fn @"fn"(comptime T: type) type {
                 else => @ptrCast(@constCast(&interfaces)),
             };
             pi._zend_hash_init(&zce.properties_info, c.HT_MIN_SIZE, null, true);
-            pi._zend_hash_init(&zce.constants_table, c.HT_MIN_SIZE, null, true);
+            pi._zend_hash_init(&zce.constants_table, c.HT_MIN_SIZE, @ptrCast(&freeConstant), true);
             pi._zend_hash_init(&zce.function_table, c.HT_MIN_SIZE, deref(&pi.zend_function_dtor), true);
-            constants.attach(@ptrCast(&self.class_entry.impl.constants_table));
+            self.registerConstants();
             return self;
         }
 
@@ -129,16 +129,26 @@ pub fn @"fn"(comptime T: type) type {
             list.delete(lc_name);
         }
 
-        pub fn initStatic(_: *@This()) !void {
+        pub fn initStatic() !void {
             if (Static != NoStatic) try Singleton(Static).init();
         }
 
-        pub fn deinitStatic(_: *@This()) void {
+        pub fn deinitStatic() void {
             if (Static != NoStatic) Singleton(Static).deinit();
         }
 
-        fn createObject(class: *Class) callconv(.c) ?*Object {
-            const result = Instance.create(class);
+        pub fn registerConstants(self: *@This()) void {
+            const st = @typeInfo(@TypeOf(constants)).@"struct";
+            const arr = self.class().constants();
+            inline for (st.field_names) |field_name| {
+                const value = @field(constants, field_name);
+                const constant: *Constant = .create(field_name, value);
+                constant.attach(arr);
+            }
+        }
+
+        fn createObject(self: *@This()) callconv(.c) ?*Object {
+            const result = Instance.create(self.class());
             const custom_obj = switch (@typeInfo(@TypeOf(result))) {
                 .error_union => result catch |err| {
                     failure.throw(err);
@@ -149,24 +159,30 @@ pub fn @"fn"(comptime T: type) type {
             return custom_obj.object();
         }
 
-        fn getIterator(class: *Class, this: *Value, by_ref: c_int) callconv(.c) ?*Object.Iterator {
-            _ = class;
+        fn getIterator(self: *@This(), this: *Value, by_ref: c_int) callconv(.c) ?*Object.Iterator {
+            _ = self;
             _ = by_ref;
             return Instance.getIterator(this.object());
         }
 
-        fn getMethod(class: *Class, method_name: *String) callconv(.c) ?*const Function {
-            return tryGetMethod(class, method_name) catch |err| throw: {
+        fn getMethod(self: *@This(), method_name: *String) callconv(.c) ?*const Function {
+            return self.tryGetMethod(method_name) catch |err| throw: {
                 failure.throw(err);
                 break :throw null;
             };
         }
 
-        fn tryGetMethod(class: *Class, method_name: *String) !?*const Function {
-            const self: *@This() = @ptrCast(class);
+        fn tryGetMethod(self: *@This(), method_name: *String) !?*const Function {
             if (method_set.find(method_name)) |func| return func;
             if (!@hasDecl(T, "getStaticMethod")) return null;
             return T.getStaticMethod(self.custom(), method_name);
+        }
+
+        fn freeConstant(value: *Value) callconv(.c) void {
+            const ptr = value.pointer();
+            const constant: *Constant = @ptrCast(@alignCast(ptr));
+            constant.name().release();
+            constant.value().release();
         }
 
         pub const Instance = Object.Custom(T);
@@ -205,7 +221,11 @@ pub fn @"fn"(comptime T: type) type {
             break :init S orelse NoStatic;
         };
         const NoStatic = struct {};
-        const methods = php.util.symbol.Extractor(T, .method, .static).get();
+
+        const methods = php.util.symbol.MethodExporter(T, .static).get();
+        const constants = php.util.symbol.ConstantExporter(T).get();
+        const classes = php.util.symbol.ClassesExporter(T).get();
+
         const method_set = init: {
             const method_names = std.meta.fieldNames(@TypeOf(methods));
             var result: Object.MethodSet(method_names) = undefined;
@@ -218,8 +238,6 @@ pub fn @"fn"(comptime T: type) type {
             }
             break :init result;
         };
-        const constants: php.util.symbol.ExportedConstants(T) = .init();
-        var classes: php.util.symbol.ExportedClasses(T) = undefined;
 
         class_entry: Class align(@max(@alignOf(Class), @alignOf(Static))),
 

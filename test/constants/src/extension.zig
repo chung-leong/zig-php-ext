@@ -28,7 +28,7 @@ pub fn @"call show_constant"(_: *@This(), args: struct {
     name: *String,
 }) !void {
     const constant = Constant.find(args.name) orelse return error.NotFound;
-    var value = constant.value();
-    value.convert(.string);
+    const value = constant.value().cast(.string);
+    defer value.release();
     php.print("{s}\n", .{value.string().slice()});
 }

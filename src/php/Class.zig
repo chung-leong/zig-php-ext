@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub const Custom = @import("Class/Custom.zig").@"fn";
 const php = @import("root.zig");
+const Array = php.Array;
 const c = php.c;
 const deref = php.deref;
 const pi = php.imports;
@@ -18,6 +19,10 @@ pub fn parent(self: *const @This()) *Class {
 
 pub fn flags(self: *const @This()) Flags {
     return @bitCast(self.impl.ce_flags);
+}
+
+pub fn constants(self: *const @This()) *Array {
+    return @ptrCast(@constCast(&self.impl.constants_table));
 }
 
 pub fn find(class_name: anytype) ?*@This() {

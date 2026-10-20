@@ -82,9 +82,9 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             const self = Singleton(T).get();
             // save the default values used by the extension
             ini_default_value = self.*;
-            try constants.register();
             try registerIniEntries(self, module_no);
             try registerClasses();
+            try registerConstants(true);
             if (!@hasDecl(T, "moduleStartup")) return;
             return T.moduleStartup(self, module_type, module_no);
         }
@@ -102,9 +102,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             Allocator.mode = .persistent;
             defer {
                 Singleton(T).deinit();
-                unregisterClasses();
+                // unregisterClasses();
                 unregisterIniEntries(module_no);
-                constants.unregister();
             }
             if (!@hasDecl(T, "moduleShutdown")) return;
             const self = Singleton(T).get();
@@ -121,8 +120,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
 
         fn tryRequestStartup(module_type: Module.Type, module_no: c_int) !void {
             Allocator.mode = .per_request;
-            constant_arrays = .init();
-            try constant_arrays.register();
+            try registerConstants(false);
             try initializeClassStatic();
             if (!@hasDecl(T, "requestStartup")) return;
             const self = Singleton(T).get();
@@ -249,17 +247,19 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         }
 
         fn registerClasses() !void {
-            inline for (comptime std.meta.fieldNames(@TypeOf(classes))) |class_name| {
-                @field(classes, class_name) = .init(String.static(class_name), null);
-                try @field(classes, class_name).register();
+            const st = @typeInfo(@TypeOf(classes)).@"struct";
+            inline for (st.field_names) |class_name| {
+                const CustomClass = @field(classes, class_name);
+                const class: *CustomClass = .create(class_name, null);
+                try class.register();
             }
         }
 
-        fn unregisterClasses() void {
-            inline for (comptime std.meta.fieldNames(@TypeOf(classes))) |class_name| {
-                @field(classes, class_name).unregister();
-            }
-        }
+        // fn unregisterClasses() void {
+        //     inline for (comptime std.meta.fieldNames(@TypeOf(classes))) |class_name| {
+        //         @field(classes, class_name).unregister();
+        //     }
+        // }
 
         fn initializeClassStatic() !void {
             inline for (comptime std.meta.fieldNames(@TypeOf(classes))) |class_name| {
@@ -273,9 +273,36 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             }
         }
 
-        const getters = php.util.symbol.Extractor(T, .getter, .instance).get();
-        const setters = php.util.symbol.Extractor(T, .setter, .instance).get();
-        const functions = php.util.symbol.Extractor(T, .method, .instance).get();
+        fn registerConstants(persistent: bool) !void {
+            const st = @typeInfo(@TypeOf(constants)).@"struct";
+            const arr = php.constants();
+            inline for (st.field_names, st.field_types) |field_name, FT| {
+                const is_literal = switch (@typeInfo(FT)) {
+                    .bool, .comptime_int, .int, .comptime_float, .float => true,
+                    .pointer => |pt| switch (pt.size) {
+                        .one => switch (@typeInfo(pt.child)) {
+                            .array => |ar| ar.child == u8,
+                            else => false,
+                        },
+                        .slice => pt.child == u8,
+                        else => false,
+                    },
+                    else => false,
+                };
+                if (persistent == is_literal) {
+                    const value = @field(constants, field_name);
+                    const constant: *Constant = .create(field_name, value);
+                    try constant.register(arr);
+                }
+            }
+        }
+
+        const getters = php.util.symbol.GetterExporter(T, .instance).get();
+        const setters = php.util.symbol.SetterExporter(T, .instance).get();
+        const functions = php.util.symbol.MethodExporter(T, .instance).get();
+        const constants = php.util.symbol.ConstantExporter(T).get();
+        const classes = php.util.symbol.ClassExporter(T).get();
+
         const function_entries = init: {
             // create entries for them (extra entry for sentinel)
             const function_names = std.meta.fieldNames(@TypeOf(functions));
@@ -290,16 +317,21 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             entries[i] = std.mem.zeroes(FunctionEntry);
             break :init entries;
         };
-        const constants: php.util.symbol.ExportedConstants(T) = .init();
-        var constant_arrays: php.util.symbol.ExportedConstantArrays(T) = undefined;
-        // class need to be initialized at runtime since symbols exported by PHP like stdclass
-        // aren't known at comptime
-        var classes: php.util.symbol.ExportedClasses(T) = undefined;
+        // var class_entries: VT: {
+        //     const st = @typeInfo(@TypeOf(classes)).@"struct";
+        //     var types: [st.field_names.len]type = undefined;
+        //     var attributes: [st.field_names.len]std.lang.Type.Struct.FieldAttributes = undefined;
+        //     for (st.field_names, 0..) |class_name, i| {
+        //         types[i] = *@field(classes, class_name);
+        //         attributes[i] = .{};
+        //     }
+        //     break :VT @Struct(.auto, null, st.field_names, &types, &attributes);
+        // } = undefined;
         // ini entries need to be var because their values are determined at runtime
-        var ini_entries: type: {
+        var ini_entries: VT: {
             const names = std.meta.fieldNames(@TypeOf(getters));
             const count = if (names.len > 0) names.len + 1 else 0;
-            break :type [count]IniEntryDef;
+            break :VT [count]IniEntryDef;
         } = undefined;
         var ini_default_value: T = undefined;
 

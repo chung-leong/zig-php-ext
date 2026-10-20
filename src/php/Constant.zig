@@ -23,41 +23,27 @@ pub fn find(n: *String) ?*@This() {
     return v.getPointerOf(@This()) catch return null;
 }
 
-pub fn init(n: *String, arg: anytype) @This() {
-    var v: Value = .fromAny(arg);
-    return .{
-        .impl = .{
-            .name = @ptrCast(n),
-            .value = v.toZval(),
-        },
-    };
-}
-
-pub fn static(comptime n: []const u8, arg: anytype) @This() {
-    const n_str: *String = .static(n);
+pub fn create(const_name: []const u8, arg: anytype) *@This() {
+    const self = php_al.create(@This()) catch unreachable;
+    const name_str: *String = .create(const_name);
     var v: Value = .fromAny(arg);
     v.impl.u2.constant_flags = c.CONST_PERSISTENT;
-    return .{
+    self.* = .{
         .impl = .{
-            .name = @ptrCast(n_str),
+            .name = @ptrCast(name_str),
             .value = v.toZval(),
         },
     };
+    return self;
 }
 
-pub fn register(self: *const @This()) !void {
-    const eg = php.globals("executor");
-    const list: *Array = @ptrCast(eg.zend_constants);
-    if (list.has(self.name())) return error.NameConflict;
-    const copy = try php_al.create(@This());
-    copy.* = self.*;
-    list.set(self.name(), .fromPointer(copy));
+pub fn register(self: *const @This(), arr: *Array) !void {
+    if (arr.has(self.name())) return error.NameConflict;
+    arr.set(self.name(), .fromPointer(self));
 }
 
-pub fn unregister(self: *const @This()) void {
-    const eg = php.globals("executor");
-    const list: *Array = @ptrCast(eg.zend_constants);
-    list.delete(self.name());
+pub fn attach(self: *const @This(), arr: *Array) void {
+    arr.set(self.name(), .fromPointer(self));
 }
 
 impl: c.zend_constant,

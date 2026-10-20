@@ -69,6 +69,11 @@ pub inline fn globals(comptime name: []const u8) *@field(c, "zend_" ++ name ++ "
     }
 }
 
+pub fn constants() *Array {
+    const eg = globals("executor");
+    return @ptrCast(eg.zend_constants);
+}
+
 pub fn throwException(obj: *Object) error{ExceptionThrown} {
     const value: Value = .fromObject(obj);
     imports.zend_throw_exception_object(@ptrCast(@constCast(&value)));

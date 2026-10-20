@@ -723,9 +723,9 @@ pub fn @"fn"(comptime T: type) type {
             const field_attrs = st.field_attrs[0 .. len - 1];
             break :init @Struct(st.layout, null, field_names, field_types, field_attrs);
         };
-        const getters = php.util.symbol.Extractor(T, .getter, .instance).get();
-        const setters = php.util.symbol.Extractor(T, .setter, .instance).get();
-        const methods = php.util.symbol.Extractor(T, .method, .instance).get();
+        const getters = php.util.symbol.GetterExporter(T, .instance).get();
+        const setters = php.util.symbol.SetterExporter(T, .instance).get();
+        const methods = php.util.symbol.MethodExporter(T, .instance).get();
         const method_set = init: {
             const method_names = std.meta.fieldNames(@TypeOf(methods));
             var result: Object.MethodSet(method_names) = undefined;

@@ -323,7 +323,7 @@ pub fn convert(self: *@This(), comptime desired_kind: Kind) void {
 }
 
 pub fn cast(self: *const @This(), comptime desired_kind: Kind) @This() {
-    var tmp = self.*;
+    var tmp = self.retain();
     tmp.convert(desired_kind);
     return tmp;
 }
