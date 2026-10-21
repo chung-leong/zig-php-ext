@@ -27,3 +27,4 @@ pub const @"export WithDoOperation" = Class.Custom(@import("WithDoOperation.zig"
 pub const @"export WithGetGarbageCollection" = Class.Custom(@import("WithGetGarbageCollection.zig"));
 pub const @"export WithGetIterator" = Class.Custom(@import("WithGetIterator.zig"));
 pub const @"export WithIterate" = Class.Custom(@import("WithIterate.zig"));
+pub const @"export hello\\world\\WithSubclasses" = Class.Custom(@import("WithSubclasses.zig"));

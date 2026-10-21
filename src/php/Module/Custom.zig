@@ -251,8 +251,9 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             const st = @typeInfo(@TypeOf(classes)).@"struct";
             inline for (st.field_names) |class_name| {
                 const CustomClass = @field(classes, class_name);
-                const class: *CustomClass = .create(class_name, null);
-                try class.register();
+                const cls: *CustomClass = .create(class_name, null);
+                try cls.register();
+                try cls.registerChildren(class_name);
             }
         }
 
@@ -323,16 +324,6 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             entries[i] = std.mem.zeroes(FunctionEntry);
             break :init entries;
         };
-        // var class_entries: VT: {
-        //     const st = @typeInfo(@TypeOf(classes)).@"struct";
-        //     var types: [st.field_names.len]type = undefined;
-        //     var attributes: [st.field_names.len]std.lang.Type.Struct.FieldAttributes = undefined;
-        //     for (st.field_names, 0..) |class_name, i| {
-        //         types[i] = *@field(classes, class_name);
-        //         attributes[i] = .{};
-        //     }
-        //     break :VT @Struct(.auto, null, st.field_names, &types, &attributes);
-        // } = undefined;
         // ini entries need to be var because their values are determined at runtime
         var ini_entries: VT: {
             const names = std.meta.fieldNames(@TypeOf(getters));

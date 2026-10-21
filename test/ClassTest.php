@@ -92,6 +92,12 @@ final class ClassTest extends ExtensionTestCase
             [1] => 0.234
             [2] => 3.45
         )
+        Enum = WithStatic\Enum
+        cat = 0
+        dog = 1
+        dog = 1
+        Flag = WithStatic\Flag
+        pork = 4
         OUTPUT, implode("\n", $lines));
     }
 
@@ -368,5 +374,16 @@ final class ClassTest extends ExtensionTestCase
         3: 3
         4: 4
         OUTPUT, implode("\n", $lines));
-    }   
+    }
+
+    public function testSubclass(): void
+    {
+        $lines = $this->runTest("classes", "subclass.php");
+        $this->assertSame(<<<OUTPUT
+        Hello
+        2
+        Hello world
+        Hello world
+        OUTPUT, implode("\n", $lines));
+    }
 }

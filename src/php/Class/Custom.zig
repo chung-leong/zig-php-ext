@@ -9,6 +9,7 @@ const Array = php.Array;
 const Allocator = php.Allocator;
 const Class = php.Class;
 const Constant = php.Constant;
+const Enumeration = php.Enumeration;
 const errable = php.errable;
 const failure = php.failure;
 const Function = php.Function;
@@ -121,13 +122,10 @@ pub fn @"fn"(comptime T: type) type {
             self.addRef();
         }
 
-        // pub fn unregister(self: *@This()) void {
-        //     const cg = php.globals("compiler");
-        //     const list: *Array = @ptrCast(cg.class_table);
-        //     const lc_name = self.name().duplicateLowerCase();
-        //     defer lc_name.release();
-        //     list.delete(lc_name);
-        // }
+        pub fn registerChildren(self: *@This(), comptime parent_class_name: []const u8) !void {
+            try self.registerClasses(parent_class_name);
+            try self.registerEnumerations(parent_class_name);
+        }
 
         pub fn initStatic() !void {
             if (Static != NoStatic) try Singleton(Static).init();
@@ -137,7 +135,39 @@ pub fn @"fn"(comptime T: type) type {
             if (Static != NoStatic) Singleton(Static).deinit();
         }
 
-        pub fn registerConstants(self: *@This()) void {
+        fn registerClasses(self: *@This(), comptime parent_class_name: []const u8) !void {
+            const st = @typeInfo(@TypeOf(classes)).@"struct";
+            const arr = self.class().constants();
+            inline for (st.field_names) |class_name| {
+                const CustomClass = @field(classes, class_name);
+                const full_class_name = parent_class_name ++ "\\" ++ class_name;
+                const cls: *CustomClass = .create(full_class_name, null);
+                try cls.register();
+                try cls.registerChildren(full_class_name);
+                // add the full class path as a constant
+                const value: Value = .fromAny(full_class_name);
+                const constant: *Constant = .create(class_name, value);
+                constant.attach(arr);
+            }
+        }
+
+        fn registerEnumerations(self: *@This(), comptime parent_class_name: []const u8) !void {
+            const st = @typeInfo(@TypeOf(enums)).@"struct";
+            const arr = self.class().constants();
+            inline for (st.field_names) |enum_name| {
+                const ET = @field(enums, enum_name);
+                const CustomEnum = Enumeration.Custom(ET);
+                const full_enum_name = parent_class_name ++ "\\" ++ enum_name;
+                const enumeration: *CustomEnum = .create(full_enum_name);
+                try enumeration.register();
+                // add the full enum path as a constant
+                const value: Value = .fromAny(full_enum_name);
+                const constant: *Constant = .create(enum_name, value);
+                constant.attach(arr);
+            }
+        }
+
+        fn registerConstants(self: *@This()) void {
             const st = @typeInfo(@TypeOf(constants)).@"struct";
             const arr = self.class().constants();
             inline for (st.field_names) |field_name| {
@@ -225,7 +255,7 @@ pub fn @"fn"(comptime T: type) type {
         const methods = php.util.symbol.MethodExporter(T, .static).get();
         const constants = php.util.symbol.ConstantExporter(T).get();
         const enums = php.util.symbol.EnumExporter(T).get();
-        const classes = php.util.symbol.ClassesExporter(T).get();
+        const classes = php.util.symbol.ClassExporter(T).get();
 
         const method_set = init: {
             const method_names = std.meta.fieldNames(@TypeOf(methods));

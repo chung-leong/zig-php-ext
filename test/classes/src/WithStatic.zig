@@ -15,8 +15,9 @@ pub fn @"static call print"(static: *Static, _: struct {}) !void {
 pub const @"export NUMBER" = 1234;
 pub const @"export TEXT" = "Hello world";
 pub const @"export ARRAY" = [3]f64{ 1.23, 0.234, 3.45 };
-pub const @"export ENUM" = enum { cat, dog, monkey };
-pub const @"export FLAG" = packed struct {
+
+pub const @"export Enum" = enum { cat, dog, monkey };
+pub const @"export Flag" = packed struct {
     chicken: bool,
     beef: bool,
     pork: bool,

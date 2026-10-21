@@ -7,7 +7,7 @@ const getter = php.IniEntry.getter;
 const setter = php.IniEntry.setter;
 
 pub const @"export SOME_CONSTANT" = "Hello world";
-pub const @"export SOME_ENUM" = enum { hello, world };
+pub const @"export SomeEnum" = enum { hello, world };
 
 pub fn @"call greet"(self: *@This(), args: struct {
     name: []const u8,
