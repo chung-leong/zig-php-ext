@@ -43,7 +43,8 @@ pub fn @"fn"(comptime names: anytype) type {
                     .@"enum", .enum_literal => @tagName(n),
                     else => n,
                 };
-                if (name.matchSlice(field_name)) break &@field(self.entries, field_name);
+                const lc_name = comptime toLowerCase(field_name);
+                if (name.matchSlice(lc_name)) break &@field(self.entries, field_name);
             } else null;
         }
 
@@ -87,4 +88,15 @@ pub fn @"fn"(comptime names: anytype) type {
 
         entries: Container,
     };
+}
+
+fn toLowerCase(name: []const u8) []const u8 {
+    const lc_name = init: {
+        var buffer: [name.len]u8 = undefined;
+        for (name, 0..) |ch, i| {
+            buffer[i] = std.ascii.toLower(ch);
+        }
+        break :init buffer;
+    };
+    return &lc_name;
 }

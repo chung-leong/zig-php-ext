@@ -269,8 +269,13 @@ final class ClassTest extends ExtensionTestCase
     public function testGetMethod(): void
     {
         $lines = $this->runTest("classes", "method.php");        
+        echo 
         $this->assertSame(<<<OUTPUT
         foo
+        getMethod
+        bar
+        hello world
+        hello world
         getMethod
         bar
         OUTPUT, implode("\n", $lines));
