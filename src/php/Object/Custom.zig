@@ -576,7 +576,7 @@ pub fn @"fn"(comptime T: type) type {
             const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "getClassName")) {
                 true => T.getClassName(self.custom()),
-                false => obj.class().name(),
+                false => obj.class().name().retain(),
             };
         }
 

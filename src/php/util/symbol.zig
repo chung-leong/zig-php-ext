@@ -41,7 +41,7 @@ pub fn MethodExporter(comptime T: type, comptime scope: Scope) type {
     return DeclarationExtractor(T, struct {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "call", scope) orelse return null;
-            if (!checkMethod(decl, T, scope, 2)) {
+            if (!checkMethod(decl, T, scope, null)) {
                 @compileError("@\"" ++ decl_name ++ "\" is not a valid method");
             }
             return name;
@@ -161,7 +161,7 @@ fn checkMethod(comptime arg: anytype, comptime T: type, comptime scope: Scope, c
 fn removePrefix(comptime decl_name: []const u8, comptime action: []const u8, comptime scope: Scope) ?[]const u8 {
     const prefix = switch (scope) {
         .instance => action ++ " ",
-        .static => "static " ++ action ++ "",
+        .static => "static " ++ action ++ " ",
     };
     return if (std.mem.startsWith(u8, decl_name, prefix)) decl_name[prefix.len..] else null;
 }

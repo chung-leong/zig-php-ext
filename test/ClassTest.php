@@ -86,12 +86,12 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame(<<<OUTPUT
         number = 1234
         text = Hello world
-        enum = 0
-        enum = 1
-        enum = 2
-        flag = 1
-        flag = 2
-        flag = 4
+        array = Array
+        (
+            [0] => 1.23
+            [1] => 0.234
+            [2] => 3.45
+        )
         OUTPUT, implode("\n", $lines));
     }
 
