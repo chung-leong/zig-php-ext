@@ -12,13 +12,18 @@ pub const @"export CONST_STRING" = "Hello world";
 pub const @"export CONST_ARRAY" = [4]i32{ 1, 2, 3, 4 };
 pub const @"export CONST_STRING_ARRAY" = [2][]const u8{ "Hello", "world" };
 
-pub const @"export CONST_ENUM" = enum { hello, world };
-pub const @"export CONST_FLAG" = packed struct {
+pub const @"export ConstEnum" = enum { hello, world };
+pub const @"export ConstType" = enum(i32) {
+    alpha = 123,
+    beta = 456,
+    gamma = 789,
+};
+pub const @"export ConstFlag" = packed struct {
     option_a: bool,
     option_b: bool,
     option_c: bool,
 };
-pub const @"export CONST_MORE" = packed struct(u8) {
+pub const @"export ConstMore" = packed struct(u8) {
     option_a: bool,
     option_b: bool,
     _: u6 = 0,

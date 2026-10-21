@@ -9,6 +9,7 @@ pub const Callable = @import("Callable.zig");
 pub const Class = @import("Class.zig");
 pub const Constant = @import("Constant.zig");
 pub const Dictionary = @import("Dictionary.zig").@"union";
+pub const Enumeration = @import("Enumeration.zig");
 pub const failure = @import("failure.zig");
 pub const Function = @import("Function.zig");
 pub const InfoTable = @import("InfoTable.zig");

@@ -6,6 +6,7 @@ const pi = php.imports;
 const Allocator = php.Allocator;
 const Class = php.Class;
 const Constant = php.Constant;
+const Enumeration = php.Enumeration;
 const errable = php.util.errable;
 const failure = php.failure;
 const unsupported = failure.unsupported;
@@ -84,6 +85,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             ini_default_value = self.*;
             try registerIniEntries(self, module_no);
             try registerClasses();
+            try registerEnumerations();
             try registerConstants(true);
             if (!@hasDecl(T, "moduleStartup")) return;
             return T.moduleStartup(self, module_type, module_no);
@@ -102,7 +104,6 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             Allocator.mode = .persistent;
             defer {
                 Singleton(T).deinit();
-                // unregisterClasses();
                 unregisterIniEntries(module_no);
             }
             if (!@hasDecl(T, "moduleShutdown")) return;
@@ -255,11 +256,15 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             }
         }
 
-        // fn unregisterClasses() void {
-        //     inline for (comptime std.meta.fieldNames(@TypeOf(classes))) |class_name| {
-        //         @field(classes, class_name).unregister();
-        //     }
-        // }
+        fn registerEnumerations() !void {
+            const st = @typeInfo(@TypeOf(enums)).@"struct";
+            inline for (st.field_names) |enum_name| {
+                const ET = @field(enums, enum_name);
+                const CustomEnum = Enumeration.Custom(ET);
+                const enumeration: *CustomEnum = .create(enum_name);
+                try enumeration.register();
+            }
+        }
 
         fn initializeClassStatic() !void {
             inline for (comptime std.meta.fieldNames(@TypeOf(classes))) |class_name| {
@@ -301,6 +306,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         const setters = php.util.symbol.SetterExporter(T, .instance).get();
         const functions = php.util.symbol.MethodExporter(T, .instance).get();
         const constants = php.util.symbol.ConstantExporter(T).get();
+        const enums = php.util.symbol.EnumExporter(T).get();
         const classes = php.util.symbol.ClassExporter(T).get();
 
         const function_entries = init: {

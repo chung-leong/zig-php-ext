@@ -44,4 +44,29 @@ final class ConstantTest extends ExtensionTestCase
         $this->assertSame("1234", $lines[1]);
         $this->assertSame("3.1415926535898", $lines[2]);
     }
+
+    public function testEnumConstant(): void
+    {
+        $lines = $this->runTest("constants", "enum.php");
+        $this->assertSame(<<<OUTPUT
+        exists
+        hello = 0
+        world = 1
+        alpha = 123
+        beta = 456
+        gamma = 789
+        OUTPUT, implode("\n", $lines));
+    }
+
+    public function testPackedStructConstant(): void
+    {
+        $lines = $this->runTest("constants", "packed.php");
+        $this->assertSame(<<<OUTPUT
+        option_a = 1
+        option_b = 2
+        option_c = 4
+        option_a = 1
+        option_b = 2
+        OUTPUT, implode("\n", $lines));
+    }
 }

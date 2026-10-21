@@ -121,13 +121,13 @@ pub fn @"fn"(comptime T: type) type {
             self.addRef();
         }
 
-        pub fn unregister(self: *@This()) void {
-            const cg = php.globals("compiler");
-            const list: *Array = @ptrCast(cg.class_table);
-            const lc_name = self.name().duplicateLowerCase();
-            defer lc_name.release();
-            list.delete(lc_name);
-        }
+        // pub fn unregister(self: *@This()) void {
+        //     const cg = php.globals("compiler");
+        //     const list: *Array = @ptrCast(cg.class_table);
+        //     const lc_name = self.name().duplicateLowerCase();
+        //     defer lc_name.release();
+        //     list.delete(lc_name);
+        // }
 
         pub fn initStatic() !void {
             if (Static != NoStatic) try Singleton(Static).init();
@@ -224,6 +224,7 @@ pub fn @"fn"(comptime T: type) type {
 
         const methods = php.util.symbol.MethodExporter(T, .static).get();
         const constants = php.util.symbol.ConstantExporter(T).get();
+        const enums = php.util.symbol.EnumExporter(T).get();
         const classes = php.util.symbol.ClassesExporter(T).get();
 
         const method_set = init: {

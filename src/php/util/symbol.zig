@@ -78,7 +78,7 @@ pub fn EnumExporter(comptime T: type) type {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "export", .instance) orelse return null;
             return switch (@typeInfo(@TypeOf(decl))) {
-                .type => check: {
+                .type => if (isCustomClass(decl)) null else check: {
                     if (switch (@typeInfo(decl)) {
                         .@"struct" => |st| st.layout != .@"packed",
                         .@"enum" => false,
