@@ -62,7 +62,7 @@ pub fn init(comptime func: anytype, comptime options: Options) @This() {
             .internal_function = .{
                 .type = c.ZEND_INTERNAL_FUNCTION,
                 .function_name = @ptrCast(func_name),
-                .handler = &internalFunction(func, options.self_source),
+                .handler = @ptrCast(&internalFunction(func, options.self_source)),
                 .num_args = handler_info.arguments.len,
                 .required_num_args = handler_info.required_count,
                 .arg_info = @constCast(arg_info.ptr),
@@ -172,8 +172,9 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
     const f = @typeInfo(F).@"fn";
     const AT = f.param_types;
     const returning_error = @typeInfo(f.return_type.?) == .error_union;
+    const cc: std.lang.CallingConvention = @typeInfo(Handler).@"fn".attrs.@"callconv";
     const ns = struct {
-        pub fn handler(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(.c) void {
+        pub fn handler(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
             const args: *Arguments = @ptrCast(zed);
             const retval: *Value = @ptrCast(zretval);
             var iter = args.iterate();
@@ -187,7 +188,7 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
             } else |err| failure.throw(err);
         }
 
-        pub fn method(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(.c) void {
+        pub fn method(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
             const php_args: *Arguments = @ptrCast(zed);
             const retval: *Value = @ptrCast(zretval);
             var iter = php_args.iterate();
@@ -218,7 +219,7 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
             } else |err| failure.throw(err);
         }
 
-        pub fn raw(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(.c) void {
+        pub fn raw(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
             const args: *Arguments = @ptrCast(zed);
             const retval: *Value = @ptrCast(zretval);
             switch (returning_error) {
@@ -244,6 +245,22 @@ pub fn extractName(comptime func: anytype) []const u8 {
     return type_name[si + 1 .. ei];
 }
 
+pub const Handler = switch (builtin.target.os.tag) {
+    .windows => init: {
+        // handler uses fastcall
+        const f = @typeInfo(StdHandler).@"fn";
+        var param_types: [f.param_types.len]type = undefined;
+        for (f.param_types, 0..) |param_type, i| param_types[i] = param_type.?;
+        break :init @Fn(&param_types, f.param_attrs, f.return_type.?, .{
+            .@"callconv" = switch (builtin.target.cpu.arch) {
+                .x86_64 => .{ .x86_64_vectorcall = .{} },
+                .x86 => .{ .x86_vectorcall = .{} },
+                else => .c,
+            },
+        });
+    },
+    else => StdHandler,
+};
 pub const HandlerInfo = struct {
     type: HandlerType,
     arguments: []ArgumentInfo,
@@ -304,20 +321,6 @@ fn argInfo(comptime info: HandlerInfo) []const c.zend_internal_arg_info {
 }
 
 const StdHandler = fn ([*c]c.zend_execute_data, [*c]c.zval) callconv(.c) void;
-const Handler = switch (builtin.target.os.tag) {
-    .windows => init: {
-        // handler uses fastcall
-        const f = @typeInfo(StdHandler).@"fn";
-        break :init @Fn(f.param_types, f.param_attrs, f.return_type.?, .{
-            .@"callconv" = switch (builtin.target.cpu.arch) {
-                .x86_64 => .{ .x86_64_vectorcall = .{} },
-                .x86 => .{ .x86_vectorcall = .{} },
-                else => .c,
-            },
-        });
-    },
-    else => StdHandler,
-};
 const Function = @This();
 
 impl: c.zend_function,

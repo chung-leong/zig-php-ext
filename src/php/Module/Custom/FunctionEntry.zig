@@ -36,7 +36,7 @@ pub fn init(comptime T: type, comptime name: [:0]const u8, comptime func: anytyp
     return .{
         .impl = .{
             .fname = name,
-            .handler = &handler,
+            .handler = @ptrCast(&handler),
             .arg_info = &zarg_info,
             .num_args = handler_info.arguments.len,
             .flags = flags,

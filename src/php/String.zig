@@ -154,11 +154,11 @@ pub fn toValue(self: *const @This()) Value {
 }
 
 pub fn toNumeric(self: *const @This()) !union(enum) {
-    integer: c_long,
+    integer: c.zend_long,
     float: f64,
 } {
     const s = self.slice();
-    var long: c_long = undefined;
+    var long: c.zend_long = undefined;
     var double: f64 = undefined;
     const result = if (s[0] > '9')
         c.IS_UNDEF

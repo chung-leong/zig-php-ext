@@ -166,7 +166,7 @@ const Key = union(enum) {
         const KT = @TypeOf(arg);
         return switch (@typeInfo(KT)) {
             .int => |int| switch (int.signedness) {
-                .signed => .{ .integer = @as(c_ulong, @bitCast(arg)) },
+                .signed => .{ .integer = @as(c.zend_ulong, @bitCast(arg)) },
                 .unsigned => .{ .integer = arg },
             },
             .comptime_int => .{ .integer = arg },
@@ -197,7 +197,7 @@ const Key = union(enum) {
         };
     }
 
-    integer: c_ulong,
+    integer: c.zend_ulong,
     string: *String,
     slice: []const u8,
 };

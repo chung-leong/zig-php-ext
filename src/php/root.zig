@@ -66,7 +66,7 @@ pub inline fn globals(comptime name: []const u8) *@field(c, "zend_" ++ name ++ "
         const offset = deref(@field(imports, name ++ "_globals_offset"));
         return @ptrFromInt(cache_address + offset);
     } else {
-        return deref(&@field(imports, name ++ "_globals"));
+        return @constCast(deref(&@field(imports, name ++ "_globals")));
     }
 }
 

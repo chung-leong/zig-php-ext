@@ -16,9 +16,9 @@ pub fn link() !void {
             @setEvalBranchQuota(2000000);
             const ptr_info = @typeInfo(decl_ptr_info.child).pointer;
             const import_name = switch (@typeInfo(ptr_info.child)) {
-                .@"fn" => |fn_info| switch (fn_info.calling_convention) {
-                    .x86_64_vectorcall => std.fmt.comptimePrint("{s}@@{d}", .{ decl_name, fn_info.params.len * @sizeOf(usize) }),
-                    .x86_vectorcall => std.fmt.comptimePrint("@{s}@{d}", .{ decl_name, fn_info.params.len * @sizeOf(usize) }),
+                .@"fn" => |fn_info| switch (fn_info.attrs.@"callconv") {
+                    .x86_64_vectorcall => std.fmt.comptimePrint("{s}@@{d}", .{ decl_name, fn_info.param_types.len * @sizeOf(usize) }),
+                    .x86_vectorcall => std.fmt.comptimePrint("@{s}@{d}", .{ decl_name, fn_info.params_types.len * @sizeOf(usize) }),
                     else => decl_name,
                 },
                 else => decl_name,
@@ -78,9 +78,11 @@ fn Ptr(comptime name: []const u8) type {
     const T = @TypeOf(@field(c, name));
     switch (@typeInfo(T)) {
         .@"fn" => |f| {
-            if (f.calling_convention == .@"inline") return void;
+            if (f.attrs.@"callconv" == .@"inline") return void;
             if (@hasField(ZendFastCall, name)) {
-                const F = @Fn(f.param_types, f.param_attrs, f.return_type.?, .{
+                var param_types: [f.param_types.len]type = undefined;
+                for (f.param_types, 0..) |param_type, i| param_types[i] = param_type.?;
+                const F = @Fn(&param_types, f.param_attrs, f.return_type.?, .{
                     .@"callconv" = switch (builtin.target.cpu.arch) {
                         .x86_64 => .{ .x86_64_vectorcall = .{} },
                         .x86 => .{ .x86_vectorcall = .{} },
@@ -157,6 +159,7 @@ pub var php_info_print_table_row: Ptr("php_info_print_table_row") = undefined;
 pub var php_info_print_table_start: Ptr("php_info_print_table_start") = undefined;
 pub var php_stream_locate_url_wrapper: Ptr("php_stream_locate_url_wrapper") = undefined;
 pub var php_stream_stdio_ops: Ptr("php_stream_stdio_ops") = undefined;
+pub var php_write: Ptr("php_write") = undefined;
 pub var std_object_handlers: Ptr("std_object_handlers") = undefined;
 pub var tsrm_get_ls_cache: switch (@hasDecl(c, "ZTS")) {
     false => void,

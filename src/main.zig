@@ -18,5 +18,5 @@ pub fn DllMain(
     _: std.os.windows.DWORD,
     _: std.os.windows.LPVOID,
 ) std.os.windows.BOOL {
-    return if (php.linkWindowsImports()) .TRUE else .FALSE;
+    return if (php.linkWindowsImports()) |_| .TRUE else |_| .FALSE;
 }

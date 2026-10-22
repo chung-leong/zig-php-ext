@@ -36,7 +36,7 @@ pub fn boolean(self: *const @This()) bool {
     return self.impl.u1.v.type == c.IS_TRUE;
 }
 
-pub fn integer(self: *const @This()) c_long {
+pub fn integer(self: *const @This()) c.zend_long {
     return self.impl.value.lval;
 }
 
@@ -131,7 +131,7 @@ pub fn getBoolean(self: *const @This()) !bool {
     };
 }
 
-pub fn getInteger(self: *const @This()) !c_long {
+pub fn getInteger(self: *const @This()) !c.zend_long {
     return switch (self.kind()) {
         .integer => self.integer(),
         .float => try floatToInteger(self.float()),
@@ -143,7 +143,7 @@ pub fn getInteger(self: *const @This()) !c_long {
     };
 }
 
-pub fn getUnsigned(self: *const @This()) !c_ulong {
+pub fn getUnsigned(self: *const @This()) !c.zend_ulong {
     const i = try self.getInteger();
     return if (i >= 0) @intCast(i) else error.NegativeValue;
 }
