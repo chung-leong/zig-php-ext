@@ -6,9 +6,8 @@ pub fn init() @This() {
     return .{};
 }
 
-pub fn deinit(_: *@This()) @This() {
+pub fn deinit(_: *@This()) void {
     php.print("deinit\n", .{});
-    return .{};
 }
 
 pub fn freeObject(_: *@This()) !void {

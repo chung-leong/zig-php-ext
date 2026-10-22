@@ -234,7 +234,7 @@ pub inline fn camelize(comptime name: []const u8) [:0]const u8 {
     return @ptrCast(buffer[0..len]);
 }
 
-pub fn decamelize(comptime name: []const u8) [:0]const u8 {
+pub fn decamelize(comptime name: []const u8) []const u8 {
     const array = init: {
         var buffer: [name.len * 2]u8 = undefined;
         var len: usize = 0;
@@ -264,8 +264,6 @@ pub fn decamelize(comptime name: []const u8) [:0]const u8 {
                 len += 1;
             }
         }
-        buffer[len] = 0;
-        len += 1;
         var array: [len]u8 = undefined;
         @memcpy(&array, buffer[0..len]);
         break :init array;

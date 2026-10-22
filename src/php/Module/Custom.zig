@@ -17,6 +17,7 @@ const Singleton = php.Singleton;
 const String = php.String;
 const Value = php.Value;
 const Dependency = php.Module.Dependency;
+const ModuleValidator = php.util.api.ModuleValidator;
 const FunctionEntry = @import("Custom/FunctionEntry.zig");
 const IniEntryDef = @import("Custom/IniEntryDef.zig");
 
@@ -25,7 +26,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
     version: [:0]const u8,
     dependency: ?[]const Dependency = null,
 }) type {
-    if (@typeInfo(T) != .@"struct") @compileError("Expected struct, received: " ++ @typeName(T));
+    comptime ModuleValidator(T).check();
     return struct {
         pub fn init() @This() {
             return .{

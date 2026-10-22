@@ -43,8 +43,21 @@ pub fn freeMessage(msg: []const u8) void {
 pub fn errorMessage(err: anytype) [:0]const u8 {
     @setEvalBranchQuota(2000000);
     return switch (err) {
-        inline else => |possible_error| comptime decamelize(@errorName(possible_error)),
+        inline else => |possible_error| comptime init: {
+            const name = decamelize(@errorName(possible_error));
+            break :init withSentinel(name);
+        },
     };
+}
+
+pub fn withSentinel(str: []const u8) [:0]const u8 {
+    const array = init: {
+        var buffer: [str.len + 1]u8 = undefined;
+        @memcpy(buffer[0..str.len], str);
+        buffer[str.len] = 0;
+        break :init buffer;
+    };
+    return @ptrCast(&array);
 }
 
 pub fn match(err: anytype, other_err: anytype) bool {

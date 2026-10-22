@@ -702,11 +702,8 @@ pub fn @"fn"(comptime T: type) type {
                 const Arg0 = switch (arg_count) {
                     0 => struct {},
                     1 => php.util.ArgType(Init, 0),
-                    else => void,
+                    else => unreachable,
                 };
-                if (@typeInfo(Arg0) != .@"struct") {
-                    @compileError("init() should accept a single struct as its sole argument");
-                }
                 break :init .{ .exists = true, .Args = Arg0, .uses_args = arg_count > 0, .by_value = true };
             } else if (@hasDecl(T, "initSelf")) {
                 const InitSelf = @TypeOf(T.initSelf);
@@ -714,11 +711,8 @@ pub fn @"fn"(comptime T: type) type {
                 const Arg0 = switch (arg_count) {
                     1 => struct {},
                     2 => php.util.ArgType(InitSelf, 0),
-                    else => void,
+                    else => unreachable,
                 };
-                if (@typeInfo(Arg0) != .@"struct") {
-                    @compileError("initSelf() should accept a single struct as its sole argument");
-                }
                 break :init .{ .exists = true, .Args = Arg0, .uses_args = arg_count > 1, .by_value = false };
             } else {
                 // use setters to initialize custom struct
@@ -741,28 +735,7 @@ pub fn @"fn"(comptime T: type) type {
                 break :init .{ .exists = false, .Args = Args };
             }
         };
-        const deinit_fn = init: {
-            if (@hasDecl(T, "deinit")) {
-                const Deinit = @TypeOf(T.deinit);
-                const arg_count = php.util.argCount(Deinit);
-                const Arg0 = switch (arg_count) {
-                    0 => void,
-                    else => php.util.ArgType(Deinit, 0),
-                };
-                if (@typeInfo(Arg0) != .pointer or @typeInfo(Arg0).pointer.child != T) {
-                    @compileError("deinit() should accept a self pointer");
-                }
-                if (arg_count > 1) {
-                    @compileError("deinit() should accept no argument");
-                }
-                if (php.util.ReturnType(Deinit) != void) {
-                    @compileError("deinit() should return void");
-                }
-                break :init .{ .exists = true };
-            } else {
-                break :init .{ .exists = false };
-            }
-        };
+        const deinit_fn = .{ .exists = @hasDecl(T, "deinit") };
         const handlers: Object.Handlers = .{
             .free_obj = @ptrCast(&freeObject),
             .dtor_obj = @ptrCast(&destroyObject),
