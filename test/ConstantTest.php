@@ -34,7 +34,7 @@ final class ConstantTest extends ExtensionTestCase
             [0] => Hello
             [1] => world
         )
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testFindConstant(): void
@@ -55,7 +55,7 @@ final class ConstantTest extends ExtensionTestCase
         alpha = 123
         beta = 456
         gamma = 789
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testPackedStructConstant(): void
@@ -67,6 +67,6 @@ final class ConstantTest extends ExtensionTestCase
         option_c = 4
         option_a = 1
         option_b = 2
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 }

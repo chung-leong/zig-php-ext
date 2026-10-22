@@ -90,7 +90,7 @@ final class ArgumentTest extends ExtensionTestCase
         Hello world
         Hello world
         This is a test
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testVariadicFunction(): void
@@ -103,7 +103,7 @@ final class ArgumentTest extends ExtensionTestCase
         1 = Hello world
         2 = 3.1415926535898
         3 = Cow
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testVariadicFunctionWithNamedArguments(): void
@@ -118,6 +118,6 @@ final class ArgumentTest extends ExtensionTestCase
         3 = Cow
         hello = world
         chicken = 12345
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 }

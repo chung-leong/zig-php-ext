@@ -26,7 +26,7 @@ final class ClassTest extends ExtensionTestCase
             [real_name] => Tony Stark
             [superhero_name] => Ironman
         )
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testDefaultConstructor(): void
@@ -51,7 +51,7 @@ final class ClassTest extends ExtensionTestCase
             [y] => 456
             [normal] => 472.29757568719
         )
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testComputedProperty(): void
@@ -68,7 +68,7 @@ final class ClassTest extends ExtensionTestCase
         Cat (.pet)
         Martin (.wild)
         Croissant (.wild)
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testStaticMethod(): void
@@ -77,7 +77,7 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame(<<<OUTPUT
         number = 123
         text = Chicken
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testStaticConstant(): void
@@ -98,7 +98,7 @@ final class ClassTest extends ExtensionTestCase
         dog = 1
         Flag = WithStatic\Flag
         pork = 4
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testFreeObject(): void
@@ -107,7 +107,7 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame(<<<OUTPUT
         destroyObject
         freeObject
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testGetConstructor(): void
@@ -119,7 +119,7 @@ final class ClassTest extends ExtensionTestCase
         constructor: 1234, Hello world
         destroyObject
         freeObject
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testCloneObject(): void
@@ -137,7 +137,7 @@ final class ClassTest extends ExtensionTestCase
             [number] => 4567
             [text] => I am Groot
         )
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testClone(): void
@@ -155,7 +155,7 @@ final class ClassTest extends ExtensionTestCase
             [number] => 4567
             [text] => I am Groot
         )
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testReadProperty(): void
@@ -229,7 +229,7 @@ final class ClassTest extends ExtensionTestCase
         false
         (unsetDimension: 4) (readDimension: 4) NAN
         negative value
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testGetClassName(): void
@@ -241,7 +241,7 @@ final class ClassTest extends ExtensionTestCase
         (
             [number] => 787
         )
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testGetProperties(): void
@@ -256,7 +256,7 @@ final class ClassTest extends ExtensionTestCase
             [bar] => mleczny
             [17] => 3.1415926535898
         )
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testGetPropertiesNoGetter(): void
@@ -269,7 +269,7 @@ final class ClassTest extends ExtensionTestCase
             [bar] => mleczny
             [17] => 3.1415926535898
         )
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testGetMethod(): void
@@ -284,7 +284,7 @@ final class ClassTest extends ExtensionTestCase
         hello world
         getMethod
         bar
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testCompareWith(): void
@@ -298,7 +298,7 @@ final class ClassTest extends ExtensionTestCase
         compareWith: 3
         equals 3
         not numeric
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testGetClosure(): void
@@ -308,7 +308,7 @@ final class ClassTest extends ExtensionTestCase
         getClosure: false
         .{ .number1 = 2.5, .number2 = 10 }
         result = 12.5
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testCastObject(): void
@@ -323,7 +323,7 @@ final class ClassTest extends ExtensionTestCase
         3.141592653589793
         to string => castObject
         '3.141592653589793'
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testDoOperation(): void
@@ -338,7 +338,7 @@ final class ClassTest extends ExtensionTestCase
         6.2831853071796
         doOperation: .div 3.141592653589793 2
         1.5707963267949
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testGetGarbageCollection(): void
@@ -359,8 +359,8 @@ final class ClassTest extends ExtensionTestCase
         4: 4
         greeting: Hello
         template: Hello, \$name!
-        OUTPUT, implode("\n", $lines));
-        // echo implode("\n", $lines);
+        OUTPUT, implode(PHP_EOL, $lines));
+        // echo implode(PHP_EOL, $lines);
     }
 
     public function testGetIterator(): void
@@ -373,7 +373,7 @@ final class ClassTest extends ExtensionTestCase
         2: 2
         3: 3
         4: 4
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testSubclass(): void
@@ -384,6 +384,6 @@ final class ClassTest extends ExtensionTestCase
         2
         Hello world
         Hello world
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 }

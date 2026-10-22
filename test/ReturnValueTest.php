@@ -42,7 +42,7 @@ final class ReturnValueTest extends ExtensionTestCase
             [2] => 3
             [3] => 4
         )
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testVectorRetval(): void
@@ -55,7 +55,7 @@ final class ReturnValueTest extends ExtensionTestCase
             [1] => 2.5
             [2] => 3.5
         )
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testOptionalRetval(): void
@@ -74,7 +74,7 @@ final class ReturnValueTest extends ExtensionTestCase
             [name] => Bigus Dickus
             [age] => 32
         )
-        OUTPUT, implode("\n", $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testStructArrayRetval(): void
@@ -103,6 +103,6 @@ final class ReturnValueTest extends ExtensionTestCase
 
         )
         OUTPUT
-        , implode("\n", $lines));
+        , implode(PHP_EOL, $lines));
     }
 }

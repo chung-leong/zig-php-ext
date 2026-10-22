@@ -7,7 +7,7 @@ class ExtensionTestCase extends TestCase
     protected function runTest($test_name, $script_name): array
     {
         chdir(__DIR__ . "/$test_name");
-        if (exec("./build") === false) {
+        if (exec("php build.php") === false) {
             throw new Exception("Unable to build extension: $test_name");
         }
         $php_version = substr(PHP_VERSION, 0, strrpos(PHP_VERSION, '.'));
@@ -16,8 +16,9 @@ class ExtensionTestCase extends TestCase
             case 'Darwin': $so_ext = 'dylib'; break;
             default: $so_ext = 'so'; break;
         }
-        $ext_path = __DIR__ . "/$test_name/extensions/$php_version/php_$test_name.$so_ext";
-        $cmd = "php -d extension='$ext_path' '$script_name'";
+        $parts = [ __DIR__, $test_name, 'extensions', $php_version, "php_$test_name.$so_ext" ];
+        $ext_path =  implode(DIRECTORY_SEPARATOR, $parts);
+        $cmd = "php -d extension=\"$ext_path\" \"$script_name\"";
         $result = exec($cmd, $lines, $code);
         if ($result === false) {
             throw new Exception("Unable to run PHP with extension: $test_name");
