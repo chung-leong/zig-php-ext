@@ -37,7 +37,7 @@ echo isset($object[8]) ? 'true' : 'false', "\n";
 echo isset($object['hello']) ? 'true' : 'false', "\n";
 
 unset($object[4]);
-echo $object[4], "\n";
+echo is_nan($object[4]) ? "NAN" : $object[4], "\n";
 
 try {
     unset($object[-2]);
