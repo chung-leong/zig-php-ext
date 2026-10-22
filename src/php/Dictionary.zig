@@ -71,10 +71,9 @@ pub const @"union" = union(enum) {
                     Value.freeConverted(@field(s, field_name));
                 }
             }
-            inline for (st.field_names, 0..) |field_name, i| {
+            inline for (st.field_names, st.field_types, 0..) |field_name, FT, i| {
                 errdefer failure_at = i;
                 @field(s, field_name) = get: {
-                    const FT = st.field_types[i];
                     if (self.has(N(field_name))) {
                         const value = try self.read(N(field_name));
                         defer value.release();

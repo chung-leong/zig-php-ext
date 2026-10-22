@@ -106,8 +106,7 @@ pub fn extract(self: *@This(), comptime T: type) !T {
         var required: usize = 0;
         var has_extra = false;
         var count: usize = 0;
-        for (st.field_names, 0..) |arg_name, i| {
-            const AT = st.field_types[i];
+        for (st.field_names, st.field_types, 0..) |arg_name, AT, i| {
             if (Function.isExtraArg(arg_name)) |variadic_type| {
                 has_extra = true;
                 switch (variadic_type) {

@@ -421,10 +421,9 @@ pub fn freeConverted(arg: anytype) void {
         .@"struct" => |st| switch (T) {
             @This() => {},
             else => if (st.backing_integer == null) {
-                inline for (st.field_names, 0..) |field_name, i| {
+                inline for (st.field_names, st.field_types, st.field_attrs) |field_name, FT, attrs| {
                     const value = @field(arg, field_name);
-                    const freeing = if (st.field_attrs[i].default_value_ptr) |opaque_ptr| check: {
-                        const FT = st.field_types[i];
+                    const freeing = if (attrs.default_value_ptr) |opaque_ptr| check: {
                         const value_ptr: *const FT = @ptrCast(@alignCast(opaque_ptr));
                         const default_value = value_ptr.*;
                         break :check !std.meta.eql(value, default_value);

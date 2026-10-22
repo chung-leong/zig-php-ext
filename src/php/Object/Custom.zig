@@ -666,13 +666,6 @@ pub fn @"fn"(comptime T: type) type {
             return if (@typeInfo(PT) == .optional) set(self.custom(), null) else error.CannotBeNull;
         }
 
-        fn isCustomClass(comptime Decl: type) bool {
-            return switch (@typeInfo(Decl)) {
-                .@"struct" => @hasField(Decl, "class_entry") and @FieldType(Decl, "class_entry") == Class,
-                else => false,
-            };
-        }
-
         const ObjectLite = init: {
             const st = @typeInfo(c.zend_object).@"struct";
             const len = st.field_names.len;

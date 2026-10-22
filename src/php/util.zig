@@ -81,9 +81,9 @@ pub fn hasPointer(comptime T: anytype) bool {
 
 pub fn getFieldDefaultValue(comptime T: type, comptime field_name: []const u8) ?@FieldType(T, field_name) {
     const st = @typeInfo(T).@"struct";
-    const field_attr, const FT: type = comptime for (st.field_names, 0..) |name, i| {
+    const field_attr, const FT: type = comptime for (st.field_names, st.field_attrs, st.field_types) |name, attrs, FT| {
         if (std.mem.eql(u8, field_name, name)) {
-            break .{ st.field_attrs[i], st.field_types[i] };
+            break .{ attrs, FT };
         }
     } else @compileError("Struct has no field by that name: " ++ field_name);
     const opaque_ptr = field_attr.default_value_ptr orelse return null;
