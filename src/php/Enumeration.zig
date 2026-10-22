@@ -1,5 +1,3 @@
-const std = @import("std");
-
 const php = @import("root.zig");
 const Array = php.Array;
 const c = php.c;
@@ -44,8 +42,8 @@ pub fn Custom(comptime T: type) type {
             flags.enumeration = true;
             const arr = self.class().constants();
             inline for (item_names, item_values) |item_name, item_value| {
-                const constant: *Constant = .create(item_name, item_value);
-                constant.attach(arr);
+                const constant: *Class.Constant = .create(self.class(), item_value);
+                arr.set(item_name, .fromPointer(constant));
             }
             return @ptrCast(self);
         }

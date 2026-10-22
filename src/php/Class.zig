@@ -1,5 +1,4 @@
-const std = @import("std");
-
+pub const Constant = @import("Class/Constant.zig");
 pub const Custom = @import("Class/Custom.zig").@"fn";
 const php = @import("root.zig");
 const Array = php.Array;

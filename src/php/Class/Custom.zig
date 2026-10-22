@@ -8,7 +8,6 @@ const php_al = php.allocator;
 const Array = php.Array;
 const Allocator = php.Allocator;
 const Class = php.Class;
-const Constant = php.Constant;
 const Enumeration = php.Enumeration;
 const errable = php.errable;
 const failure = php.failure;
@@ -147,9 +146,8 @@ pub fn @"fn"(comptime T: type) type {
                 try cls.register();
                 try cls.registerChildren(full_class_name);
                 // add the full class path as a constant
-                const value: Value = .fromAny(full_class_name);
-                const constant: *Constant = .create(class_name, value);
-                constant.attach(arr);
+                const constant: *Class.Constant = .create(self.class(), full_class_name);
+                arr.set(class_name, .fromPointer(constant));
             }
         }
 
@@ -163,9 +161,8 @@ pub fn @"fn"(comptime T: type) type {
                 const enumeration: *CustomEnum = .create(full_enum_name);
                 try enumeration.register();
                 // add the full enum path as a constant
-                const value: Value = .fromAny(full_enum_name);
-                const constant: *Constant = .create(enum_name, value);
-                constant.attach(arr);
+                const constant: *Class.Constant = .create(self.class(), full_enum_name);
+                arr.set(enum_name, .fromPointer(constant));
             }
         }
 
@@ -174,8 +171,8 @@ pub fn @"fn"(comptime T: type) type {
             const arr = self.class().constants();
             inline for (st.field_names) |field_name| {
                 const value = @field(constants, field_name);
-                const constant: *Constant = .create(field_name, value);
-                constant.attach(arr);
+                const constant: *Class.Constant = .create(self.class(), value);
+                arr.set(field_name, .fromPointer(constant));
             }
         }
 
@@ -212,8 +209,8 @@ pub fn @"fn"(comptime T: type) type {
 
         fn freeConstant(value: *Value) callconv(.c) void {
             const ptr = value.pointer();
-            const constant: *Constant = @ptrCast(@alignCast(ptr));
-            constant.name().release();
+            const constant: *Class.Constant = @ptrCast(@alignCast(ptr));
+            php_al.destroy(constant);
             constant.value().release();
         }
 

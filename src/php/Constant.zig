@@ -1,5 +1,3 @@
-pub const std = @import("std");
-
 const php = @import("root.zig");
 const c = php.c;
 const php_al = php.allocator;
@@ -39,10 +37,6 @@ pub fn create(const_name: []const u8, arg: anytype) *@This() {
 
 pub fn register(self: *const @This(), arr: *Array) !void {
     if (arr.has(self.name())) return error.NameConflict;
-    arr.set(self.name(), .fromPointer(self));
-}
-
-pub fn attach(self: *const @This(), arr: *Array) void {
     arr.set(self.name(), .fromPointer(self));
 }
 
