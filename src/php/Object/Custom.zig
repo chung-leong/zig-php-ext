@@ -16,9 +16,6 @@ const Opcode = Object.Opcode;
 const PropertiesPurpose = Object.PropertiesPurpose;
 const String = php.String;
 const Value = php.Value;
-const Access = Value.Access;
-const State = Value.State;
-const Kind = Value.Kind;
 const argCount = php.util.argCount;
 const WithoutError = php.util.WithoutError;
 const errable = php.util.errable;
@@ -97,50 +94,6 @@ pub fn @"fn"(comptime T: type) type {
             if (@hasDecl(T, "getProperties")) break :init true;
             if (std.meta.fieldNames(@TypeOf(getters)).len > 0) break :init true;
             break :init false;
-        };
-        pub const handler_protypes = .{
-            .freeObject = fn (*T) void,
-            .destroyObject = fn (*T) void,
-            .cloneObject = fn (*T) *Object,
-            .castObject = fn (*T, Kind) ?*Object,
-            .readProperty = .{
-                fn (*T, *String, Access) Value,
-                fn (*T, *String, Access, ?[*]?*anyopaque) Value,
-            },
-            .writeProperty = .{
-                fn (*T, *String, Value) void,
-                fn (*T, *String, Value, ?[*]?*anyopaque) void,
-            },
-            .hasProperty = .{
-                fn (*T, *String) bool,
-                fn (*T, *String, ?[*]?*anyopaque) bool,
-            },
-            .unsetProperty = .{
-                fn (*T, *String) void,
-                fn (*T, *String, ?[*]?*anyopaque) void,
-            },
-            .getProperties = .{
-                fn (*T, PropertiesPurpose) void,
-            },
-            .getPropertyPointer = .{
-                fn (*T, *String, Access) ?*Value,
-                fn (*T, *String, Access, ?[*]?*anyopaque) ?*Value,
-            },
-            .readDimension = fn (*T, Value, Access) Value,
-            .writeDimension = fn (*T, Value, Value) void,
-            .hasDimension = fn (*T, Value, bool) void,
-            .unsetDimension = fn (*T, Value) void,
-            .countElements = fn (*T, Value) usize,
-            .getMethod = .{
-                fn (*T, *String) *const Function,
-                fn (*T, *String, *String) *const Function,
-            },
-            .getConstructor = fn (*T) *Function,
-            .getClassName = fn (*T) *String,
-            .compareWith = fn (*T, Value) c_int,
-            .getClosure = fn (*T, bool) ClosureResult,
-            .getGarbageCollection = fn (*T) GarbageCollectionResult,
-            .doOperation = fn (u8, Value, Value) Value,
         };
 
         fn construct(obj: *Object, args: init_fn.Args) !void {
@@ -267,7 +220,7 @@ pub fn @"fn"(comptime T: type) type {
             };
         }
 
-        fn readProperty(obj: *Object, name: *String, access: Access, cache_slot: ?[*]?*anyopaque, retval: *Value) callconv(.c) *Value {
+        fn readProperty(obj: *Object, name: *String, access: Value.Access, cache_slot: ?[*]?*anyopaque, retval: *Value) callconv(.c) *Value {
             if (tryReadProperty(obj, name, access, cache_slot)) |value| {
                 retval.* = value;
             } else |err| {
@@ -277,7 +230,7 @@ pub fn @"fn"(comptime T: type) type {
             return retval;
         }
 
-        fn tryReadProperty(obj: *Object, name: *String, access: Access, cache_slot: ?[*]?*anyopaque) !Value {
+        fn tryReadProperty(obj: *Object, name: *String, access: Value.Access, cache_slot: ?[*]?*anyopaque) !Value {
             const self: *@This() = @ptrCast(obj);
             return inline for (comptime std.meta.fieldNames(@TypeOf(getters))) |getter_name| {
                 if (name.matchSlice(getter_name)) break self.callGetter(getter_name);
@@ -312,7 +265,7 @@ pub fn @"fn"(comptime T: type) type {
             };
         }
 
-        fn hasProperty(obj: *Object, name: *String, state: State, cache_slot: ?[*]?*anyopaque) callconv(.c) c_int {
+        fn hasProperty(obj: *Object, name: *String, state: Value.State, cache_slot: ?[*]?*anyopaque) callconv(.c) c_int {
             if (tryHasProperty(obj, name, cache_slot)) |found| {
                 if (found) {
                     if (state == .not_null or state == .not_false) {
@@ -433,14 +386,14 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        fn getPropertyPointer(obj: *Object, name: *String, access: Access, cache_slot: ?[*]?*anyopaque) callconv(.c) ?*Value {
+        fn getPropertyPointer(obj: *Object, name: *String, access: Value.Access, cache_slot: ?[*]?*anyopaque) callconv(.c) ?*Value {
             return tryGetPropertyPointer(obj, name, access, cache_slot) catch |err| {
                 failure.throw(err);
                 return null;
             };
         }
 
-        fn tryGetPropertyPointer(obj: *Object, name: *String, access: Access, cache_slot: ?[*]?*anyopaque) !?*Value {
+        fn tryGetPropertyPointer(obj: *Object, name: *String, access: Value.Access, cache_slot: ?[*]?*anyopaque) !?*Value {
             _ = cache_slot;
             const self: *@This() = @ptrCast(obj);
             return switch (@hasDecl(T, "getPropertyPointer")) {

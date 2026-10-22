@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const php = @import("root.zig");
+pub const api = @import("util/api.zig");
 pub const symbol = @import("util/symbol.zig");
 
 const Array = php.Array;
@@ -231,4 +232,43 @@ pub inline fn camelize(comptime name: []const u8) [:0]const u8 {
     }
     buffer[len] = 0;
     return @ptrCast(buffer[0..len]);
+}
+
+pub fn decamelize(comptime name: []const u8) [:0]const u8 {
+    const array = init: {
+        var buffer: [name.len * 2]u8 = undefined;
+        var len: usize = 0;
+        for (name, 0..) |char, i| {
+            const conversion_needed = check: {
+                var needed = false;
+                if (std.ascii.isUpper(char)) {
+                    // previous letter is not uppercase
+                    if (i == 0 or !std.ascii.isUpper(name[i - 1])) {
+                        // next letter is not uppercase
+                        if (i == name.len - 1 or !std.ascii.isUpper(name[i + 1])) {
+                            needed = true;
+                        }
+                    }
+                }
+                break :check needed;
+            };
+            if (conversion_needed) {
+                if (i > 0) {
+                    buffer[len] = ' ';
+                    len += 1;
+                }
+                buffer[len] = std.ascii.toLower(char);
+                len += 1;
+            } else {
+                buffer[len] = char;
+                len += 1;
+            }
+        }
+        buffer[len] = 0;
+        len += 1;
+        var array: [len]u8 = undefined;
+        @memcpy(&array, buffer[0..len]);
+        break :init array;
+    };
+    return @ptrCast(&array);
 }
