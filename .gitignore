@@ -8,3 +8,4 @@ zig-pkg/
 *.o
 *.ini
 composer.lock
+.*

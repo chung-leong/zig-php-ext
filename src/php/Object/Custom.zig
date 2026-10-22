@@ -465,7 +465,7 @@ pub fn @"fn"(comptime T: type) type {
             };
         }
 
-        fn countElements(obj: *Object, count: *c_long) c.zend_result {
+        fn countElements(obj: *Object, count: *c.zend_long) c.zend_result {
             if (tryCountElements(obj)) |num| {
                 count.* = @intCast(num);
                 return c.SUCCESS;

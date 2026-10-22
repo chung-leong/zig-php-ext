@@ -41,8 +41,8 @@ pub fn @"fn"(comptime T: type) type {
                 true => switch (st.field_types.len) {
                     2 => {
                         const Key = st.field_types[0];
-                        if (Key != *String and Key != c_long and Key != Value) {
-                            @compileError("Key must be Value, *String, or c_long");
+                        if (Key != *String and Key != c.zend_long and Key != Value) {
+                            @compileError("Key must be Value, *String, or " ++ @typeName(c.zend_long));
                         }
                         break :init st.field_types[1];
                     },

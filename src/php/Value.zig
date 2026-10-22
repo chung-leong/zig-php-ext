@@ -284,7 +284,7 @@ pub fn getStruct(self: *const @This(), comptime T: type) !T {
     if (self.kind() == .integer) {
         if (st.backing_integer) |Int| {
             if (self.getInteger()) |int| {
-                const bits: @Int(@typeInfo(Int).int.signedness, @bitSizeOf(c_long)) = @bitCast(int);
+                const bits: @Int(@typeInfo(Int).int.signedness, @bitSizeOf(c.zend_long)) = @bitCast(int);
                 const backing_int: Int = @truncate(bits);
                 return @bitCast(backing_int);
             } else |_| {}
@@ -467,7 +467,7 @@ pub fn fromBoolean(b: bool) @This() {
     };
 }
 
-pub fn fromInteger(lval: c_long) @This() {
+pub fn fromInteger(lval: c.zend_long) @This() {
     return .{
         .impl = .{
             .u1 = .{ .type_info = c.IS_LONG },
@@ -476,7 +476,7 @@ pub fn fromInteger(lval: c_long) @This() {
     };
 }
 
-pub fn fromUnsigned(ul: c_ulong) @This() {
+pub fn fromUnsigned(ul: c.zend_ulong) @This() {
     return fromInteger(@intCast(ul));
 }
 
@@ -555,7 +555,7 @@ pub fn fromPointer(ptr: *const anyopaque) @This() {
 pub fn fromEnum(arg: anytype) @This() {
     const T = @TypeOf(arg);
     if (@typeInfo(T) != .@"enum") @compileError("Enum expected, received: " ++ @typeName(T));
-    const int: c_long = @backingInt(arg);
+    const int: c.zend_long = @backingInt(arg);
     return fromInteger(int);
 }
 
@@ -565,7 +565,7 @@ pub fn fromStruct(arg: anytype) @This() {
     const st = @typeInfo(T).@"struct";
     if (st.backing_integer) |Int| {
         const int: Int = @bitCast(arg);
-        const long: c_long = @intCast(int);
+        const long: c.zend_long = @intCast(int);
         return .fromInteger(long);
     } else {
         const obj: *Object = .createFromStruct(arg);
@@ -682,9 +682,9 @@ pub const State = enum(c_int) {
     present,
 };
 
-fn floatToInteger(value: f64) !c_long {
+fn floatToInteger(value: f64) !c.zend_long {
     @setRuntimeSafety(false);
-    const long: c_long = @intFromFloat(value);
+    const long: c.zend_long = @intFromFloat(value);
     const double: f64 = @floatFromInt(long);
     return switch (double == value) {
         true => long,
@@ -692,10 +692,10 @@ fn floatToInteger(value: f64) !c_long {
     };
 }
 
-fn integerToFloat(value: c_long) !f64 {
+fn integerToFloat(value: c.zend_long) !f64 {
     @setRuntimeSafety(false);
     const double: f64 = @floatFromInt(value);
-    const long: c_long = @intFromFloat(double);
+    const long: c.zend_long = @intFromFloat(double);
     return switch (long == value) {
         true => double,
         else => error.NotFloatingPoint,

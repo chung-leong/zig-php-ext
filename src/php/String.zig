@@ -176,7 +176,7 @@ pub fn parseBoolean(self: *const @This()) bool {
     return pi.zend_ini_parse_bool(zstr);
 }
 
-pub fn parseInteger(self: *const @This()) c_long {
+pub fn parseInteger(self: *const @This()) c.zend_long {
     const s = &self.slice();
     return pi.zend_atol(s.ptr, s.len);
 }
@@ -204,12 +204,12 @@ pub fn static(comptime s: []const u8) *@This() {
     return @ptrCast(@constCast(&ns.str));
 }
 
-pub fn calculateHash(s: []const u8) c_ulong {
+pub fn calculateHash(s: []const u8) c.zend_ulong {
     if (@inComptime()) {
         // we can't use the function from PHP at comptime because it uses memcpy() when the target is ARM64
-        var hash: c_ulong = 5381;
+        var hash: c.zend_ulong = 5381;
         for (s) |char| hash = hash *% 33 +% char;
-        hash |= switch (@sizeOf(c_ulong)) {
+        hash |= switch (@sizeOf(c.zend_ulong)) {
             8 => 0x8000000000000000,
             4 => 0x80000000,
             else => unreachable,

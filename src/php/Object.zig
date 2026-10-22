@@ -21,7 +21,7 @@ pub fn class(self: *const @This()) *const Class {
     return @ptrCast(self.impl.ce);
 }
 
-pub fn handle(self: *const @This()) c_long {
+pub fn handle(self: *const @This()) c.zend_long {
     return @ptrCast(self.impl.handle);
 }
 
@@ -148,7 +148,7 @@ pub fn readDimension(self: *const @This(), key: anytype) !Value {
 pub fn countElements(self: *const @This()) !usize {
     const zobj = @constCast(&self.impl);
     const handler = zobj.handlers.*.count_elements orelse return error.NoPropertyAccess;
-    var count: c_long = undefined;
+    var count: c.zend_long = undefined;
     const result = handler(zobj, &count);
     if (result != c.SUCCESS) return error.Missing;
     return @intCast(count);

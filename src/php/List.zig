@@ -2,9 +2,10 @@ pub const std = @import("std");
 
 pub const Iterator = @import("List/Iterator.zig");
 const php = @import("root.zig");
-const php_al = php.allocator;
 const Array = php.Array;
+const c = php.c;
 const Object = php.Object;
+const php_al = php.allocator;
 const String = php.String;
 const Value = php.Value;
 
@@ -29,7 +30,7 @@ pub const @"union" = union(enum) {
     }
 
     pub fn has(self: @This(), index: usize) bool {
-        const long: c_long = @intCast(index);
+        const long: c.zend_long = @intCast(index);
         return switch (self) {
             .array => |arr| try arr.has(long),
             .object => |obj| try obj.hasDimension(.fromInteger(long)),
@@ -37,7 +38,7 @@ pub const @"union" = union(enum) {
     }
 
     pub fn read(self: @This(), index: usize) !Value {
-        const long: c_long = @intCast(index);
+        const long: c.zend_long = @intCast(index);
         return switch (self) {
             .array => |arr| get: {
                 const value = try arr.get(long);

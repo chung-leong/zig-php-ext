@@ -11,7 +11,7 @@
         ]
     },
     "scripts": {
-        "test": "php ./vendor/bin/phpunit ./test --testdox --display-warnings"
+        "test": "php ./vendor/bin/phpunit --testdox --display-warnings"
     },
     "require": {
         "revolt/event-loop": "^1.0",
