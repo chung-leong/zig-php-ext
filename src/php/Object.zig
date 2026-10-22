@@ -1,4 +1,4 @@
-pub const std = @import("std");
+const std = @import("std");
 
 pub const Custom = @import("Object/Custom.zig").@"fn";
 pub const Iterator = @import("Object/Iterator.zig");

@@ -300,15 +300,17 @@ pub const Options = struct {
     is_static: bool = false,
 };
 
-fn argInfo(comptime info: HandlerInfo) []const c.zend_internal_arg_info {
+const ArgInfoEntry = @typeInfo(@FieldType(c.zend_internal_function, "arg_info")).pointer.child;
+
+fn argInfo(comptime info: HandlerInfo) []const ArgInfoEntry {
     const len = info.arguments.len + if (info.is_variadic) 1 else 0;
     const array = init: {
-        var buffer: [len]c.zend_internal_arg_info = undefined;
+        var buffer: [len]ArgInfoEntry = undefined;
         for (info.arguments, 0..) |arg, i| {
             buffer[i] = .{
-                .name = switch (c.zend_internal_function == c.zend_arg_info) {
-                    true => String.static(arg.name), // 8.6
-                    false => arg.name,
+                .name = switch (@FieldType(ArgInfoEntry, "name")) {
+                    [*c]c.zend_string => @ptrCast(String.static(arg.name)), // 8.6
+                    else => arg.name,
                 },
                 .type = .{
                     .type_mask = if (arg.by_ref) 1 << c._ZEND_SEND_MODE_SHIFT else 0,

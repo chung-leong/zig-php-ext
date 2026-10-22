@@ -1,5 +1,3 @@
-pub const std = @import("std");
-
 pub const Iterator = @import("List/Iterator.zig");
 const php = @import("root.zig");
 const Array = php.Array;

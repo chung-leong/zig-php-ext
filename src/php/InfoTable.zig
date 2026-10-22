@@ -1,5 +1,3 @@
-const std = @import("std");
-
 const php = @import("root.zig");
 const pi = php.imports;
 

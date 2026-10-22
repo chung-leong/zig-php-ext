@@ -1,4 +1,4 @@
-pub const std = @import("std");
+const std = @import("std");
 
 const php = @import("root.zig");
 const Allocator = php.Allocator;

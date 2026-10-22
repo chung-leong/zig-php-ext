@@ -1,5 +1,3 @@
-pub const std = @import("std");
-
 const php = @import("../root.zig");
 const Array = php.Array;
 const List = php.List;

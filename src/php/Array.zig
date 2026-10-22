@@ -1,4 +1,4 @@
-pub const std = @import("std");
+const std = @import("std");
 
 pub const Iterator = @import("./Array/Iterator.zig");
 const php = @import("root.zig");

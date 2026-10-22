@@ -1,4 +1,4 @@
-pub const std = @import("std");
+const std = @import("std");
 pub const LookupFlags = std.os.wasi.lookupflags_t;
 pub const Stat = std.os.wasi.filestat_t;
 

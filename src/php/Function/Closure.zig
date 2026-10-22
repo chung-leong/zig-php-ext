@@ -1,6 +1,3 @@
-const std = @import("std");
-const builtin = @import("builtin");
-
 const php = @import("../root.zig");
 const c = php.c;
 const pi = php.imports;
