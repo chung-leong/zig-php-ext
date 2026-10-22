@@ -95,6 +95,9 @@ pub fn @"fn"(comptime T: type) type {
                 0 => null,
                 else => @ptrCast(@constCast(&interfaces)),
             };
+            if (@hasField(c.zend_class_entry, "default_object_handlers")) {
+                zce.default_object_handlers = &Object.Custom(T).handlers;
+            }
             pi._zend_hash_init(&zce.properties_info, c.HT_MIN_SIZE, null, true);
             pi._zend_hash_init(&zce.constants_table, c.HT_MIN_SIZE, @ptrCast(&freeConstant), true);
             pi._zend_hash_init(&zce.function_table, c.HT_MIN_SIZE, deref(&pi.zend_function_dtor), true);

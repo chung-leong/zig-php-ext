@@ -95,6 +95,31 @@ pub fn @"fn"(comptime T: type) type {
             if (std.meta.fieldNames(@TypeOf(getters)).len > 0) break :init true;
             break :init false;
         };
+        pub const handlers: Object.Handlers = .{
+            .free_obj = @ptrCast(&freeObject),
+            .dtor_obj = @ptrCast(&destroyObject),
+            .clone_obj = @ptrCast(&cloneObject),
+            .read_property = @ptrCast(&readProperty),
+            .write_property = @ptrCast(&writeProperty),
+            .read_dimension = @ptrCast(&readDimension),
+            .write_dimension = @ptrCast(&writeDimension),
+            .get_property_ptr_ptr = @ptrCast(&getPropertyPointer),
+            .has_property = @ptrCast(&hasProperty),
+            .unset_property = @ptrCast(&unsetProperty),
+            .get_properties = @ptrCast(&getProperties),
+            .get_properties_for = @ptrCast(&getPropertiesFor),
+            .has_dimension = @ptrCast(&hasDimension),
+            .unset_dimension = @ptrCast(&unsetDimension),
+            .get_method = @ptrCast(&getMethod),
+            .get_constructor = @ptrCast(&getConstructor),
+            .get_class_name = @ptrCast(&getClassName),
+            .cast_object = @ptrCast(&castObject),
+            .count_elements = @ptrCast(&countElements),
+            .get_closure = @ptrCast(&getClosure),
+            .get_gc = @ptrCast(&getGarbageCollection),
+            .do_operation = @ptrCast(&doOperation),
+            .compare = @ptrCast(&compareWith),
+        };
 
         fn construct(obj: *Object, args: init_fn.Args) !void {
             const self: *@This() = @ptrCast(obj);
@@ -729,31 +754,6 @@ pub fn @"fn"(comptime T: type) type {
             }
         };
         const deinit_fn = .{ .exists = @hasDecl(T, "deinit") };
-        const handlers: Object.Handlers = .{
-            .free_obj = @ptrCast(&freeObject),
-            .dtor_obj = @ptrCast(&destroyObject),
-            .clone_obj = @ptrCast(&cloneObject),
-            .read_property = @ptrCast(&readProperty),
-            .write_property = @ptrCast(&writeProperty),
-            .read_dimension = @ptrCast(&readDimension),
-            .write_dimension = @ptrCast(&writeDimension),
-            .get_property_ptr_ptr = @ptrCast(&getPropertyPointer),
-            .has_property = @ptrCast(&hasProperty),
-            .unset_property = @ptrCast(&unsetProperty),
-            .get_properties = @ptrCast(&getProperties),
-            .get_properties_for = @ptrCast(&getPropertiesFor),
-            .has_dimension = @ptrCast(&hasDimension),
-            .unset_dimension = @ptrCast(&unsetDimension),
-            .get_method = @ptrCast(&getMethod),
-            .get_constructor = @ptrCast(&getConstructor),
-            .get_class_name = @ptrCast(&getClassName),
-            .cast_object = @ptrCast(&castObject),
-            .count_elements = @ptrCast(&countElements),
-            .get_closure = @ptrCast(&getClosure),
-            .get_gc = @ptrCast(&getGarbageCollection),
-            .do_operation = @ptrCast(&doOperation),
-            .compare = @ptrCast(&compareWith),
-        };
         const constructor = switch (@hasDecl(T, "getConstructor")) {
             true => {},
             false => Function.init(construct, .{
