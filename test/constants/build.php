@@ -7,11 +7,56 @@ use PhpSchool\CliMenu\MenuItem\RadioItem;
 use PhpZip\ZipFile;
 
 error_reporting(E_ALL ^ E_DEPRECATED);
-
 require_once(__DIR__ . '/vendor/autoload.php');
 
-class Settings {
+define('BACKGROUND_COLOR', [ 220, 'yellow' ]);
+define('FOREGROUND_COLOR', [ 0, 'black' ]);
+
+class Meta {
+    var $ext_name;
+    var $ext_version;
+    var $zig_config;
+
     function __construct() {
+        $json = file_get_contents(__DIR__ . "/composer.json");
+        $composer = json_decode($json);
+        $this->ext_name = preg_replace("/.*?\//", "", $composer->name);
+        $this->ext_version = $composer->version;
+        $this->zig_config = isset($composer->zig->config) ? $composer->zig->config : null;
+    }
+
+    function getDefaultConfig() {
+        if ($this->zig_config) {
+            $config = new stdclass;
+            foreach ($this->zig_config as $name => $item) {
+                $default_value = $item->default;
+                if (isset($item->type)) {
+                    // make sure float values are floats when default values are whole
+                    switch ($item->type) {
+                        case 'f16':
+                        case 'f32':
+                        case 'f64': 
+                            $default_value = (float) $default_value;
+                            break;
+                    }
+                }
+                $config->$name = $default_value;
+            }
+            return $config;
+        }
+    }
+}
+
+class Settings {
+    var $versions;
+    var $targets;
+    var $debug;
+    var $optimize;
+    var $zig_config;
+
+    function __construct() {
+        global $meta;
+        $this->zig_config = $meta->getDefaultConfig();
         $this->ini_path = join(DIRECTORY_SEPARATOR, [ __DIR__, 'build.ini' ]);
         if (file_exists($this->ini_path)) {
             $this->load();
@@ -49,6 +94,20 @@ class Settings {
         $this->debug = (bool) $fields['debug'];
         $this->targets = array_map('trim', $fields['targets'] ?? []);
         $this->optimize = trim($fields['optimize'] ?? 'ReleaseSmall');
+            
+        if ($this->zig_config) {
+            foreach ($this->zig_config as $name => $default_value) {
+                if (isset($fields[$name])) {
+                    $value = $fields[$name];
+                    switch (gettype($default_value)) {
+                        case 'boolean': $value = !!preg_match("/^(true|on|yes|1)$/i", $value); break;
+                        case 'integer': $value = (int) $value; break;
+                        case 'double': $value = (float) $value; break;
+                    }
+                    $this->zig_config->$name = $value;
+                }
+            }
+        }
     }
 
     function save() {
@@ -77,6 +136,23 @@ class Settings {
             $lines[] = $prefix . "optimize = $mode";
         }
         $lines[] = "";
+        if ($this->zig_config) {
+            // save extra zig configuration
+            $lines[] = "[zig]";
+            foreach ($this->zig_config as $name => $value) {
+                if (is_array($value)) {
+                    foreach($value as $item) {
+                        $lines[] = "{$name}[] = $item";
+                    }
+                } else {
+                    if (gettype($value) === 'boolean') {
+                        $value = ($value) ? 'true' : 'false';
+                    }
+                    $lines[] = "$name = $value";
+                }
+                $lines[] = "";
+            }
+        }
         $contents = join(PHP_EOL, $lines);
         $old_contents = @file_get_contents($this->ini_path);
         if ($contents != $old_contents or !file_exists($this->ini_path)) {
@@ -85,112 +161,20 @@ class Settings {
     }
 }
 
-// extract app name
-$json = file_get_contents(__DIR__ . "/composer.json");
-$composer = json_decode($json);
-$app_name = preg_replace("/.*?\//", "", $composer->name);
-$app_name_uc = ucfirst($app_name);
-
-$build = false;
+// load metadata and user settings
+$meta = new Meta;
 $settings = new Settings;
-$menu = (new CliMenuBuilder)
-    ->setTitle("PHP-$app_name_uc Extension Build Script")
-    ->addSubMenu("PHP version", function ($b) use($settings) {
-        $b->setTitle("Select the version(s) of PHP for which you wish to create the extension");
-        $versions = [ 
-            '8.1' => "8.1.x", 
-            '8.2' => "8.2.x",
-            '8.3' => "8.3.x",
-            '8.4' => "8.4.x", 
-            '8.5' => "8.5.x",
-            '8.6' => "8.6.x",
-        ];
-        $cb = function($menu) use($versions, $settings) {
-            $item = $menu->getSelectedItem();
-            $id = array_search($item->getText(), $versions);
-            $op = ($item->getChecked()) ? 'array_merge' : 'array_diff';
-            $settings->versions = $op($settings->versions, [ $id ]);
-            sort($settings->versions);
-        };
-        foreach ($versions as $id => $label) {
-            $item = new CheckboxItem($label, $cb, false, false);
-            if (in_array($id, $settings->versions)) {
-                $item->setChecked();
-            }
-            $b->addMenuItem($item);
+
+function updateMenuItem($title) {
+    global $menu;
+    $prefix = substr($title, 0, strpos($title, ": "));
+    foreach ($menu->getItems() as $item) {
+        if (str_starts_with($item->getText(), $prefix)) {
+            $item->setText($title);
+            break;
         }
-        $b->addLineBreak('-');
-    })
-    ->addSubMenu("PHP debug mode", function ($b) use($settings) {
-        $b->setTitle("Select the debug mode of the PHP executable");
-        $cb = function($menu) use($settings) {
-            $item = $menu->getSelectedItem();
-            $settings->debug = $item->getText() == 'Enabled';
-        };
-        foreach ([ false, true ] as $enabled) {
-            $label = $enabled ? 'Enabled' : 'Disabled';
-            $item = new RadioItem($label, $cb, false, false);
-            if ($settings->debug == $enabled) {
-                $item->setChecked();
-            }
-            $b->addMenuItem($item);
-        }
-    })
-    ->addSubMenu("Operation System", function ($b) use($settings) {
-        $b->setTitle("Select the operation system(s) you wish to support");
-        $targets = [
-            'x86_64-linux-gnu' => "Linux x86 64-bit",
-            'aarch64-linux-gnu' => "Linux ARM 64-bit",
-            'x86_64-macos' => "MacOS x86 64-bit",
-            'aarch64-macos' => "MacOS ARM 64-bit",
-            'x86_64-windows' => "Windows x86 64-bit",
-            'x86_64-windows-ts' => "Windows x86 64-bit (thread-safe)",
-        ];
-        $cb = function($menu) use($targets, $settings) {
-            $item = $menu->getSelectedItem();
-            $id = array_search($item->getText(), $targets);
-            $op = ($item->getChecked()) ? 'array_merge' : 'array_diff';
-            $settings->targets = $op($settings->targets, [ $id ]);
-            sort($settings->targets);
-        };
-        foreach ($targets as $id => $label) {
-            $item = new CheckboxItem($label, $cb, false, false);
-            if (in_array($id, $settings->targets)) {
-                $item->setChecked();
-            }
-            $b->addMenuItem($item);
-        }
-        $b->addLineBreak('-');
-    })
-    ->addSubMenu("Optimization level", function ($b) use($settings) {
-        $b->setTitle("Select the optimization level used to compile the extension");
-        $levels = [ 'Debug', 'ReleaseSafe', 'ReleaseSmall', 'ReleaseFast' ];
-        $cb = function($menu) use($settings) {
-            $item = $menu->getSelectedItem();
-            $settings->optimize = $item->getText();
-        };
-        foreach ($levels as $level) {
-            $item = new RadioItem($level, $cb, false, false);
-            if ($settings->optimize == $level) {
-                $item->setChecked();
-            }
-            $b->addMenuItem($item);
-        }
-    })
-    ->addLineBreak('-')
-    ->addItem("Build", function($menu) use(&$build, $settings) {
-        if ($settings->debug && $settings->optimize != 'Debug') {
-            $flash = $menu->flash("Unable to build debug version optimized for release");
-            $flash->display();
-            return;
-        }
-        $build = true;
-        $menu->close();
-    })
-    ->setMarginAuto()
-    ->setBackgroundColour(220, 'yellow')
-    ->setForegroundColour(0, 'black')
-    ->build();
+    }
+}
 
 $action = $argv[1] ?? '';
 switch ($action) {
@@ -198,13 +182,210 @@ switch ($action) {
         $build = true; 
         break;
     case 'menu': 
-        if (!is_callable('posix_isatty')) {
-            echo "Unable to show menu: posix extension is not installed\n";
-            exit(1);
-        } else if (!posix_isatty(STDIN)) {
+        $build = false;
+        if (is_callable('posix_isatty') and !posix_isatty(STDIN)) {
             echo "Unable to show menu: stdin is not a TTY\n";
             exit(1);
         }
+        // add standard entries to menu
+        $builder = new CliMenuBuilder;
+        $builder->setTitle("Build Script for php-$meta->ext_name (v{$meta->ext_version})");
+        $title = "PHP version: " . implode(", ", $settings->versions);
+        $builder->addSubMenu($title, function ($b) use($settings) {
+            $b->setTitle("Select the version(s) of PHP for which you wish to create the extension");
+            $versions = [ 
+                '8.1' => "8.1.x", 
+                '8.2' => "8.2.x",
+                '8.3' => "8.3.x",
+                '8.4' => "8.4.x", 
+                '8.5' => "8.5.x",
+                '8.6' => "8.6.x",
+            ];
+            $cb = function($menu) use($versions, $settings) {
+                $item = $menu->getSelectedItem();
+                $id = array_search($item->getText(), $versions);
+                $op = ($item->getChecked()) ? 'array_merge' : 'array_diff';
+                $settings->versions = $op($settings->versions, [ $id ]);
+                sort($settings->versions);
+                $title = "PHP version: " . implode(", ", $settings->versions);
+                updateMenuItem($title);
+            };
+            foreach ($versions as $id => $label) {
+                $item = new CheckboxItem($label, $cb, false, false);
+                if (in_array($id, $settings->versions)) {
+                    $item->setChecked();
+                }
+                $b->addMenuItem($item);
+            }
+            $b->addLineBreak('-');
+        });
+        $title = "PHP debug mode: " . (($settings->debug) ? 'enabled' : 'disabled');
+        $builder->addSubMenu($title, function ($b) use($settings) {
+            $b->setTitle("Select the debug mode of the PHP executable");
+            $cb = function($menu) use($settings) {
+                $item = $menu->getSelectedItem();
+                $settings->debug = $item->getText() == 'Enabled';
+                $title = "PHP debug mode: " . (($settings->debug) ? 'enabled' : 'disabled');
+                updateMenuItem($title);
+            };
+            foreach ([ false, true ] as $enabled) {
+                $label = $enabled ? 'Enabled' : 'Disabled';
+                $item = new RadioItem($label, $cb, false, false);
+                if ($settings->debug == $enabled) {
+                    $item->setChecked();
+                }
+                $b->addMenuItem($item);
+            }
+            $b->addLineBreak('-');
+        });
+        $title = "Operation system: " . implode(", ", $settings->targets);
+        $builder->addSubMenu($title, function ($b) use($settings) {
+            $b->setTitle("Select the operation system(s) you wish to support");
+            $targets = [
+                'x86_64-linux-gnu' => "Linux x86 64-bit",
+                'aarch64-linux-gnu' => "Linux ARM 64-bit",
+                'x86_64-macos' => "MacOS x86 64-bit",
+                'aarch64-macos' => "MacOS ARM 64-bit",
+                'x86_64-windows' => "Windows x86 64-bit",
+                'x86_64-windows-ts' => "Windows x86 64-bit (thread-safe)",
+            ];
+            $cb = function($menu) use($targets, $settings) {
+                $item = $menu->getSelectedItem();
+                $id = array_search($item->getText(), $targets);
+                $op = ($item->getChecked()) ? 'array_merge' : 'array_diff';
+                $settings->targets = $op($settings->targets, [ $id ]);
+                sort($settings->targets);
+                $title = "Operation system: " . implode(", ", $settings->targets);
+                updateMenuItem($title);
+            };
+            foreach ($targets as $id => $label) {
+                $item = new CheckboxItem($label, $cb, false, false);
+                if (in_array($id, $settings->targets)) {
+                    $item->setChecked();
+                }
+                $b->addMenuItem($item);
+            }
+            $b->addLineBreak('-');
+        });
+        $title = "Optimization level: " . $settings->optimize;
+        $builder->addSubMenu($title, function ($b) use($settings) {
+            $b->setTitle("Select the optimization level used to compile the extension");
+            $levels = [ 'Debug', 'ReleaseSafe', 'ReleaseSmall', 'ReleaseFast' ];
+            $cb = function($menu) use($settings) {
+                $item = $menu->getSelectedItem();
+                $settings->optimize = $item->getText();
+                $title = "Optimization level: " . $settings->optimize;
+                updateMenuItem($title);
+            };
+            foreach ($levels as $level) {
+                $item = new RadioItem($level, $cb, false, false);
+                if ($settings->optimize == $level) {
+                    $item->setChecked();
+                }
+                $b->addMenuItem($item);
+            }
+            $b->addLineBreak('-');
+        });
+        $builder->addLineBreak('-');
+
+        if ($settings->zig_config) {
+            // add custom configuration entries to menu
+            foreach ($settings->zig_config as $name => $current_value) {
+                $type = gettype($current_value);
+                $entry = $meta->zig_config->$name;
+                if (isset($entry->choices)) {
+                    if (is_array($current_value)) {
+                        $title = "$entry->title: " . implode(", ", $current_value);
+                        $builder->addSubMenu($title, function ($b) use($settings, $name, $entry, $current_value) {
+                            $b->setTitle($entry->title);
+                            foreach ($entry->choices as $item_name => $label) {
+                                $cb = function($menu) use($settings, $name, $item_name, $entry) {
+                                    $item = $menu->getSelectedItem();
+                                    $op = ($item->getChecked()) ? 'array_merge' : 'array_diff';
+                                    $new_value = $op($settings->zig_config->$name, [ $item_name ]);
+                                    sort($new_value);
+                                    $settings->zig_config->$name = $new_value;
+                                    $title = "$entry->title: " . implode(", ", $new_value);
+                                    updateMenuItem($title);
+                                };
+                                $item = new CheckboxItem($label, $cb, false, false);
+                                if (in_array($item_name, $current_value)) {
+                                    $item->setChecked();
+                                }
+                                $b->addMenuItem($item);
+                            }
+                            $b->addLineBreak('-');
+                        });
+                    } else {
+                        $title = "$entry->title: $current_value";
+                        $builder->addSubMenu($title, function ($b) use($settings, $name, $entry, $current_value) {
+                            $b->setTitle($entry->title);
+                            foreach ($entry->choices as $item_name => $label) {
+                                $cb = function($menu) use($settings, $name, $item_name, $entry) {
+                                    $item = $menu->getSelectedItem();
+                                    $new_value = $item_name;
+                                    $settings->zig_config->$name = $new_value;
+                                    $title = "$entry->title: $new_value";
+                                    updateMenuItem($title);
+                                };
+                                $item = new RadioItem($label, $cb, false, false);
+                                if ($item_name === $current_value) {
+                                    $item->setChecked();
+                                }
+                                $b->addMenuItem($item);
+                            }
+                            $b->addLineBreak('-');
+                        });
+                    }
+                } else {
+                    if ($type === 'boolean') {                
+                        $title = "$entry->title: " . (($current_value) ? "true" : "false");
+                        $builder->addItem($title, function ($menu) use($settings, $name, $entry, $type) {
+                            $new_value = !$settings->zig_config->$name;
+                            $settings->zig_config->$name = $new_value;
+                            $item = $menu->getSelectedItem();
+                            $item->setText("$entry->title: " . (($new_value) ? "true" : "false"));
+                            $menu->redraw();
+                        });
+                    } else {
+                        $title = "$entry->title: $current_value";
+                        $builder->addItem($title, function ($menu) use($settings, $name, $entry, $type) {
+                            $current_value = $settings->zig_config->$name;
+                            $result = $menu->askText()
+                                ->setPromptText($entry->prompt)
+                                ->setPlaceholderText($current_value)
+                                ->ask();
+                            $new_value = $result->fetch();
+                            switch (gettype($current_value)) {
+                                case 'integer': $new_value = (int) $new_value; break;
+                                case 'double': $new_value = (float) $new_value; break;
+                            }
+                            $settings->zig_config->$name = $new_value;
+                            $item = $menu->getSelectedItem();
+                            $item->setText("$entry->title: $new_value");
+                            $menu->redraw();
+                        });
+                    }
+                }
+            }
+            $builder->addLineBreak('-');
+        }
+
+        // add action items and set display properties
+        $builder->addItem("Build", function($menu) use(&$build, $settings) {
+            if ($settings->debug && $settings->optimize != 'Debug') {
+                $flash = $menu->flash("Unable to build debug version optimized for release");
+                $flash->display();
+                return;
+            }
+            $build = true;
+            $menu->close();
+        });
+        $builder->setMarginAuto();
+        $builder->setBackgroundColour(...BACKGROUND_COLOR);
+        $builder->setForegroundColour(...FOREGROUND_COLOR);
+        $menu = $builder->build();   
+
         $menu->open();
         $settings->save();
         break;
@@ -256,7 +437,6 @@ foreach ($settings->versions as $version) {
                     }
                 }
                 $links = array_merge($qa_links, $links);
-                print_r($links);
             }
             $link = $links[$version];
             if (!in_array('https', stream_get_wrappers())) {
@@ -311,7 +491,7 @@ foreach ($settings->versions as $version) {
             case 'macos': $so_ext = 'dylib'; break;
             default: $so_ext = 'so'; break;
         }
-        $so_name = "php_$app_name.$so_ext";
+        $so_name = "php_{$meta->ext_name}.$so_ext";
         $so_path = join(DIRECTORY_SEPARATOR, [ $so_dir, $so_name ]);
         $cmd = [ 
             'zig',
@@ -326,6 +506,22 @@ foreach ($settings->versions as $version) {
         }
         if ($ts) {
             $cmd[] = "-Dphp-ts";
+        }
+        if ($settings->zig_config) {
+            // add custom configuration
+            foreach ($settings->zig_config as $name => $value) {
+                if (is_array($value)) {
+                    foreach ($value as $item) {
+                        $cmd[] = "-D{$name}_{$item}";
+                    }
+                } else {
+                    if (gettype($value) === 'boolean') {
+                        $cmd[] = "-D{$name}";
+                    } else {
+                        $cmd[] = "-D{$name}={$value}";
+                    }
+                }
+            }
         }
         if (!@unlink($so_path)) {
             // can't delete a DLL when it's still loaded in Windows
