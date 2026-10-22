@@ -37,6 +37,7 @@ const ZendFastCall = enum {
     _emalloc,
     _is_numeric_string_ex,
     _zend_hash_init,
+    _zend_new_array,
     _zend_new_array_0,
     convert_to_array,
     convert_to_boolean,
@@ -121,6 +122,7 @@ pub var _php_stream_tell: Ptr("_php_stream_tell") = undefined;
 pub var _php_stream_truncate_set_size: Ptr("_php_stream_truncate_set_size") = undefined;
 pub var _php_stream_write: Ptr("_php_stream_write") = undefined;
 pub var _zend_hash_init: Ptr("_zend_hash_init") = undefined;
+pub var _zend_new_array: Ptr("_zend_new_array") = undefined;
 pub var _zend_new_array_0: Ptr("_zend_new_array_0") = undefined;
 pub var compiler_globals: switch (@hasDecl(c, "ZTS")) {
     false => Ptr("compiler_globals"),

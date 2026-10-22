@@ -155,7 +155,7 @@ class Settings {
         }
         $contents = join(PHP_EOL, $lines);
         $old_contents = @file_get_contents($this->ini_path);
-        if ($contents != $old_contents) {
+        if ($contents != $old_contents or !file_exists($this->ini_path)) {
             file_put_contents($this->ini_path, $contents);
         }
     }
