@@ -219,7 +219,7 @@ PHP Fatal error:  Uncaught Exception: the man is deaf in /home/cleong/zig-php-ex
 ## Extension name and version
 
 By now, we've exhausted the demonstrative possibities of our simple "hello" extension. Let us 
-change it to so it does something useful. We want to make a function that calculates the hash
+change it so it does something more useful. We want to make a function that calculates the hash
 of the given data using the 
 [CityHash](https://opensource.googleblog.com/2011/04/introducing-cityhash.html) algorithm. We'll 
 start by changing the name of our extension. This information is retrieved from `composer.json`:
@@ -325,3 +325,120 @@ pub fn @"call city_hash"(_: *@This(), args: struct {
 Native PHP types are reference-counted. Here, a string with refcount = 1 gets returned to PHP. 
 When PHP is done with it, it'll decrement the refcount to zero and it'll be released.
 
+## Custom menu items
+
+You can add custom items to the build menu by adding a special entry in `composer.json`:
+
+![menu](img/custom-menu.png)
+
+The menu shown above is the rendering of the following `composer.json`:
+
+```json
+{
+    "name": "mycompany/custom-config",
+    "description": "A description of my application",    
+    "version": "0.1.0",
+    "zig": {
+        "config": {
+            "cfg_string": { 
+                "title": "Test String",
+                "description": "Configuration option that is a string",
+                "prompt": "Enter a string",
+                "default": "Hello world"
+            },
+            "cfg_int": { 
+                "title": "Test integer",
+                "type": "usize",
+                "description": "Configuration option that is an integer",
+                "prompt": "Enter an integer",
+                "default": 1234
+            },
+            "cfg_float": { 
+                "title": "Test float",
+                "type": "f64",
+                "description": "Configuration option that is a float",
+                "prompt": "Enter an float",
+                "default": 0.1234
+            },
+            "cfg_bool": { 
+                "title": "Test boolean",
+                "description": "Configuration option that is a boolean",
+                "default": false
+            },
+            "cfg_flag": { 
+                "title": "Test flag set",
+                "description": "Configuration option flag",
+                "prompt": "Set one or more",
+                "type" : "Flag",
+                "choices": { 
+                    "alpha": "Alpha",
+                    "beta": "Beta",
+                    "gamma": "Gamma"
+                },
+                "default": [ "alpha", "beta" ]
+            },
+            "some_enum": { 
+                "title": "Test enum",
+                "description": "Configuration option that is an enum",
+                "prompt": "Select one",
+                "type" : "Enum",
+                "choices": {
+                    "apple": "You like apple",
+                    "banana": "You like banana", 
+                    "cantaloupe": "You hate cantaloupe" 
+                },
+                "default": "cantaloupe"
+            }
+        }
+    }
+}
+```
+
+Custom fields defined in such a manner will be available at comptime as fields in 
+`@import("config")`. Normally, the returned struct would only contain the extension name and 
+version.
+
+When `choices` is present, the end-user will be presented with a list of possible choices.
+
+`prompt` and `title` are text strings that appears in the build menu.
+
+The `description` field is entirely optional. It's only shown if the end-user chooses to run 
+`zig build --help`:
+
+```
+Project-Specific Options:
+  -Doptimize=[enum]            Prioritize performance, safety, or binary size
+                                 Supported Values:
+                                   debug
+                                   safe
+                                   fast
+                                   small
+  -Dtarget=[string]            The CPU architecture, OS, and ABI to build for
+  -Dcpu=[string]               Target CPU features to add or subtract
+  -Dofmt=[string]              Target object format
+  -Ddynamic-linker=[string]    Path to interpreter on the target system
+  -Dphp-include=[string]       Directory containing PHP header files
+  -Dphp-extension=[string]     Directory where the extension will be saved
+  -Dphp-debug=[bool]           Whether PHP executable has debug enabled
+  -Dphp-ts=[bool]              Whether PHP executable was compiled with thread-safety enabled
+  -Dcfg_string=[string]        Configuration option that is a string
+  -Dcfg_int=[int]              Configuration option that is an integer
+  -Dcfg_float=[float]          Configuration option that is a float
+  -Dcfg_bool=[bool]            Configuration option that is a boolean
+  -Dcfg_flag_alpha=[bool]      Configuration option flag: alpha
+  -Dcfg_flag_beta=[bool]       Configuration option flag: beta
+  -Dcfg_flag_gamma=[bool]      Configuration option flag: gamma
+  -Dsome_enum=[enum]           Configuration option that is an enum
+                                 Supported Values:
+                                   apple
+                                   banana
+                                   cantaloupe
+```
+
+In its absence, `prompt` would be shown.
+
+`type` is required when the value in question is an enum or a packed struct with boolean flags.
+When used, you have to provide the definition of the actual type in `composer.zig`. The `type` 
+field is also needed when a floating point field's default value does not clearly indicate that 
+the field is supposed to be a floating point number (i.e. when the default value is a whole 
+number).
