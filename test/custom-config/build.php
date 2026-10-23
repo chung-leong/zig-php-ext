@@ -491,7 +491,7 @@ foreach ($settings->versions as $version) {
             case 'macos': $so_ext = 'dylib'; break;
             default: $so_ext = 'so'; break;
         }
-        $so_name = "php_{$meta->ext_name}.$so_ext";
+        $so_name = "php_" . strtr($meta->ext_name, '-', '_') . ".$so_ext";
         $so_path = join(DIRECTORY_SEPARATOR, [ $so_dir, $so_name ]);
         $cmd = [ 
             'zig',
