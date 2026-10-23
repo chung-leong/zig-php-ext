@@ -16,11 +16,11 @@ if (file_exists($filename)) {
 }
 
 $ignore = <<<PATTERNS
-.git
-.phpunit.cache
-.phpunit.result
-.vscode
-.zig-cache
+\.git
+\.phpunit\.cache
+\.phpunit\.result
+\.vscode
+\.zig-cache
 demos
 doc
 extensions
@@ -39,14 +39,14 @@ vendor/symfony
 vendor/theseer
 zig-out
 
-.*.zip
-.gitignore
-ai-disclosure.yaml
+\.gitignore
+.*\.zip
+ai-disclosure\.yaml
 build$
-build.ini
-composer.lock
+build\.ini
+composer\.lock
 package$
-phpunit.xml
+phpunit\.xml
 PATTERNS;
 $filters = preg_split('/[\r\n]+/', $ignore, -1, PREG_SPLIT_NO_EMPTY);
 $patterns = array_map(function($s) {
