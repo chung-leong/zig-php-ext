@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const extra = @import("build.extra.zig");
+
 pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
@@ -124,20 +126,32 @@ pub fn build(b: *std.Build) !void {
     translate_c.defineCMacro("ZEND_DEBUG", if (php_debug) "1" else "0");
     if (php_ts) translate_c.defineCMacro("ZTS", null);
 
+    const std_imports: []const std.Build.Module.Import = &.{
+        .{ .name = "c", .module = translate_c.createModule() },
+    };
+    const extra_imports: []const std.Build.Module.Import = switch (@hasDecl(extra, "getImports")) {
+        true => @call(.always_inline, extra.getImports, .{ b, .{
+            .target = target,
+            .optimize = optimize,
+        } }),
+        false => &.{},
+    };
     const mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
         .single_threaded = false,
         .link_libc = true,
-        .imports = &.{
-            .{ .name = "c", .module = translate_c.createModule() },
-        },
+        .imports = try std.mem.concat(b.allocator, std.Build.Module.Import, &.{
+            std_imports,
+            extra_imports,
+        }),
     });
     mod.stack_check = false;
     if (target.result.os.tag == .windows) {
         mod.linkSystemLibrary("dbghelp", .{});
     }
+    mod.addOptions("config", options);
 
     const lib = b.addLibrary(.{
         .linkage = .dynamic,
@@ -155,8 +169,16 @@ pub fn build(b: *std.Build) !void {
         // allow symbols from php executable to be undefined
         lib.linker_allow_shlib_undefined = true;
     }
-    lib.root_module.addOptions("config", options);
-
+    const extra_c_files: []const std.Build.Module.CSourceFile = switch (@hasDecl(extra, "getCSourceFiles")) {
+        true => @call(.always_inline, extra.getCSourceFiles, .{ b, .{
+            .library = lib,
+            .module = mod,
+            .target = target,
+            .optimize = optimize,
+        } }),
+        false => &.{},
+    };
+    for (extra_c_files) |file| mod.addCSourceFile(file);
     inline for (.{ translate_c, mod }) |c| {
         const os_specific = if (target.result.os.tag == .linux)
             "src/include/linux"
@@ -172,6 +194,16 @@ pub fn build(b: *std.Build) !void {
         c.addIncludePath(.{ .cwd_relative = try std.fs.path.join(b.allocator, &.{ php_include, "TSRM" }) });
         c.addIncludePath(.{ .cwd_relative = try std.fs.path.join(b.allocator, &.{ php_include, "Zend" }) });
     }
+    const extra_include_paths: []const std.Build.LazyPath = switch (@hasDecl(extra, "getIncludePaths")) {
+        true => @call(.always_inline, extra.getIncludePaths, .{ b, .{
+            .library = lib,
+            .module = mod,
+            .target = target,
+            .optimize = optimize,
+        } }),
+        false => &.{},
+    };
+    for (extra_include_paths) |path| mod.addIncludePath(path);
 
     const wf = b.addUpdateSourceFiles();
     const file_ext = if (target.result.os.tag == .linux)
