@@ -153,9 +153,13 @@ pub fn build(b: *std.Build) !void {
     }
     mod.addOptions("config", options);
 
+    const so_name = try std.fmt.allocPrint(b.allocator, "php_{s}", .{ext.name});
+    for (so_name) |*ptr| {
+        if (ptr.* == '-') ptr.* = '_';
+    }
     const lib = b.addLibrary(.{
         .linkage = .dynamic,
-        .name = try std.fmt.allocPrint(b.allocator, "php_{s}", .{ext.name}),
+        .name = so_name,
         .root_module = mod,
         .version = try std.SemanticVersion.parse(ext.version),
         .use_llvm = true,
@@ -206,7 +210,7 @@ pub fn build(b: *std.Build) !void {
     for (extra_include_paths) |path| mod.addIncludePath(path);
 
     const wf = b.addUpdateSourceFiles();
-    const file_ext = if (target.result.os.tag == .linux)
+    const so_ext = if (target.result.os.tag == .linux)
         "so"
     else if (target.result.os.tag.isDarwin())
         "dylib"
@@ -214,7 +218,7 @@ pub fn build(b: *std.Build) !void {
         "dll"
     else
         unreachable;
-    const filename = try std.fmt.allocPrint(b.allocator, "php_{s}.{s}", .{ ext.name, file_ext });
+    const filename = try std.fmt.allocPrint(b.allocator, "{s}.{s}", .{ so_name, so_ext });
     wf.addCopyFileToSource(lib.getEmittedBin(), try std.fs.path.join(b.allocator, &.{ php_extension, filename }));
     if (target.result.os.tag == .windows and optimize == .debug) {
         const pdb_filename = try std.fmt.allocPrint(b.allocator, "php_{s}.pdb", .{ext.name});

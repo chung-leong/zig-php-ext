@@ -48,6 +48,9 @@ It lets you to select multiple platforms to compile the extension for:
 
 ![menu](img/menu-os.png)
 
+The information you entered is saved to `build.ini`. Your selection will be used again when you 
+run `php build.php`.
+
 Note: On Windows, the menu only works when you launch it in Git Bash.
 
 ## Examining the code
@@ -83,7 +86,7 @@ pub fn DllMain(
 
 `Module.Custom` is a parametric struct type for defining an extension. It accepts a
 namespace and an option struct as arguments. The namespace is defined in `extension.zig`. This 
-is the file that you'll be modifying for your own extension.
+is the file that you'll be modifying to create your own extension.
 
 **src/extension.zig**:
 
@@ -137,6 +140,10 @@ pub fn @"set greeting"(self: *@This(), value: [:0]const u8) void {
 }
 ```
 
+The `@"export"` prefix is used to add constants and 
+[enumerations](https://www.php.net/manual/en/language.types.enumerations.php) specific to the 
+extension. It's also used for adding custom classes. We'll get to that in later sections.
+
 ## Receiving arguments of different types
 
 We can use Zig [tagged unions](https://ziglang.org/documentation/0.17.0/#Tagged-union) to receive 
@@ -172,7 +179,7 @@ Hello, Charlie!
 Hello, Dan!
 ```
 
-## Reporting error
+## Reporting errors
 
 Use Zig's standard error mechanism to trigger exceptions on the PHP side:
 
@@ -208,4 +215,113 @@ Hello, Bob!
 Hello, Charlie!
 PHP Fatal error:  Uncaught Exception: the man is deaf in /home/cleong/zig-php-ext/examples/hello/test.php:4
 ```
+
+## Extension name and version
+
+By now, we've exhausted the demonstrative possibities of our simple "hello" extension. Let us 
+change it to so it does something useful. We want to make a function that calculates the hash
+of the given data using the 
+[CityHash](https://opensource.googleblog.com/2011/04/introducing-cityhash.html) algorithm. We'll 
+start by changing the name of our extension. This information is retrieved from `composer.json`:
+
+```json
+{
+    "name": "mycompany\/hello",
+    "description": "A description of my application",
+    "version": "0.1.0"
+}
+```
+
+We'll change the name to "city-hash" and bump the version number up to 0.17.0:
+
+```json
+{
+    "name": "mycompany\/city-hash",
+    "description": "A description of my application",
+    "version": "0.17.0"
+}
+```
+
+Now we'll to get a library file named `php_city_hash.so` (`.dll` on Windows, `.dylib` on MacOS).
+
+## Returning strings
+
+Replace the code in `src/extension.zig`, with the following:
+
+```zig
+const std = @import("std");
+const CityHash64 = std.hash.cityhash.CityHash64;
+
+const php = @import("php/root.zig");
+
+pub fn @"call city_hash"(_: *@This(), args: struct {
+    data: []const u8,
+}) !*u64 {
+    return CityHash64.hash(args.data);
+}
+```
+
+Create `test.php`:
+
+```php
+<?php
+
+echo city_hash("Hello world!"), "\n";
+
+?>
+```
+
+And run it:
+
+```
+php -d extension=extensions/8.5/php_city_hash.so test.php
+```
+```
+8483183195033020432
+```
+
+Here, we're simply using a function built into Zig's standard library to calculate the hash.
+The result is a 64-bit unsigned number, which we return to PHP. This is not very convenient,
+we most often use the hexdecimal representation of hashes. A function that returns a string
+is more ergonomic. 
+
+Strings introduce added complication because they're variable-length. Their creation requires
+memory allocation. We have to be mindful of memory ownership. Zig-php-ext uses the standard 
+approach in Zig: unless a function receives an allocator from the caller, it should not 
+assume the memory will get freed by the caller.
+
+The following code will result in a memory leak:
+
+```zig
+const std = @import("std");
+const CityHash64 = std.hash.cityhash.CityHash64;
+
+const php = @import("php/root.zig");
+
+pub fn @"call city_hash"(_: *@This(), args: struct {
+    data: []const u8,
+}) ![]const u8 {
+    const hash = CityHash64.hash(args.data);
+    return std.fmt.allocPrint(php.allocator, "{x}", .{hash});
+}
+```
+
+In this situation, we need to return a PHP string instead:
+
+```zig
+const std = @import("std");
+const CityHash64 = std.hash.cityhash.CityHash64;
+
+const php = @import("php/root.zig");
+
+pub fn @"call city_hash"(_: *@This(), args: struct {
+    data: []const u8,
+}) *php.String {
+    const hash = CityHash64.hash(args.data);
+    return .allocPrint("{x}", .{hash});
+}
+```
+
+Native PHP types are reference-counted. Here, a string with refcount = 1 gets returned to PHP. 
+When PHP is done with it, it'll decrement the refcount to zero and it'll be released.
 
