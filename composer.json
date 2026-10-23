@@ -14,8 +14,7 @@
         "test": "php ./vendor/bin/phpunit --testdox --display-warnings"
     },
     "require": {
-        "revolt/event-loop": "^1.0",
-        "php-school/cli-menu": "^4.3",
-        "nelexa/zip": "^4.0"
+        "php-school/cli-menu": "4.3",
+        "nelexa/zip": "4.0"
     }
 }
