@@ -125,13 +125,9 @@ pub fn handlerInfo(comptime func: anytype, comptime self_src: SelfSource) Handle
         }
         break :init .{ count, extra };
     };
-    const is_variadic = is_raw or has_extra or check: {
-        if (arg_types.len > 0) {
-            // see if last argument is a dictionary
-            const LT = arg_types[arg_types.len - 1];
-            break :check LT == Dictionary or LT == ?Dictionary;
-        }
-        break :check false;
+    const is_variadic = is_raw or has_extra or switch (arg_types.len) {
+        0 => false,
+        else => acceptsNamedParameters(arg_types[arg_types.len - 1]),
     };
     const arguments, const required_count = init: {
         var arguments: [arg_count]ArgumentInfo = undefined;
@@ -163,6 +159,16 @@ pub fn handlerInfo(comptime func: anytype, comptime self_src: SelfSource) Handle
         .arguments = arguments,
         .required_count = required_count,
         .is_variadic = is_variadic,
+    };
+}
+
+fn acceptsNamedParameters(comptime AT: type) bool {
+    return switch (@typeInfo(AT)) {
+        .optional => |op| acceptsNamedParameters(op.child),
+        .error_union => |eu| acceptsNamedParameters(eu.payload),
+        .@"union" => AT == Dictionary,
+        .@"struct" => true,
+        else => false,
     };
 }
 

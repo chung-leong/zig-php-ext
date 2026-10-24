@@ -120,4 +120,17 @@ final class ArgumentTest extends ExtensionTestCase
         chicken = 12345
         OUTPUT, implode(PHP_EOL, $lines));
     }
+
+    public function testNamedArgumentsToStruct(): void
+    {
+        $lines = $this->runTest("arguments", "options.php");
+        $this->assertSame(<<<OUTPUT
+        arg1 = 100
+        options = .{ .alpha = false, .beta = .pig }
+        arg1 = 101
+        options = .{ .alpha = true, .beta = .pig }
+        arg1 = 102
+        options = .{ .alpha = true, .beta = .cow }
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
 }

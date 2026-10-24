@@ -160,3 +160,17 @@ pub fn @"call acceptManyNamed"(
         }
     }
 }
+
+pub fn @"call acceptOptions"(
+    _: *@This(),
+    args: struct {
+        arg1: c_long,
+        options: struct {
+            alpha: bool = false,
+            beta: enum { cow, pig, chicken } = .pig,
+        } = .{},
+    },
+) void {
+    php.print("arg1 = {d}\n", .{args.arg1});
+    php.print("options = {}\n", .{args.options});
+}
