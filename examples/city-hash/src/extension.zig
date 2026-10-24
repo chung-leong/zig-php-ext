@@ -12,7 +12,10 @@ pub fn @"call city_hash"(_: *@This(), args: struct {
     data: []const u8,
     options: Options = .{},
 }) *php.String {
-    const hash = CityHash64.hash(args.data);
+    const hash = if (args.options.seed) |seed|
+        CityHash64.hashWithSeed(args.data, seed)
+    else
+        CityHash64.hash(args.data);
     return switch (args.options.uppercase) {
         true => .allocPrint("{X}", .{hash}),
         false => .allocPrint("{x}", .{hash}),

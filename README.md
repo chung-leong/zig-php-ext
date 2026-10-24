@@ -281,14 +281,14 @@ php -d extension=extensions/8.5/php_city_hash.so test.php
 ```
 
 Here, we're simply using a function built into Zig's standard library to calculate the hash.
-The result is a 64-bit unsigned number, which we return to PHP. This is not very convenient,
-we most often use the hexdecimal representation of hashes. A function that returns a string
-is more ergonomic. 
+The result is a 64-bit unsigned number, which we return to PHP. This is not very convenient.
+We most often use the hexdecimal representation of hashes. A function that returns a string
+would be more ergonomic. 
 
-Strings introduce added complication because they're variable-length. Their creation requires
-memory allocation. We have to be mindful of memory ownership. Zig-php-ext uses the standard 
-approach in Zig: unless a function receives an allocator from the caller, it should not 
-assume the memory will get freed by the caller.
+Strings introduce added complications because they're variable-length. Their creation requires
+memory allocation. We have to be mindful of memory ownership therefore. Zig-php-ext follows the 
+standard approach in Zig: unless a function receives an allocator from the caller, it should not
+assume memory will get freed by the caller.
 
 The following code will result in a memory leak:
 
@@ -306,7 +306,7 @@ pub fn @"call city_hash"(_: *@This(), args: struct {
 }
 ```
 
-In this situation, we need to return a PHP string instead:
+For this situation, we need to return a PHP string instead:
 
 ```zig
 const std = @import("std");
@@ -322,8 +322,103 @@ pub fn @"call city_hash"(_: *@This(), args: struct {
 }
 ```
 
-Native PHP types are reference-counted. Here, a string with refcount = 1 gets returned to PHP. 
-When PHP is done with it, it'll decrement the refcount to zero and it'll be released.
+Strings, arrays, and objects in PHP are reference-counted. Here, a string with refcount = 1 
+gets returned to PHP. When PHP is done with it, it'll decrement the refcount to zero and the 
+memory allocated for the string will be released.
+
+With our new code we get the following output:
+
+```
+75ba522b8881a810
+```
+
+## Accepting optional arguments
+
+Suppose we want to give the user of our hash function the option to specify a seed. We also 
+want them to be able to choose between upper-case or lower-case output. To do that, we just need 
+to provide default values to these arguments in the struct:
+
+```zig
+const std = @import("std");
+const CityHash64 = std.hash.cityhash.CityHash64;
+
+const php = @import("php/root.zig");
+
+pub fn @"call city_hash"(_: *@This(), args: struct {
+    data: []const u8,
+    seed: ?u64 = null,
+    uppercase: bool = false,
+}) *php.String {
+    const hash = if (args.seed) |seed|
+        CityHash64.hashWithSeed(args.data, seed)
+    else
+        CityHash64.hash(args.data);
+    return switch (args.uppercase) {
+        true => .allocPrint("{X}", .{hash}),
+        false => .allocPrint("{x}", .{hash}),
+    };
+}
+```
+```php
+<?php
+
+echo city_hash("Hello world!"), "\n";
+echo city_hash("Hello world!", 0x1234, true), "\n";
+
+?>
+```
+```
+75ba522b8881a810
+8604784A83200D0D
+```
+
+## Accepting named arguments
+
+Another way of doing optional arguments is with named arguments. Zig-php-ext passes extra named 
+arguments as an associative array to the function handler as its final argument. This array can 
+be used to initialize an optional struct:
+
+```zig
+const std = @import("std");
+const CityHash64 = std.hash.cityhash.CityHash64;
+
+const php = @import("php/root.zig");
+
+const Options = struct {
+    seed: ?u64 = null,
+    uppercase: bool = false,
+};
+
+pub fn @"call city_hash"(_: *@This(), args: struct {
+    data: []const u8,
+    options: Options = .{},
+}) *php.String {
+    const hash = if (args.options.seed) |seed|
+        CityHash64.hashWithSeed(args.data, seed)
+    else
+        CityHash64.hash(args.data);
+    return switch (args.options.uppercase) {
+        true => .allocPrint("{X}", .{hash}),
+        false => .allocPrint("{x}", .{hash}),
+    };
+}
+```
+```php
+<?php
+
+echo city_hash("Hello world!"), "\n";
+echo city_hash("Hello world!", uppercase: true), "\n";
+
+?>
+```
+```
+75ba522b8881a810
+75BA522B8881A810
+```
+
+## Defining custom classes
+
+## Accepting objects of custom classes as argument
 
 ## Custom menu items
 
