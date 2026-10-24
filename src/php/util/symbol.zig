@@ -54,7 +54,7 @@ pub fn ClassExporter(comptime T: type) type {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "export", .instance) orelse return null;
             return switch (@typeInfo(@TypeOf(decl))) {
-                .type => if (isCustomClass(decl)) name else null,
+                .type => if (php.util.api.isCustomType(decl)) name else null,
                 else => null,
             };
         }
@@ -78,7 +78,7 @@ pub fn EnumExporter(comptime T: type) type {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "export", .instance) orelse return null;
             return switch (@typeInfo(@TypeOf(decl))) {
-                .type => if (isCustomClass(decl)) null else check: {
+                .type => if (php.util.api.isCustomType(decl)) null else check: {
                     if (switch (@typeInfo(decl)) {
                         .@"struct" => |st| st.layout != .@"packed",
                         .@"enum" => false,
@@ -164,13 +164,6 @@ fn removePrefix(comptime decl_name: []const u8, comptime action: []const u8, com
         .static => "static " ++ action ++ " ",
     };
     return if (std.mem.startsWith(u8, decl_name, prefix)) decl_name[prefix.len..] else null;
-}
-
-fn isCustomClass(comptime Decl: type) bool {
-    return switch (@typeInfo(Decl)) {
-        .@"struct" => @hasField(Decl, "class_entry") and @FieldType(Decl, "class_entry") == Class,
-        else => false,
-    };
 }
 
 fn joinNames(comptime export_name: []const u8, comptime field_name: []const u8) []const u8 {

@@ -2,13 +2,14 @@ const std = @import("std");
 
 const php = @import("root.zig");
 const c = php.c;
-const pi = php.imports;
+const Class = php.Class;
 const failure = php.failure;
-const php_al = php.allocator;
 const Callable = php.Callable;
 const Dictionary = php.Dictionary;
 const List = php.List;
 const Object = php.Object;
+const php_al = php.allocator;
+const pi = php.imports;
 const Reference = php.Reference;
 const Resource = php.Resource;
 const Stream = php.Stream;
@@ -355,10 +356,18 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
                     const ref = try self.getReference();
                     break :get ref.target();
                 },
-                else => {
-                    const result = try self.convertTo(pt.child);
-                    const target = php_al.create(T);
-                    target.* = result;
+                else => get: {
+                    if (comptime php.util.api.isCustomType(pt.child)) {
+                        const obj = try self.getObject();
+                        const custom_class = Class.Custom(pt.child.Custom).get();
+                        if (!obj.isInstanceOf(custom_class.class())) return error.NotClassInstance;
+                        break :get @ptrCast(@alignCast(obj));
+                    } else {
+                        const result = try self.convertTo(pt.child);
+                        const target = php_al.create(T);
+                        target.* = result;
+                        break :get target;
+                    }
                 },
             },
             .slice => switch (pt.child) {
@@ -386,7 +395,7 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
                 true => inline for (un.field_types, 0..) |FT, i| {
                     if (self.convertTo(FT)) |nv| break @unionInit(T, un.field_names[i], nv) else |_| {}
                 } else error.NoMatch,
-                false => @compileError("Union must be tagged"),
+                false => @compileError("Union must be tagged: " ++ @typeName(T)),
             },
         },
         else => unsupported(T),
@@ -404,7 +413,7 @@ pub fn freeConverted(arg: anytype) void {
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
                 Array, Object, Reference, Resource, Stream, String, @This() => {},
-                else => {
+                else => if (comptime !php.util.api.isCustomType(pt.child)) {
                     freeConverted(arg.*);
                     php_al.destroy(arg);
                 },
@@ -422,14 +431,15 @@ pub fn freeConverted(arg: anytype) void {
             @This() => {},
             else => if (st.backing_integer == null) {
                 inline for (st.field_names, st.field_types, st.field_attrs) |field_name, FT, attrs| {
-                    const value = @field(arg, field_name);
+                    const value_ptr = &@field(arg, field_name);
                     const freeing = if (attrs.default_value_ptr) |opaque_ptr| check: {
-                        const value_ptr: *const FT = @ptrCast(@alignCast(opaque_ptr));
-                        const default_value = value_ptr.*;
-                        break :check !std.meta.eql(value, default_value);
+                        const default_value_ptr: *const FT = @ptrCast(@alignCast(opaque_ptr));
+                        const value_mem = std.mem.asBytes(value_ptr);
+                        const default_value_mem = std.mem.asBytes(default_value_ptr);
+                        break :check !std.mem.eql(u8, value_mem, default_value_mem);
                     } else true;
                     if (freeing) {
-                        freeConverted(value);
+                        freeConverted(value_ptr.*);
                     }
                 }
             },
@@ -608,7 +618,10 @@ pub fn fromAny(arg: anytype) switch (@typeInfo(@TypeOf(arg))) {
                         },
                         false => unsupported(T),
                     },
-                    else => unsupported(T),
+                    else => switch (comptime php.util.api.isCustomType(pt.child)) {
+                        true => .fromObject(arg.object()),
+                        false => unsupported(T),
+                    },
                 },
             },
             .slice => switch (pt.child) {

@@ -286,7 +286,10 @@ fn valueTypeName(comptime T: type) []const u8 {
                 Object => "object",
                 Resource => "resource",
                 Value => "reference",
-                else => unsupported(T),
+                else => switch (php.util.api.isCustomType(pt.child)) {
+                    true => "object",
+                    false => unsupported(T),
+                },
             },
             .slice => switch (pt.child) {
                 u8 => "string",

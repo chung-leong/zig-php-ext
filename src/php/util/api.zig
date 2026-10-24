@@ -137,6 +137,15 @@ pub fn ClassValidator(comptime T: type) type {
     };
 }
 
+pub const CustomOpaque = opaque {};
+
+pub fn isCustomType(comptime T: type) bool {
+    return switch (@typeInfo(T)) {
+        .@"struct" => @hasDecl(T, "CustomOpaque") and T.CustomOpaque == CustomOpaque,
+        else => false,
+    };
+}
+
 fn checkStruct(comptime T: type) void {
     if (@typeInfo(T) != .@"struct") {
         @compileError("Struct expected, received: " ++ @typeName(T));

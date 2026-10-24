@@ -30,6 +30,10 @@ pub fn @"fn"(comptime T: type) type {
             return @ptrCast(@constCast(self));
         }
 
+        pub fn get() *@This() {
+            return registered orelse @panic("Not registered as custom class: " ++ @typeName(T));
+        }
+
         pub fn custom(_: *@This()) *T {
             return Singleton(T).get();
         }
@@ -124,6 +128,7 @@ pub fn @"fn"(comptime T: type) type {
             if (list.has(lc_name)) return error.NameConflict;
             list.set(lc_name, .fromPointer(&self.class_entry.impl));
             self.addRef();
+            registered = self;
         }
 
         pub fn registerChildren(self: *@This(), comptime parent_class_name: []const u8) !void {
@@ -180,7 +185,7 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         fn createObject(self: *@This()) callconv(.c) ?*Object {
-            const result = Instance.create(self.class());
+            const result = Instance.createWithClass(self.class());
             const custom_obj = switch (@typeInfo(@TypeOf(result))) {
                 .error_union => result catch |err| {
                     failure.throw(err);
@@ -217,6 +222,7 @@ pub fn @"fn"(comptime T: type) type {
             constant.value().release();
         }
 
+        pub const CustomOpaque = php.util.api.CustomOpaque;
         pub const Instance = Object.Custom(T);
         pub const Static = init: {
             var S: ?type = null;
@@ -271,6 +277,8 @@ pub fn @"fn"(comptime T: type) type {
             }
             break :init result;
         };
+
+        var registered: ?*@This() = null;
 
         class_entry: Class align(@max(@alignOf(Class), @alignOf(Static))),
 

@@ -40,8 +40,13 @@ pub fn @"fn"(comptime T: type) type {
             return @intFromPtr(obj.impl.handlers) == @intFromPtr(&handlers);
         }
 
-        pub fn create(class: *const Class) !*@This() {
-            const self = try php_al.create(@This());
+        pub fn create() *@This() {
+            const custom_class = Class.Custom(T).get();
+            return createWithClass(custom_class.class());
+        }
+
+        pub fn createWithClass(class: *const Class) *@This() {
+            const self = php_al.create(@This()) catch unreachable;
             errdefer php_al.destroy(self);
             // initialize the PHP portion
             pi.zend_object_std_init(@ptrCast(&self.php_object), @ptrCast(@constCast(class)));
@@ -87,6 +92,7 @@ pub fn @"fn"(comptime T: type) type {
             return custom_iter.iterator();
         }
 
+        pub const CustomOpaque = php.util.api.CustomOpaque;
         pub const Custom = T;
         pub const has_iterator = init: {
             if (@hasDecl(T, "getIterator")) break :init true;
@@ -216,7 +222,7 @@ pub fn @"fn"(comptime T: type) type {
                 true => T.cloneObject(self.custom()),
                 false => switch (@hasDecl(T, "clone")) {
                     true => clone: {
-                        const copy = try create(obj.class());
+                        const copy = createWithClass(obj.class());
                         copy.custom_struct = try T.clone(self.custom());
                         copy.flags.initialized = true;
                         break :clone copy.object();

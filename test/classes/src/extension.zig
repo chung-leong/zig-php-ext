@@ -3,6 +3,7 @@ const std = @import("std");
 const php = @import("php/root.zig");
 const Class = php.Class;
 const Module = php.Module;
+const Object = php.Object;
 
 pub const @"export Greeting" = Class.Custom(@import("Greeting.zig"));
 pub const @"export Superhero" = Class.Custom(@import("Superhero.zig"));
@@ -28,3 +29,18 @@ pub const @"export WithGetGarbageCollection" = Class.Custom(@import("WithGetGarb
 pub const @"export WithGetIterator" = Class.Custom(@import("WithGetIterator.zig"));
 pub const @"export WithIterate" = Class.Custom(@import("WithIterate.zig"));
 pub const @"export hello\\world\\WithSubclasses" = Class.Custom(@import("WithSubclasses.zig"));
+
+pub fn @"call print_point"(_: *@This(), args: struct {
+    point_obj: *Object.Custom(@import("Point.zig")),
+}) void {
+    const point = args.point_obj.custom();
+    php.print("x = {d}, y = {d}\n", .{ point.x, point.y });
+}
+
+pub fn @"call get_point"(_: *@This(), _: struct {}) *Object.Custom(@import("Point.zig")) {
+    const custom_obj = Object.Custom(@import("Point.zig")).create();
+    const point = custom_obj.custom();
+    point.x = 1234.5;
+    point.y = 4567.8;
+    return custom_obj;
+}

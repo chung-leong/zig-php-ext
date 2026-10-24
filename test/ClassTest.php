@@ -386,4 +386,23 @@ final class ClassTest extends ExtensionTestCase
         Hello world
         OUTPUT, implode(PHP_EOL, $lines));
     }
+
+    public function testObjectArgument(): void
+    {
+        $lines = $this->runTest("classes", "obj-argument.php");
+        $this->assertSame("x = 1.23, y = 4.56", $lines[0]);
+    }
+
+    public function testObjectReturnValue(): void
+    {
+        $lines = $this->runTest("classes", "obj-retval.php");
+        $this->assertSame(<<<OUTPUT
+        Point Object
+        (
+            [x] => 1234.5
+            [y] => 4567.8
+            [normal] => 4731.6790983751
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
 }
