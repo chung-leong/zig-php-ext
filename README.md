@@ -419,9 +419,127 @@ echo city_hash("Hello world!", uppercase: true), "\n";
 
 This technique is useful in situations where the number of optional arguments is large.
 
-## Accepting a list of objects
+## Accepting struct arguments
 
-Zig-php-ext will in general tries to convert PHP types 
+When an argument is a struct, on the PHP side you specify it using an associative array:
+
+```zig
+const php = @import("php/root.zig");
+
+const Power = enum { tech, mutant, occult, alien, training };
+
+const Avenger = struct {
+    real_name: []const u8,
+    superhero_name: []const u8,
+    power: Power = .training,
+};
+
+pub const @"export Power" = Power;
+
+pub fn @"call show"(_: *@This(), args: struct {
+    avenger: Avenger,
+}) !void {
+    php.print("{s} = {s} ({})\n", .{
+        args.avenger.superhero_name,
+        args.avenger.real_name,
+        args.avenger.power,
+    });
+}
+```
+```php
+<?php
+
+show([ 'real_name' => "Tony Stark", 'superhero_name' => "Ironman", 'power' => Power::tech ]);
+
+?>
+```
+```
+Ironman = Tony Stark (.tech)
+```
+
+```php
+<?php
+
+class Superhero {
+    function __construct($real_name, $superhero_name, $power) {
+        $this->real_name = $real_name;
+        $this->superhero_name = $superhero_name;
+        $this->power = $power;
+    }
+}
+
+show(new Superhero("Tony Stark", "Ironman", 'tech'));
+
+?>
+```
+```
+Ironman = Tony Stark (.tech)
+```
+
+A function can also accepts a list of objects:
+
+```zig
+pub fn @"call assemble"(_: *@This(), args: struct {
+    avengers: []Avenger,
+}) !void {
+    for (args.avengers) |a| {
+        php.print("{s} = {s} ({})\n", .{
+            a.superhero_name,
+            a.real_name,
+            a.power,
+        });
+    }
+}
+```
+```php
+<?php
+
+assemble([
+    [ 'real_name' => "Tony Stark", 'superhero_name' => "Ironman", 'power' => 'tech' ],
+    [ 'real_name' => "Natalia Romanov", 'superhero_name' => "Black Widow" ],
+    [ 'real_name' => "Peter Parker", 'superhero_name' => "Blue Beetle", 'power' => 'mutant' ],
+]);
+
+?>
+```
+```
+Ironman = Tony Stark (.tech)
+Black Widow = Natalia Romanov (.training)
+Blue Beetle = Peter Parker (.mutant)
+```
+
+Notice that enum can accept either a integer or a string.
+
+## Defining custom classes
+
+## Defining sub-classes and enumerations
+
+## Accepting objects of custom classes as argument
+
+## Passing arguments by reference
+
+Use a pointer to `php.Value` if your function needs a by-ref argument:
+
+```zig
+const php = @import("php/root.zig");
+
+pub fn @"call set_text"(_: *@This(), args: struct {
+    value: *php.Value,
+}) !void {
+    args.value.release();
+    args.value.* = .fromString(.static("Hello world"));
+}
+```
+```php
+<?php
+
+set_text($text);
+echo $text, "\n";
+
+?>
+```
+
+`Value` represents a PHP variant (aka `zval`).
 
 ## Defining variadic function
 
@@ -458,7 +576,6 @@ arg1 = 1234
 
 Add the `@"???"` field to the argument struct if you wish to get named arguments as well:
 
-
 ```zig
 const php = @import("php/root.zig");
 
@@ -490,17 +607,6 @@ arg1 = 4567
 cow = .string
 chicken = .integer
 ```
-
-## Passing arguments by reference
-
-
-
-## Defining custom classes
-
-## Defining sub-classes and enumerations
-
-
-## Accepting objects of custom classes as argument
 
 ## Custom menu items
 
