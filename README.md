@@ -375,8 +375,9 @@ echo city_hash("Hello world!", 0x1234, true), "\n";
 ## Accepting named arguments
 
 Another way of doing optional arguments is with named arguments. Zig-php-ext passes extra named 
-arguments as an associative array to the function handler as its final argument. This array can 
-be used to initialize an optional struct:
+arguments (i.e. arguments whose names do not match those of the function's declared arguments)
+as an associative array to the function handler as its final argument. This array can be used to
+initialize an optional struct:
 
 ```zig
 const std = @import("std");
@@ -416,7 +417,88 @@ echo city_hash("Hello world!", uppercase: true), "\n";
 75BA522B8881A810
 ```
 
+This technique is useful in situations where the number of optional arguments is large.
+
+## Accepting a list of objects
+
+Zig-php-ext will in general tries to convert PHP types 
+
+## Defining variadic function
+
+If you want to define a function that accepts any number of arguments, you have to add the special
+`@"..."` field to the argument struct:
+
+```zig
+const php = @import("php/root.zig");
+
+pub fn @"call list_arguments"(_: *@This(), args: struct {
+    arg0: u32,
+    @"...": []const php.Value,
+}) !void {
+    php.print("arg1 = {d}\n", .{args.arg0});
+    for (args.@"...") |arg| php.print("{}\n", .{arg.kind()});
+}
+```
+```php
+<?php
+
+list_arguments(1234, 1, 2.5, "Hello world", false, null, (object) []);
+
+?>
+```
+```
+arg1 = 1234
+.integer
+.float
+.string
+.boolean
+.null
+.object
+```
+
+Add the `@"???"` field to the argument struct if you wish to get named arguments as well:
+
+
+```zig
+const php = @import("php/root.zig");
+
+pub fn @"call list_arguments"(_: *@This(), args: struct {
+    arg0: u32,
+    @"...": []const php.Value,
+    @"???": ?*php.Array,
+}) !void {
+    php.print("arg1 = {d}\n", .{args.arg0});
+    for (args.@"...") |arg| php.print("{}\n", .{arg.kind()});
+    if (args.@"???") |named| {
+        var iter = named.iterate(.{});
+        while (iter.next()) |n_arg| {
+            php.print("{s} = {}\n", .{ iter.key().string().slice(), n_arg.kind() });
+        }
+    }
+}
+```
+```php
+<?php
+
+list_arguments(4567, false, cow: 'tasty', chicken: 1234);
+
+?>
+```
+```
+arg1 = 4567
+.boolean
+cow = .string
+chicken = .integer
+```
+
+## Passing arguments by reference
+
+
+
 ## Defining custom classes
+
+## Defining sub-classes and enumerations
+
 
 ## Accepting objects of custom classes as argument
 
@@ -523,7 +605,7 @@ Project-Specific Options:
   -Dcfg_flag_alpha=[bool]      Configuration option flag: alpha
   -Dcfg_flag_beta=[bool]       Configuration option flag: beta
   -Dcfg_flag_gamma=[bool]      Configuration option flag: gamma
-  -Dsome_enum=[enum]           Configuration option that is an enum
+  -Dcfg_enum=[enum]            Configuration option that is an enum
                                  Supported Values:
                                    apple
                                    banana
@@ -537,3 +619,5 @@ When used, you have to provide the definition of the actual type in `composer.zi
 field is also needed when a floating point field's default value does not clearly indicate that 
 the field is supposed to be a floating point number (i.e. when the default value is a whole 
 number).
+
+## Packaging your extension
