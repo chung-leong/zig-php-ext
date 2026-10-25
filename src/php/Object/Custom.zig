@@ -264,7 +264,7 @@ pub fn @"fn"(comptime T: type) type {
         fn tryReadProperty(obj: *Object, name: *String, access: Value.Access, cache_slot: ?[*]?*anyopaque) !Value {
             const self: *@This() = @ptrCast(obj);
             return inline for (comptime std.meta.fieldNames(@TypeOf(getters))) |getter_name| {
-                if (name.matchSlice(getter_name)) break self.callGetter(getter_name);
+                if (name.matchStatic(getter_name)) break self.callGetter(getter_name);
             } else switch (@hasDecl(T, "readProperty")) {
                 true => switch (comptime argCount(@TypeOf(T.readProperty))) {
                     4 => T.readProperty(self.custom(), name, access, cache_slot),
@@ -285,7 +285,7 @@ pub fn @"fn"(comptime T: type) type {
         fn tryWriteProperty(obj: *Object, name: *String, value: *Value, cache_slot: ?[*]?*anyopaque) !void {
             const self: *@This() = @ptrCast(obj);
             return inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
-                if (name.matchSlice(setter_name)) break self.callSetter(setter_name, value.*);
+                if (name.matchStatic(setter_name)) break self.callSetter(setter_name, value.*);
             } else switch (@hasDecl(T, "writeProperty")) {
                 true => switch (comptime argCount(@TypeOf(T.writeProperty))) {
                     4 => T.writeProperty(self.custom(), name, value.*, cache_slot),
@@ -325,7 +325,7 @@ pub fn @"fn"(comptime T: type) type {
         fn tryHasProperty(obj: *Object, name: *String, cache_slot: ?[*]?*anyopaque) !bool {
             const self: *@This() = @ptrCast(obj);
             return inline for (comptime std.meta.fieldNames(@TypeOf(getters))) |getter_name| {
-                if (name.matchSlice(getter_name)) break true;
+                if (name.matchStatic(getter_name)) break true;
             } else switch (@hasDecl(T, "hasProperty")) {
                 true => switch (comptime argCount(@TypeOf(T.hasProperty))) {
                     3 => T.hasProperty(self.custom(), name, cache_slot),
@@ -345,7 +345,7 @@ pub fn @"fn"(comptime T: type) type {
         fn tryUnsetProperty(obj: *Object, name: *String, cache_slot: ?[*]?*anyopaque) !void {
             const self: *@This() = @ptrCast(obj);
             return inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
-                if (name.matchSlice(setter_name)) break self.callSetterWithNull(setter_name);
+                if (name.matchStatic(setter_name)) break self.callSetterWithNull(setter_name);
             } else switch (@hasDecl(T, "unsetProperty")) {
                 true => switch (comptime argCount(@TypeOf(T.unsetProperty))) {
                     3 => T.unsetProperty(self.custom(), name, cache_slot),

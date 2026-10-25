@@ -264,7 +264,7 @@ pub fn getEnum(self: *const @This(), comptime T: type) !T {
         const str = self.getString() catch return error.NotIntegerOrString;
         const field_names = @typeInfo(T).@"enum".field_names;
         inline for (field_names) |field_name| {
-            if (str.matchSlice(field_name)) return @field(T, field_name);
+            if (str.matchStatic(field_name)) return @field(T, field_name);
         } else {
             const list = comptime join: {
                 var text: []const u8 = "";
@@ -295,6 +295,14 @@ pub fn getStruct(self: *const @This(), comptime T: type) !T {
         return if (st.backing_integer != null) error.NotIntegerOrAssociativeArray else err;
     };
     return dict.extract(T);
+}
+
+pub fn getCustomObject(self: *const @This(), comptime T: type) !*T {
+    if (comptime !php.util.api.isCustomType(T)) @compileError("Not a custom object type: " ++ @typeName(T));
+    const obj = try self.getObject();
+    const custom_class = Class.Custom(T.Custom).get();
+    if (!obj.isInstanceOf(custom_class.class())) return error.NotClassInstance;
+    return @ptrCast(@alignCast(obj));
 }
 
 pub fn compareWith(self: *const @This(), other: @This()) c_int {
@@ -356,18 +364,14 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
                     const ref = try self.getReference();
                     break :get ref.target();
                 },
-                else => get: {
-                    if (comptime php.util.api.isCustomType(pt.child)) {
-                        const obj = try self.getObject();
-                        const custom_class = Class.Custom(pt.child.Custom).get();
-                        if (!obj.isInstanceOf(custom_class.class())) return error.NotClassInstance;
-                        break :get @ptrCast(@alignCast(obj));
-                    } else {
+                else => switch (comptime php.util.api.isCustomType(pt.child)) {
+                    true => try self.getCustomObject(pt.child),
+                    false => get: {
                         const result = try self.convertTo(pt.child);
                         const target = php_al.create(T);
                         target.* = result;
                         break :get target;
-                    }
+                    },
                 },
             },
             .slice => switch (pt.child) {
@@ -413,9 +417,12 @@ pub fn freeConverted(arg: anytype) void {
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
                 Array, Object, Reference, Resource, Stream, String, @This() => {},
-                else => if (comptime !php.util.api.isCustomType(pt.child)) {
-                    freeConverted(arg.*);
-                    php_al.destroy(arg);
+                else => switch (comptime php.util.api.isCustomType(pt.child)) {
+                    true => {},
+                    false => {
+                        freeConverted(arg.*);
+                        php_al.destroy(arg);
+                    },
                 },
             },
             .slice => switch (pt.child) {

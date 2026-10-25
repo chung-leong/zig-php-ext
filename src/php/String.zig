@@ -131,10 +131,19 @@ pub fn subtractRef(self: *@This()) void {
 }
 
 pub fn match(self: *const @This(), s2: *const @This()) bool {
+    if (self.impl.h != 0 and s2.impl.h != 0) {
+        if (self.impl.h != s2.impl.h) return false;
+    }
     return self.matchSlice(s2.slice());
 }
 
 pub fn matchSlice(self: *const @This(), s2: []const u8) bool {
+    return std.mem.eql(u8, self.slice(), s2);
+}
+
+pub fn matchStatic(self: *const @This(), comptime s2: []const u8) bool {
+    const h2 = comptime calculateHash(s2);
+    if (self.impl.h != 0 and self.impl.h != h2) return false;
     return std.mem.eql(u8, self.slice(), s2);
 }
 

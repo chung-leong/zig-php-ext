@@ -332,6 +332,34 @@ With our new code we get the following output:
 75ba522b8881a810
 ```
 
+## Returning structs
+
+When a function returns a struct, it gets converted to a `stdclass`:
+
+```zig
+pub fn @"call get"(_: *@This(), _: struct {}) !Avenger {
+    return .{
+        .superhero_name = "Captain America",
+        .real_name = "Steve Rogers",
+    };
+}
+```
+```php
+<?php
+
+print_r(get());
+
+?>
+```
+```
+stdClass Object
+(
+    [real_name] => Steve Rogers
+    [superhero_name] => Captain America
+    [power] => 4
+)
+```
+
 ## Accepting optional arguments
 
 Suppose we want to give the user of our hash function the option to specify a seed. We also 
@@ -512,7 +540,149 @@ Notice that enum can accept either a integer or a string.
 
 ## Defining custom classes
 
+Definition of custom classes is done in a similiar manner as a custom module. `php.Class.Custom` 
+is a parametric type that accepts a namespace as argument. The resulting class type can then be 
+used in a `@"export [name]"` declaration to export the class:
+
+```zig
+const std = @import("std");
+
+const php = @import("php/root.zig");
+const getter = php.Object.getter;
+const setter = php.Object.setter;
+
+pub const @"export marvel\\Avenger" = php.Class.Custom(struct {
+    pub const @"export Power" = Power;
+
+    pub const @"get real_name" = getter(@This(), .real_name);
+    pub const @"set real_name" = setter(@This(), .real_name);
+    pub const @"get superhero_name" = getter(@This(), .superhero_name);
+    pub const @"set superhero_name" = setter(@This(), .superhero_name);
+
+    pub fn @"get power"(self: *@This()) *php.String {
+        return switch (self.power) {
+            inline else => |tag| php.String.static(@tagName(tag)),
+        };
+    }
+
+    pub fn @"set power"(self: *@This(), name: *php.String) !void {
+        self.power = inline for (comptime std.meta.fieldNames(Power)) |field_name| {
+            if (name.matchStatic(field_name)) break @field(Power, field_name);
+        } else return error.InvalidPower;
+    }
+
+    pub fn @"call show"(self: *@This(), _: struct {}) !void {
+        php.print("{s} = {s} ({})\n", .{
+            self.superhero_name,
+            self.real_name,
+            self.power,
+        });
+    }
+
+    const Power = enum { tech, mutant, occult, alien, training };
+
+    real_name: []const u8 = "",
+    superhero_name: []const u8 = "",
+    power: Power = .training,
+});
+```
+```
+<?php
+
+use marvel\Avenger;
+
+$avenger = new Avenger("Ironman", "Tony Stark", "tech");
+$avenger->show();
+$avenger->power = 'mutant';
+$avenger->show();
+
+?>
+```
+```
+Tony Stark = Ironman (.tech)
+Tony Stark = Ironman (.mutant)
+```
+
+The code above defines the custom struct using as an inline statement. Typically you would 
+have the definition in a separate file instead.
+
+The struct doesn't implement `init()` or `initSelf()`, so the class's constructor initializes its
+fields using its setters, with the arguments in the same order as the setters. In such a case, 
+the struct fields must have default values. When one of these function is present, you'd need to 
+implement `deinit()`.
+
+Named arguments can be used to initialize the object:
+
+```php
+<?php
+
+$avenger = new Avenger(real_name: "Peter Parker", superhero_name: "Antman", power: "tech");
+print_r($avenger);
+
+?>
+```
+```
+marvel\Avenger Object
+(
+    [real_name] => Peter Parker
+    [superhero_name] => Antman
+    [power] => tech
+)
+```
+
+Since the struct also lacks a `iterate()` method, the default iteration method is used, which 
+returns results from the getter functions:
+
+```php
+<?php
+
+$avenger = new Avenger(real_name: "Peter Parker", superhero_name: "Antman", power: "tech");
+foreach ($avenger as $key => $value) {
+    echo "$key = $value\n";
+}
+
+?>
+```
+```
+real_name = Peter Parker
+superhero_name = Antman
+power = tech
+```
+
 ## Defining sub-classes and enumerations
+
+In the example in the previous section, `Power` appears in an `@"export..."` declaration within 
+the class. This results in the enum being exported within the namespace of the class. A constant
+is added to the class itself providing the full class path:
+
+```php
+<?php
+
+echo Avenger::Power, "\n";
+
+?>
+```
+```
+marvel\Avenger\Power
+```
+
+Since strings can be used to reference classes in PHP, you can access the enum either through the 
+class or import it separately:
+
+```php
+<?php
+
+use marvel\Avenger\Power;
+
+echo Avenger::Power::mutant, "\n";
+echo Power::mutant, "\n";
+
+?>
+```
+```
+1
+1
+```
 
 ## Accepting objects of custom classes as argument
 

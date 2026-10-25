@@ -16,4 +16,6 @@ assemble([
     [ 'real_name' => "Peter Parker", 'superhero_name' => "Blue Beetle", 'power' => 'mutant' ],
 ]);
 
+print_r(get());
+
 ?>

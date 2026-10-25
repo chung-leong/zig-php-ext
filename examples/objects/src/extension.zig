@@ -31,3 +31,10 @@ pub fn @"call assemble"(_: *@This(), args: struct {
         });
     }
 }
+
+pub fn @"call get"(_: *@This(), _: struct {}) !Avenger {
+    return .{
+        .superhero_name = "Captain America",
+        .real_name = "Steve Rogers",
+    };
+}

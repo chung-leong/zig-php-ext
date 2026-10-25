@@ -44,7 +44,7 @@ pub fn @"fn"(comptime names: anytype) type {
                     else => n,
                 };
                 const lc_name = comptime toLowerCase(field_name);
-                if (name.matchSlice(lc_name)) break &@field(self.entries, field_name);
+                if (name.matchStatic(lc_name)) break &@field(self.entries, field_name);
             } else null;
         }
 
