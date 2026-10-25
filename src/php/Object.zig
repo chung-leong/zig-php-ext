@@ -164,8 +164,8 @@ pub fn readProperty(self: *const @This(), name: anytype) !Value {
     const handler = zobj.handlers.*.read_property orelse return error.NoPropertyAccess;
     const access: Value.Access = .read;
     const result = handler(zobj, zn, @backingInt(access), null, zval);
-    if (result != c.SUCCESS) return error.Missing;
-    return value;
+    if (result == null) return error.Missing;
+    return .fromZval(result.*);
 }
 
 pub fn hasProperty(self: *const @This(), name: anytype) !bool {
