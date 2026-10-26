@@ -45,10 +45,8 @@ zig-out
 \.gitignore
 .*\.zip
 ai-disclosure\.yaml
-build$
 build\.ini
 composer\.lock
-package$
 phpunit\.xml
 PATTERNS;
 $filters = preg_split('/[\r\n]+/', $ignore, -1, PREG_SPLIT_NO_EMPTY);

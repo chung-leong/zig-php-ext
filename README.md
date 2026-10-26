@@ -18,7 +18,7 @@ First, install the Zig compiler if it's not on your computer. The easiest way is
 
 Then download the latest package from this project's 
 [release page](https://github.com/chung-leong/zig-php-ext/releases). Unzip it into a directory,
-change to it in a terminal and run `php build.php`. The build script will download the PHP SDK 
+change to it in a terminal and run `./build`. The build script will download the PHP SDK 
 for the current version of PHP and compile the default "hello" extension. After a minute or so,
 you should see the path of the end product:
 
@@ -40,7 +40,7 @@ Hello, Alice!
 
 ## Compiling for different platforms
 
-Run `php build.php menu` to activate the build menu:
+Run `./build menu` to activate the build menu:
 
 ![menu](img/menu.png)
 
@@ -49,7 +49,7 @@ It lets you to select multiple platforms to compile the extension for:
 ![menu](img/menu-os.png)
 
 The information you entered is saved to `build.ini`. Your selection will be used again when you 
-run `php build.php`.
+run `./build`.
 
 Note: On Windows, the menu only works when you launch it in Git Bash.
 
@@ -1003,6 +1003,6 @@ number).
 
 ## Packaging your extension
 
-Run `php package.php` in the extension's root directory to package the source code in a zip file.
+Run `./package` in the extension's root directory to place it source code into a zip file.
 The script will exclude files in the `test` directory and unnecessary packages in the `vendor`
 directory like PHPUnit.
