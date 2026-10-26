@@ -7,9 +7,13 @@ class ExtensionTestCase extends TestCase
     protected function runTest($test_name, $script_name): array
     {
         chdir(__DIR__ . "/$test_name");
-        if (exec("php build.php") === false) {
-            throw new Exception("Unable to build extension: $test_name");
+        $result = exec("php build.php", $lines, $code);
+        if ($result === false) {
+            throw new Exception("Unable to run build script: $test_name");
+        } else if ($code !== 0) {
+            throw new Exception($result);
         }
+        unset($lines);
         $php_version = substr(PHP_VERSION, 0, strrpos(PHP_VERSION, '.'));
         switch (PHP_OS_FAMILY) {
             case 'Windows': $so_ext = 'dll'; break;
