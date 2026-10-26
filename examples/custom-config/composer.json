@@ -57,7 +57,7 @@
                 },
                 "default": [ "alpha", "beta" ]
             },
-            "some_enum": { 
+            "cfg_enum": { 
                 "title": "Test enum",
                 "description": "Configuration option that is an enum",
                 "prompt": "Select one",

@@ -84,9 +84,9 @@ pub fn DllMain(
 }
 ```
 
-`Module.Custom` is a parametric struct type for defining an extension. It accepts a
-namespace and an option struct as arguments. The namespace is defined in `extension.zig`. This 
-is the file that you'll be modifying to create your own extension.
+`Module.Custom` is a parametric struct type for defining an extension. It accepts a struct type 
+and an option struct as arguments. The namespace is defined in `extension.zig`. This 
+is the file you'll be modifying to create your own extension.
 
 **src/extension.zig**:
 
@@ -281,9 +281,8 @@ php -d extension=extensions/8.5/php_city_hash.so test.php
 ```
 
 Here, we're simply using a function built into Zig's standard library to calculate the hash.
-The result is a 64-bit unsigned number, which we return to PHP. This is not very convenient.
-We most often use the hexdecimal representation of hashes. A function that returns a string
-would be more ergonomic. 
+The result is a 64-bit unsigned number. Since we most often use the hexdecimal representation of 
+hashes, a function that returns a string would be more ergonomic. 
 
 Strings introduce added complications because they're variable-length. Their creation requires
 memory allocation. We have to be mindful of memory ownership therefore. Zig-php-ext follows the 
@@ -330,34 +329,6 @@ With our new code we get the following output:
 
 ```
 75ba522b8881a810
-```
-
-## Returning structs
-
-When a function returns a struct, it gets converted to a `stdclass`:
-
-```zig
-pub fn @"call get"(_: *@This(), _: struct {}) !Avenger {
-    return .{
-        .superhero_name = "Captain America",
-        .real_name = "Steve Rogers",
-    };
-}
-```
-```php
-<?php
-
-print_r(get());
-
-?>
-```
-```
-stdClass Object
-(
-    [real_name] => Steve Rogers
-    [superhero_name] => Captain America
-    [power] => 4
-)
 ```
 
 ## Accepting optional arguments
@@ -538,11 +509,142 @@ Blue Beetle = Peter Parker (.mutant)
 
 Notice that enum can accept either a integer or a string.
 
+## Returning structs
+
+When a function returns a struct, it gets converted to a `stdclass`:
+
+```zig
+pub fn @"call get"(_: *@This(), _: struct {}) !Avenger {
+    return .{
+        .superhero_name = "Captain America",
+        .real_name = "Steve Rogers",
+    };
+}
+```
+```php
+<?php
+
+print_r(get());
+
+?>
+```
+```
+stdClass Object
+(
+    [real_name] => Steve Rogers
+    [superhero_name] => Captain America
+    [power] => 4
+)
+```
+
+You can also return an array of structs:
+
+```zig
+pub fn @"call get_two"(_: *@This(), _: struct {}) ![2]Avenger {
+    return .{
+        .{
+            .superhero_name = "Captain America",
+            .real_name = "Steve Rogers",
+        },
+        .{
+            .superhero_name = "Ironman",
+            .real_name = "Tony Stark",
+            .power = .tech,
+        },
+    };
+}
+```
+```php
+<?php
+
+print_r(get_two());
+
+?>
+```
+```
+Array
+(
+    [0] => stdClass Object
+        (
+            [real_name] => Steve Rogers
+            [superhero_name] => Captain America
+            [power] => 4
+        )
+
+    [1] => stdClass Object
+        (
+            [real_name] => Tony Stark
+            [superhero_name] => Ironman
+            [power] => 0
+        )
+
+)
+```
+
+If the array is variable-length, you'll need to create a PHP array manually and return that:
+
+```zig
+pub fn @"call get_multiple"(_: *@This(), args: struct {
+    count: usize,
+}) !*php.Array {
+    const array: *php.Array = .create();
+    for (0..args.count) |_| {
+        array.append(.fromAny(.{
+            .superhero_name = "Multiple Man",
+            .real_name = "Jamie Madrox",
+        }));
+    }
+    return array;
+}
+```
+```php
+<?php
+
+print_r(get_multiple(5));
+
+?>
+```
+```
+Array
+(
+    [0] => stdClass Object
+        (
+            [superhero_name] => Multiple Man
+            [real_name] => Jamie Madrox
+        )
+
+    [1] => stdClass Object
+        (
+            [superhero_name] => Multiple Man
+            [real_name] => Jamie Madrox
+        )
+
+    [2] => stdClass Object
+        (
+            [superhero_name] => Multiple Man
+            [real_name] => Jamie Madrox
+        )
+
+    [3] => stdClass Object
+        (
+            [superhero_name] => Multiple Man
+            [real_name] => Jamie Madrox
+        )
+
+    [4] => stdClass Object
+        (
+            [superhero_name] => Multiple Man
+            [real_name] => Jamie Madrox
+        )
+
+)
+```
+
 ## Defining custom classes
 
-Definition of custom classes is done in a similiar manner as a custom module. `php.Class.Custom` 
-is a parametric type that accepts a namespace as argument. The resulting class type can then be 
-used in a `@"export [name]"` declaration to export the class:
+The parametric type `php.Class.Custom` is used to define a custom class. It accepts a struct type 
+as an argument. Used a `@"export [name]"` declaration to export the class. The name may include
+a namespace: 
 
 ```zig
 const std = @import("std");
@@ -603,13 +705,17 @@ Tony Stark = Ironman (.tech)
 Tony Stark = Ironman (.mutant)
 ```
 
-The code above defines the custom struct using as an inline statement. Typically you would 
-have the definition in a separate file instead.
+The code above defines the custom struct in an inline statement. Typically you would have the
+definition in a separate file.
 
-The struct doesn't implement `init()` or `initSelf()`, so the class's constructor initializes its
-fields using its setters, with the arguments in the same order as the setters. In such a case, 
-the struct fields must have default values. When one of these function is present, you'd need to 
-implement `deinit()`.
+When the struct doesn't implement `init()` or `initSelf()`, the class's constructor would 
+initialize its fields using its setters, with the arguments in the same order as the setters. In 
+such a case, all fields must have default values. 
+
+If implemented, the initialization function should be either 
+`pub fn init(args: struct { ... }) !@This()` or 
+`pub fn initSelf(self: *@This(), args: struct { ... }) !void`. The argument struct may be omitted.
+Returning an error union is also optional. You'd need to implement `deinit()` as well. 
 
 Named arguments can be used to initialize the object:
 
@@ -630,8 +736,8 @@ marvel\Avenger Object
 )
 ```
 
-Since the struct also lacks a `iterate()` method, the default iteration method is used, which 
-returns results from the getter functions:
+When the struct lacks a `iterate()` method, the default iteration method is used, which returns
+results from the getter functions:
 
 ```php
 <?php
@@ -684,7 +790,7 @@ echo Power::mutant, "\n";
 1
 ```
 
-## Accepting objects of custom classes as argument
+Sub-classes can be exported in the same manner.
 
 ## Passing arguments by reference
 
@@ -784,7 +890,7 @@ You can add custom items to the build menu by adding a special entry in `compose
 
 ![menu](img/custom-menu.png)
 
-The menu shown above is the rendering of the following `composer.json`:
+The menu shown above is rendered from the following `composer.json`:
 
 ```json
 {
@@ -830,7 +936,7 @@ The menu shown above is the rendering of the following `composer.json`:
                 },
                 "default": [ "alpha", "beta" ]
             },
-            "some_enum": { 
+            "cfg_enum": { 
                 "title": "Test enum",
                 "description": "Configuration option that is an enum",
                 "prompt": "Select one",
@@ -847,9 +953,8 @@ The menu shown above is the rendering of the following `composer.json`:
 }
 ```
 
-Custom fields defined in such a manner will be available at comptime as fields in 
-`@import("config")`. Normally, the returned struct would only contain the extension name and 
-version.
+These custom fields are available at comptime in `@import("config")`. Typically, the namespace 
+would only contain the extension name and version.
 
 When `choices` is present, the end-user will be presented with a list of possible choices.
 
@@ -897,3 +1002,7 @@ the field is supposed to be a floating point number (i.e. when the default value
 number).
 
 ## Packaging your extension
+
+Run `php package.php` in the extension's root directory to package the source code in a zip file.
+The script will exclude files in the `test` directory and unnecessary packages in the `vendor`
+directory like PHPUnit.

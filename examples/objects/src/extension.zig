@@ -38,3 +38,30 @@ pub fn @"call get"(_: *@This(), _: struct {}) !Avenger {
         .real_name = "Steve Rogers",
     };
 }
+
+pub fn @"call get_two"(_: *@This(), _: struct {}) ![2]Avenger {
+    return .{
+        .{
+            .superhero_name = "Captain America",
+            .real_name = "Steve Rogers",
+        },
+        .{
+            .superhero_name = "Ironman",
+            .real_name = "Tony Stark",
+            .power = .tech,
+        },
+    };
+}
+
+pub fn @"call get_multiple"(_: *@This(), args: struct {
+    count: usize,
+}) !*php.Array {
+    const array: *php.Array = .create();
+    for (0..args.count) |_| {
+        array.append(.fromAny(.{
+            .superhero_name = "Multiple Man",
+            .real_name = "Jamie Madrox",
+        }));
+    }
+    return array;
+}

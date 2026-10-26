@@ -17,5 +17,7 @@ assemble([
 ]);
 
 print_r(get());
+print_r(get_two());
+print_r(get_multiple(5));
 
 ?>
