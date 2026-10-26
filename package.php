@@ -26,7 +26,9 @@ $ignore = <<<PATTERNS
 \.zig-cache
 demos
 doc
+examples
 extensions
+img
 lib
 patch
 php-devel
@@ -48,6 +50,7 @@ ai-disclosure\.yaml
 build\.ini
 composer\.lock
 phpunit\.xml
+README\.md
 PATTERNS;
 $filters = preg_split('/[\r\n]+/', $ignore, -1, PREG_SPLIT_NO_EMPTY);
 $patterns = array_map(function($s) {
