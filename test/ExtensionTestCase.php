@@ -16,7 +16,11 @@ class ExtensionTestCase extends TestCase
             case 'Darwin': $so_ext = 'dylib'; break;
             default: $so_ext = 'so'; break;
         }
-        $parts = [ __DIR__, $test_name, 'extensions', $php_version, "php_" . strtr($test_name, '-', '_') . ".$so_ext" ];
+        $parts = [ __DIR__, $test_name, 'extensions', $php_version ];
+        if (PHP_ZTS) {
+            $parts[] = "TS";
+        }
+        $parts[] = "php_" . strtr($test_name, '-', '_') . ".$so_ext";
         $ext_path =  implode(DIRECTORY_SEPARATOR, $parts);
         $cmd = "php -d extension=\"$ext_path\" \"$script_name\"";
         $result = exec($cmd, $lines, $code);
