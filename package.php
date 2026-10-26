@@ -9,7 +9,10 @@ require_once(__DIR__ . '/vendor/autoload.php');
 $composer_cfg = json_decode(file_get_contents("composer.json"));
 $ext_version = $composer_cfg->version;
 $ext_name = explode('/', $composer_cfg->name)[1];
-$package_name = getenv('PACKAGE') ?? "php-$ext_name-$ext_version";
+$package_name = getenv('PACKAGE');
+if ($package_name === false) {
+    $package_name = "php-$ext_name-$ext_version";
+}
 $filename = "$package_name.zip";
 if (file_exists($filename)) {
     unlink($filename);
