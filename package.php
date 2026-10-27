@@ -110,6 +110,13 @@ foreach ($paths as $path) {
             $data = implode("\n", $lines);
         }
         $zip_file->addFromString($dest_path, $data);
+        switch ($path) {
+            case 'build':
+            case 'package':
+                $entry = $zip_file->getEntry($dest_path);
+                $entry->setUnixMode(0100755);
+                break;
+        }
     }
 }
 $zip_file->saveAsFile($filename);

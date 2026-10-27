@@ -14,7 +14,7 @@
         "test": "php ./vendor/bin/phpunit --testdox --display-warnings"
     },
     "require": {
-        "php-school/cli-menu": "4.3",
-        "nelexa/zip": "4.0"
+        "nelexa/zip": "4.0.2",
+        "php-school/cli-menu": "4.3.0"
     }
 }
