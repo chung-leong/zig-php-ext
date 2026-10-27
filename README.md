@@ -48,6 +48,10 @@ It lets you to select multiple platforms to compile the extension for:
 
 ![menu](img/menu-os.png)
 
+You can also compile for multiple versions of PHP--all at once:
+
+![menu](img/menu-version.png)
+
 The information you entered is saved to `build.ini`. Your selection will be used again when you 
 run `./build`.
 
