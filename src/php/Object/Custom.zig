@@ -40,16 +40,19 @@ pub fn @"fn"(comptime T: type) type {
             return @intFromPtr(obj.impl.handlers) == @intFromPtr(&handlers);
         }
 
-        pub fn create() *@This() {
-            const custom_class = Class.Custom(T).get();
-            return createWithClass(custom_class.class());
+        pub fn create(args: init_fn.Args) !*@This() {
+            const self = createUninitialized();
+            const obj = self.object();
+            errdefer obj.release();
+            try construct(obj, args);
         }
 
-        pub fn createWithClass(class: *const Class) *@This() {
+        pub fn createUninitialized() *@This() {
+            const cls: *const Class = Class.Custom(T).get().class();
             const self = php_al.create(@This()) catch unreachable;
             errdefer php_al.destroy(self);
             // initialize the PHP portion
-            pi.zend_object_std_init(@ptrCast(&self.php_object), @ptrCast(@constCast(class)));
+            pi.zend_object_std_init(@ptrCast(&self.php_object), @ptrCast(@constCast(cls)));
             // handlers need to be set after zend_object_std_init() due to change in PHP 8.3
             self.php_object.handlers = &handlers;
             // set fields of custom struct to their default values (when available)
@@ -222,7 +225,7 @@ pub fn @"fn"(comptime T: type) type {
                 true => T.cloneObject(self.custom()),
                 false => switch (@hasDecl(T, "clone")) {
                     true => clone: {
-                        const copy = createWithClass(obj.class());
+                        const copy = createUninitialized(obj.class());
                         copy.custom_struct = try T.clone(self.custom());
                         copy.flags.initialized = true;
                         break :clone copy.object();

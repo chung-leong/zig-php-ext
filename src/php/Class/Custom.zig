@@ -184,15 +184,8 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        fn createObject(self: *@This()) callconv(.c) ?*Object {
-            const result = Instance.createWithClass(self.class());
-            const custom_obj = switch (@typeInfo(@TypeOf(result))) {
-                .error_union => result catch |err| {
-                    failure.throw(err);
-                    return null;
-                },
-                else => result,
-            };
+        fn createObject(_: *@This()) callconv(.c) ?*Object {
+            const custom_obj = Instance.createUninitialized();
             return custom_obj.object();
         }
 
