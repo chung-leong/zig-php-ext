@@ -89,8 +89,8 @@ pub fn DllMain(
 ```
 
 `Module.Custom` is a parametric struct type for defining an extension. It accepts a struct type 
-and an option struct as arguments. The namespace is defined in `extension.zig`. This 
-is the file you'll be modifying to create your own extension.
+and an option struct as arguments. The struct is defined in `extension.zig`. This is the file 
+you'll be modifying to create your own extension.
 
 **src/extension.zig**:
 
@@ -114,14 +114,15 @@ pub const @"set greeting" = setter(@This(), .greeting);
 greeting: [:0]const u8 = "Hello",
 ```
 
-The function we called earlier, `greet()`, is defined by `@"call greet"()`. The `@"call` prefix indicates
-a function is meant to be used in PHP. Arguments from PHP are contained in a struct. In this case
-we have a single one, which is expected to be a string.
+The function we called earlier, `greet()`, is defined by `@"call greet"()`. The `@"call ..."` 
+prefix indicates a function is meant to be used in PHP. Arguments from PHP are contained in a 
+struct. In this case we have a single one, which is expected to be a string.
 
-The `self` argument points to a struct containing the extension's settings. If we run the following command:
+The `self` argument points to a struct containing the extension's settings. If we run the 
+following command:
 
 ```sh
-php -d extension=extensions/8.5/php_hello.so -r "ini_set('hello.greeting', 'Hi'); greet('Alice');"
+php -d extension=extensions/8.5/php_hello.so -r "ini_set('hello.greeting', 'Ahoj'); greet('Alice');"
 ```
 
 We would get this:
@@ -144,7 +145,7 @@ pub fn @"set greeting"(self: *@This(), value: [:0]const u8) void {
 }
 ```
 
-The `@"export"` prefix is used to add constants and 
+The `@"export ..."` prefix is used to add constants and 
 [enumerations](https://www.php.net/manual/en/language.types.enumerations.php) specific to the 
 extension. It's also used for adding custom classes. We'll get to that in later sections.
 
@@ -338,7 +339,7 @@ With our new code we get the following output:
 ## Accepting optional arguments
 
 Suppose we want to give the user of our hash function the option to specify a seed. We also 
-want them to be able to choose between upper-case or lower-case output. To do that, we just need 
+want to let them choose between upper-case or lower-case output. To do that, we just need 
 to provide default values to these arguments in the struct:
 
 ```zig
@@ -380,7 +381,7 @@ echo city_hash("Hello world!", 0x1234, true), "\n";
 Another way of doing optional arguments is with named arguments. Zig-php-ext passes extra named 
 arguments (i.e. arguments whose names do not match those of the function's declared arguments)
 as an associative array to the function handler as its final argument. This array can be used to
-initialize an optional struct:
+initialize a struct:
 
 ```zig
 const std = @import("std");
@@ -424,7 +425,7 @@ This technique is useful in situations where the number of optional arguments is
 
 ## Accepting struct arguments
 
-When an argument is a struct, on the PHP side you specify it using an associative array:
+When an argument is a struct, on the PHP side it accepts an associative array:
 
 ```zig
 const php = @import("php/root.zig");
@@ -460,6 +461,8 @@ show([ 'real_name' => "Tony Stark", 'superhero_name' => "Ironman", 'power' => Po
 Ironman = Tony Stark (.tech)
 ```
 
+An object is also acceptable:
+
 ```php
 <?php
 
@@ -479,7 +482,7 @@ show(new Superhero("Tony Stark", "Ironman", 'tech'));
 Ironman = Tony Stark (.tech)
 ```
 
-A function can also accepts a list of objects:
+A function can also easily accepts a list of structs:
 
 ```zig
 pub fn @"call assemble"(_: *@This(), args: struct {
@@ -761,9 +764,9 @@ power = tech
 
 ## Defining sub-classes and enumerations
 
-In the example in the previous section, `Power` appears in an `@"export..."` declaration within 
+In the example in the previous section, `Power` appears in an `@"export ..."` declaration within 
 the class. This results in the enum being exported within the namespace of the class. A constant
-is added to the class itself providing the full class path:
+under the same name is added to the class itself providing the full class path:
 
 ```php
 <?php
@@ -818,8 +821,11 @@ echo $text, "\n";
 
 ?>
 ```
+```
+Hello world
+```
 
-`Value` represents a PHP variant (aka `zval`).
+`Value` represents a PHP variant--a.k.a. `zval`.
 
 ## Defining variadic function
 
