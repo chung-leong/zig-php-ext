@@ -297,12 +297,10 @@ pub fn getStruct(self: *const @This(), comptime T: type) !T {
     return dict.extract(T);
 }
 
-pub fn getCustomObject(self: *const @This(), comptime T: type) !*T {
-    if (comptime !php.util.api.isCustomType(T)) @compileError("Not a custom object type: " ++ @typeName(T));
+pub fn getCustom(self: *const @This(), comptime T: type) !*T {
     const obj = try self.getObject();
-    const custom_class = Class.Custom(T.Custom).get();
-    if (!obj.isInstanceOf(custom_class.class())) return error.NotClassInstance;
-    return @ptrCast(@alignCast(obj));
+    if (!obj.isCustom(T)) return error.NotCustomObject;
+    return obj.custom(T);
 }
 
 pub fn compareWith(self: *const @This(), other: @This()) c_int {
@@ -364,15 +362,7 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
                     const ref = try self.getReference();
                     break :get ref.target();
                 },
-                else => switch (comptime php.util.api.isCustomType(pt.child)) {
-                    true => try self.getCustomObject(pt.child),
-                    false => get: {
-                        const result = try self.convertTo(pt.child);
-                        const target = php_al.create(T);
-                        target.* = result;
-                        break :get target;
-                    },
-                },
+                else => try self.getCustom(pt.child),
             },
             .slice => switch (pt.child) {
                 u8 => (try self.getString()).slice(),
@@ -417,13 +407,7 @@ pub fn freeConverted(arg: anytype) void {
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
                 Array, Object, Reference, Resource, Stream, String, @This() => {},
-                else => switch (comptime php.util.api.isCustomType(pt.child)) {
-                    true => {},
-                    false => {
-                        freeConverted(arg.*);
-                        php_al.destroy(arg);
-                    },
-                },
+                else => {},
             },
             .slice => switch (pt.child) {
                 u8 => {},
@@ -625,10 +609,7 @@ pub fn fromAny(arg: anytype) switch (@typeInfo(@TypeOf(arg))) {
                         },
                         false => unsupported(T),
                     },
-                    else => switch (comptime php.util.api.isCustomType(pt.child)) {
-                        true => .fromObject(arg.object()),
-                        false => unsupported(T),
-                    },
+                    else => unsupported(T),
                 },
             },
             .slice => switch (pt.child) {

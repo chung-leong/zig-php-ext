@@ -32,25 +32,13 @@ pub fn @"fn"(comptime T: type) type {
 
         pub fn fromCustom(custom_ptr: *const T) *@This() {
             const self: *const @This() = @fieldParentPtr("custom_struct", custom_ptr);
-            std.debug.assert(is(self.object()));
+            std.debug.assert(self.object().isCustom(T));
             return @constCast(self);
         }
 
-        pub fn is(obj: *const Object) bool {
-            return @intFromPtr(obj.impl.handlers) == @intFromPtr(&handlers);
-        }
-
-        pub fn create(args: init_fn.Args) !*@This() {
-            const self = createUninitialized();
-            const obj = self.object();
-            errdefer obj.release();
-            try construct(obj, args);
-        }
-
-        pub fn createUninitialized() *@This() {
+        pub fn create() *@This() {
             const cls: *const Class = Class.Custom(T).get().class();
             const self = php_al.create(@This()) catch unreachable;
-            errdefer php_al.destroy(self);
             // initialize the PHP portion
             pi.zend_object_std_init(@ptrCast(&self.php_object), @ptrCast(@constCast(cls)));
             // handlers need to be set after zend_object_std_init() due to change in PHP 8.3
@@ -225,7 +213,7 @@ pub fn @"fn"(comptime T: type) type {
                 true => T.cloneObject(self.custom()),
                 false => switch (@hasDecl(T, "clone")) {
                     true => clone: {
-                        const copy = createUninitialized(obj.class());
+                        const copy = create();
                         copy.custom_struct = try T.clone(self.custom());
                         copy.flags.initialized = true;
                         break :clone copy.object();
@@ -577,13 +565,13 @@ pub fn @"fn"(comptime T: type) type {
             const obj, const value, const multiplier: c_int = init: {
                 if (value_ptr1.kind() == .object) {
                     const obj1 = value_ptr1.object();
-                    if (is(obj1)) {
+                    if (obj1.isCustom(T)) {
                         break :init .{ obj1, value_ptr2.*, 1 };
                     }
                 }
                 if (value_ptr2.kind() == .object) {
                     const obj2 = value_ptr2.object();
-                    if (is(obj2)) {
+                    if (obj2.isCustom(T)) {
                         break :init .{ obj2, value_ptr1.*, -1 };
                     }
                 }

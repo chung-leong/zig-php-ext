@@ -32,7 +32,7 @@ pub fn create(s: []const u8) *@This() {
         0 => @ptrCast(deref(pi.zend_empty_string)),
         1 => @ptrCast(deref(pi.zend_one_char_string)[s[0]]),
         else => create: {
-            const ns = createUnitialized(s.len);
+            const ns = createUninitialized(s.len);
             if (s.len > 0) {
                 const new_slice = @constCast(ns.slice());
                 @memcpy(new_slice, s);
@@ -42,7 +42,7 @@ pub fn create(s: []const u8) *@This() {
     };
 }
 
-pub fn createUnitialized(len: usize) *@This() {
+pub fn createUninitialized(len: usize) *@This() {
     return switch (len) {
         0 => @ptrCast(deref(pi.zend_empty_string)),
         else => create: {

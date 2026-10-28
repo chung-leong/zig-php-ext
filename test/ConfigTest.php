@@ -15,7 +15,7 @@ final class ConfigTest extends ExtensionTestCase
         cfg_float = 0.1234
         cfg_bool = true
         cfg_flag = .{ .alpha = true, .beta = true, .gamma = false }
-        some_enum = .cantaloupe
+        cfg_enum = .cantaloupe
         OUTPUT, implode(PHP_EOL, $lines));
     }
 }

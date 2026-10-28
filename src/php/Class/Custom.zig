@@ -185,7 +185,7 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         fn createObject(_: *@This()) callconv(.c) ?*Object {
-            const custom_obj = Instance.createUninitialized();
+            const custom_obj = Instance.create();
             return custom_obj.object();
         }
 

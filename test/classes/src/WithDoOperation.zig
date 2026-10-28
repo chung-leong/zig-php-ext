@@ -24,7 +24,8 @@ fn getValue(operand: Value) !Value {
     return switch (operand.kind()) {
         .object => get: {
             const obj = operand.object();
-            const self = try obj.getCustom(@This(), error.NotThisType);
+            if (!obj.isCustom(@This())) return error.NotThisType;
+            const self = obj.custom(@This());
             break :get .fromFloat(self.float);
         },
         else => operand,

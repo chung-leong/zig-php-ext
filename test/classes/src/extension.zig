@@ -4,6 +4,7 @@ const php = @import("php/root.zig");
 const Class = php.Class;
 const Module = php.Module;
 const Object = php.Object;
+const Point = @import("Point.zig");
 
 pub const @"export Greeting" = Class.Custom(@import("Greeting.zig"));
 pub const @"export Superhero" = Class.Custom(@import("Superhero.zig"));
@@ -31,16 +32,14 @@ pub const @"export WithIterate" = Class.Custom(@import("WithIterate.zig"));
 pub const @"export hello\\world\\WithSubclasses" = Class.Custom(@import("WithSubclasses.zig"));
 
 pub fn @"call print_point"(_: *@This(), args: struct {
-    point_obj: *Object.Custom(@import("Point.zig")),
+    point: *Point,
 }) void {
-    const point = args.point_obj.custom();
-    php.print("x = {d}, y = {d}\n", .{ point.x, point.y });
+    php.print("x = {d}, y = {d}\n", .{ args.point.x, args.point.y });
 }
 
-pub fn @"call get_point"(_: *@This(), _: struct {}) *Object.Custom(@import("Point.zig")) {
-    const custom_obj = Object.Custom(@import("Point.zig")).create();
-    const point = custom_obj.custom();
-    point.x = 1234.5;
-    point.y = 4567.8;
-    return custom_obj;
+pub fn @"call get_point"(_: *@This(), _: struct {}) *Object {
+    return .createCustom(Point, .{
+        .x = 1234.5,
+        .y = 4567.8,
+    });
 }

@@ -51,6 +51,12 @@ pub fn createStandard() *@This() {
     return @ptrCast(zobj);
 }
 
+pub fn createCustom(comptime T: type, initializers: T) *@This() {
+    const custom_obj = Object.Custom(T).create();
+    custom_obj.custom().* = initializers;
+    return custom_obj.object();
+}
+
 pub fn createFromName(name: anytype, params: []const Value) !*@This() {
     const ce = Class.find(name) orelse return error.ClassNotFound;
     return .create(ce, params);
@@ -186,12 +192,11 @@ pub fn getProperties(self: *const @This()) *Array {
     return @ptrCast(ht);
 }
 
-pub fn getCustom(self: *const @This(), comptime T: type, err: anytype) !*T {
-    return if (Custom(T).is(self)) self.custom(T) else err;
+pub fn isCustom(self: *const @This(), comptime T: type) bool {
+    return @intFromPtr(self.impl.handlers) == @intFromPtr(&Custom(T).handlers);
 }
 
 pub fn custom(self: *const @This(), comptime T: type) *T {
-    std.debug.assert(Custom(T).is(self));
     const custom_obj: *Custom(T) = @ptrCast(@constCast(self));
     return custom_obj.custom();
 }

@@ -1,9 +1,6 @@
 const std = @import("std");
 
 const php = @import("root.zig");
-pub const api = @import("util/api.zig");
-pub const symbol = @import("util/symbol.zig");
-
 const Array = php.Array;
 const Dictionary = php.Dictionary;
 const Class = php.Class;
@@ -17,6 +14,8 @@ const Resource = php.Resource;
 const Stream = php.Stream;
 const String = php.String;
 const Value = php.Value;
+pub const api = @import("util/api.zig");
+pub const symbol = @import("util/symbol.zig");
 
 pub fn argCount(comptime F: type) usize {
     return switch (@typeInfo(F)) {
@@ -150,10 +149,7 @@ pub fn freeAny(arg: anytype) void {
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
                 Array, Object, Reference, Resource, Stream, String => arg.release(),
-                else => {
-                    freeAny(arg.*);
-                    php_al.destroy(arg);
-                },
+                else => Object.fromCustom(arg).release(),
             },
             .slice => {
                 for (arg) |element| freeAny(element);
