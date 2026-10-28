@@ -57,4 +57,75 @@ final class TypedArrayTest extends ExtensionTestCase
         1
         OUTPUT, implode(PHP_EOL, $lines));
     }
+
+    public function testReverse(): void
+    {
+        $lines = $this->runTest("typed-array", "reverse.php");       
+        $this->assertSame(<<<OUTPUT
+        Uint8Array Object
+        (
+            [buffer] => ArrayBuffer Object
+                (
+                    [byteLength] => 3
+                    [detached] =>
+                    [maxByteLength] => 3
+                    [resizable] =>
+                )
+
+            [byteLength] => 3
+            [byteOffset] => 0
+            [length] => 3
+            [[ITEMS]] => Array
+                (
+                    [0] => 3
+                    [1] => 2
+                    [2] => 1
+                )
+
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testIterate(): void
+    {
+        $lines = $this->runTest("typed-array", "iterate.php");       
+        $this->assertSame(<<<OUTPUT
+        3.140625
+        6.28125
+        9.421875
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testSet(): void
+    {
+        $lines = $this->runTest("typed-array", "set.php");       
+        $this->assertSame(<<<OUTPUT
+        Uint8Array Object
+        (
+            [buffer] => ArrayBuffer Object
+                (
+                    [byteLength] => 8
+                    [detached] =>
+                    [maxByteLength] => 8
+                    [resizable] =>
+                )
+
+            [byteLength] => 8
+            [byteOffset] => 0
+            [length] => 8
+            [[ITEMS]] => Array
+                (
+                    [0] => 0
+                    [1] => 0
+                    [2] => 0
+                    [3] => 1
+                    [4] => 2
+                    [5] => 3
+                    [6] => 0
+                    [7] => 0
+                )
+
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
 }

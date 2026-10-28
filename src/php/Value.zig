@@ -364,12 +364,12 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
                 },
                 else => try self.getCustom(pt.child),
             },
-            .slice => switch (pt.child) {
-                u8 => (try self.getString()).slice(),
-                else => get: {
-                    const list = try self.getList();
-                    break :get list.extract(T);
-                },
+            .slice => get: {
+                if (pt.child == u8 and self.kind() == .string) {
+                    break :get self.string().slice();
+                }
+                const list = try self.getList();
+                break :get list.extract(T);
             },
             else => unsupported(T),
         },

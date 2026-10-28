@@ -6,7 +6,7 @@ const Object = php.Object;
 const PropertiesPurpose = Object.PropertiesPurpose;
 const String = php.String;
 
-pub fn getProperties(_: *@This(), purpose: PropertiesPurpose) !*Array {
+pub fn getProperties(_: *@This(), purpose: PropertiesPurpose) !?*Array {
     php.print("(getProperties: {}) ", .{purpose});
     const arr = Array.create();
     arr.set("foo", .fromString(.static("cowboy")));

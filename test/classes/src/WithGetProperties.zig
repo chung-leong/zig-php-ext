@@ -14,7 +14,7 @@ pub const @"set number" = setter(@This(), .number);
 pub const @"get optional" = getter(@This(), .optional);
 pub const @"set optional" = setter(@This(), .optional);
 
-pub fn getProperties(_: *@This(), purpose: PropertiesPurpose) !*Array {
+pub fn getProperties(_: *@This(), purpose: PropertiesPurpose) !?*Array {
     php.print("(getProperties: {}) ", .{purpose});
     const arr = Array.create();
     arr.set("foo", .fromString(.static("cowboy")));

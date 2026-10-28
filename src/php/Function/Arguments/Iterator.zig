@@ -281,7 +281,7 @@ fn getTypeName(allocator: std.mem.Allocator, comptime T: type) []const u8 {
                 },
             },
             .slice => switch (pt.child) {
-                u8 => "string",
+                u8 => "string|array",
                 else => "array",
             },
             else => unsupported(T),

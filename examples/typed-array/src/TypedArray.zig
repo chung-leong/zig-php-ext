@@ -17,7 +17,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                 length: usize,
                 buffer: *ArrayBuffer,
                 array: *TypedArray,
-                list: List,
+                list: []const T,
             },
             byte_offset: ?usize,
             length: ?usize,
@@ -45,18 +45,10 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                         },
                         .list => |li| {
                             // received a regular array or an array-like object
-                            const len = try li.getLength();
-                            var ab: ArrayBuffer = .init(.{ .length = len * @sizeOf(T) });
+                            var ab: ArrayBuffer = .init(.{ .length = li.len * @sizeOf(T) });
                             errdefer ab.deinit();
-                            var iter = li.iterate();
-                            defer iter.deinit();
-                            const dest = ab.getElements(T, 0, len) catch unreachable;
-                            var index: usize = 0;
-                            while (iter.next()) |value| {
-                                dest[index] = try value.convertTo(T);
-                                index += 1;
-                                if (index >= len) break;
-                            }
+                            const dest = ab.getElements(T, 0, li.len) catch unreachable;
+                            for (li, 0..) |value, i| dest[i] = value;
                             break :init .createCustom(ArrayBuffer, ab);
                         },
                     }
@@ -140,6 +132,31 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             }
         }
 
+        pub fn iterate(self: *@This()) Iterator {
+            return .init(self);
+        }
+
+        pub const Iterator = struct {
+            pub fn init(array: *TypedArray) @This() {
+                Object.fromCustom(array).addRef();
+                return .{ .array = array };
+            }
+
+            pub fn deinit(self: *@This()) void {
+                Object.fromCustom(self.array).release();
+            }
+
+            pub fn next(self: *@This()) !?T {
+                const elements = try self.array.getElements();
+                if (self.index >= elements.len) return null;
+                defer self.index += 1;
+                return elements[self.index];
+            }
+
+            array: *TypedArray,
+            index: usize = 0,
+        };
+
         pub const @"export BYTES_PER_ELEMENT" = @sizeOf(T);
 
         pub fn @"get buffer"(self: *@This()) *Object {
@@ -155,10 +172,34 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             return self.length;
         }
 
-        pub fn @"call at"(self: *@This(), args: struct { index: isize }) !?T {
+        pub fn @"call at"(self: *@This(), args: struct {
+            index: isize,
+        }) !?T {
             const elements = try self.getElements();
             const index = self.toAbsoluteIndex(args.index) catch return null;
             return elements[index];
+        }
+
+        pub fn @"call reverse"(self: *@This(), _: struct {}) !*Object {
+            const elements = try self.getElements();
+            std.mem.reverse(T, elements);
+            return Object.fromCustom(self);
+        }
+
+        pub fn @"call set"(self: *@This(), args: struct {
+            source: union(enum) {
+                array: *TypedArray,
+                list: []const T,
+            },
+            offset: usize,
+        }) !void {
+            const dest = try self.getElements();
+            const src: []const T = switch (args.source) {
+                .array => |ta| try ta.getElements(),
+                .list => |li| li,
+            };
+            if (args.offset + src.len > dest.len) return error.OutOfBound;
+            @memcpy(dest[args.offset .. args.offset + src.len], src);
         }
 
         fn toAbsoluteIndex(self: *@This(), i: isize) !usize {
