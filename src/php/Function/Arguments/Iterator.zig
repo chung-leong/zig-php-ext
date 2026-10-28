@@ -5,6 +5,7 @@ const Array = php.Array;
 const c = php.c;
 const php_al = php.allocator;
 const Callable = php.Callable;
+const Class = php.Class;
 const Dictionary = php.Dictionary;
 const failure = php.failure;
 const Function = php.Function;
@@ -126,7 +127,8 @@ pub fn extract(self: *@This(), comptime T: type) !T {
     };
     try self.verifyCount(min, max);
     var set: T = undefined;
-    var mismatch: ?Mismatch = null;
+    var mismatch: Mismatch = .{};
+    defer mismatch.deinit();
     var required_remaining = min;
     inline for (st.field_names, 0..) |arg_name, i| {
         if (comptime Function.isExtraArg(arg_name)) |variadic_type| {
@@ -143,17 +145,8 @@ pub fn extract(self: *@This(), comptime T: type) !T {
             if (!optional or i + required_remaining < self.len) {
                 const arg = self.next().?;
                 const value = arg.convertTo(FT) catch |err| report: {
-                    if (mismatch == null) {
-                        // remember the first mismatch
-                        mismatch = .{
-                            .fn_name = self.callee.name(),
-                            .arg_name = arg_name,
-                            .value_type = valueTypeName(FT),
-                            .index = i,
-                            .value = arg,
-                            .err = err,
-                        };
-                    }
+                    // remember the first mismatch
+                    mismatch.record(self.callee.name(), arg_name, i, FT, arg, err);
                     self.index -= 1;
                     // break out of for loop if argument is required
                     if (!optional) break;
@@ -166,9 +159,9 @@ pub fn extract(self: *@This(), comptime T: type) !T {
             }
         }
     }
-    if (mismatch) |m| {
+    if (mismatch.recorded) {
         // report the mismatch only if we've failed to reach the end
-        if (self.index < self.len) return m.report();
+        if (self.index < self.len) return mismatch.report();
     }
     return set;
 }
@@ -183,7 +176,8 @@ pub fn extractNamed(self: *@This(), comptime T: type) !T {
     };
     if (!valid) @compileError("Struct type expected, received: " ++ @typeName(T));
     var set: T = undefined;
-    var mismatch: ?Mismatch = null;
+    var mismatch: Mismatch = null;
+    defer mismatch.deinit();
     inline for (@typeInfo(T).@"struct".field_names, 0..) |arg_name, i| {
         const FT = @TypeOf(@field(set, arg_name));
         const VT, const optional = switch (@typeInfo(FT)) {
@@ -199,13 +193,7 @@ pub fn extractNamed(self: *@This(), comptime T: type) !T {
         };
         if (arg_maybe) |arg| {
             const value = arg.convertTo(VT) catch |err| {
-                mismatch = .{
-                    .fn_name = self.callee.name(),
-                    .arg_name = arg_name,
-                    .value = arg,
-                    .value_type = valueTypeName(FT),
-                    .err = err,
-                };
+                mismatch.record(self.callee.name(), arg_name, null, FT, arg, err);
                 break;
             };
             @field(set, arg_name) = value;
@@ -213,18 +201,12 @@ pub fn extractNamed(self: *@This(), comptime T: type) !T {
             if (optional) {
                 @field(set, arg_name) = fieldDefaultValue(T, i);
             } else {
-                mismatch = .{
-                    .fn_name = self.callee.name(),
-                    .arg_name = arg_name,
-                    .value = .fromNull(),
-                    .value_type = valueTypeName(FT),
-                    .err = error.Missing,
-                };
+                mismatch.record(self.callee.name(), arg_name, null, FT, null, error.Missing);
                 break;
             }
         }
     }
-    if (mismatch) |m| return m.report();
+    if (mismatch.recorded) return mismatch.report();
     if (self.named_params) |args| {
         // if all named arguments were taken out, shrink the argument list
         if (args.length() == 0) {
@@ -272,9 +254,9 @@ fn fieldDefaultValue(comptime T: type, comptime index: usize) @typeInfo(T).@"str
     return default_value_ptr.*;
 }
 
-fn valueTypeName(comptime T: type) []const u8 {
+fn getTypeName(allocator: std.mem.Allocator, comptime T: type) []const u8 {
     @setEvalBranchQuota(2_000_000);
-    return comptime switch (@typeInfo(T)) {
+    return switch (@typeInfo(T)) {
         .bool => "boolean",
         .int => "int",
         .float => "float",
@@ -286,7 +268,17 @@ fn valueTypeName(comptime T: type) []const u8 {
                 Object => "object",
                 Resource => "resource",
                 Value => "reference",
-                else => "object",
+                else => switch (@typeInfo(pt.child)) {
+                    .@"struct" => get: {
+                        const custom_class = Class.Custom(pt.child).get();
+                        const name = custom_class.name().slice();
+                        break :get if (std.mem.lastIndexOfScalar(u8, name, '\\')) |slash_index|
+                            name[slash_index + 1 ..]
+                        else
+                            name;
+                    },
+                    else => unsupported(T),
+                },
             },
             .slice => switch (pt.child) {
                 u8 => "string",
@@ -294,7 +286,9 @@ fn valueTypeName(comptime T: type) []const u8 {
             },
             else => unsupported(T),
         },
-        .optional => |opt| std.fmt.comptimePrint("?{s}", .{valueTypeName(opt.child)}),
+        .optional => |opt| std.fmt.allocPrint(allocator, "?{s}", .{
+            getTypeName(allocator, opt.child),
+        }) catch unreachable,
         .@"struct" => |st| switch (T) {
             Callable => "callable",
             else => switch (st.backing_integer != null) {
@@ -307,26 +301,11 @@ fn valueTypeName(comptime T: type) []const u8 {
             else => format: {
                 const len = un.field_types.len;
                 var names: [len][]const u8 = undefined;
-                var combined_name_len: usize = 0;
-                for (un.field_types, 0..) |FT, i| {
-                    const name = valueTypeName(FT);
+                inline for (un.field_types, 0..) |FT, i| {
+                    const name = getTypeName(allocator, FT);
                     names[i] = name;
-                    combined_name_len += name.len;
-                    if (i != len - 1) combined_name_len += 1;
                 }
-                var buffer: [combined_name_len]u8 = undefined;
-                var offset: usize = 0;
-                for (0..len) |i| {
-                    const name = names[i];
-                    @memcpy(buffer[offset .. offset + name.len], name);
-                    offset += name.len;
-                    if (offset < combined_name_len) {
-                        buffer[offset] = '|';
-                        offset += 1;
-                    }
-                }
-                const combined_name = buffer;
-                break :format &combined_name;
+                break :format std.mem.join(allocator, "|", &names) catch unreachable;
             },
         },
         .@"enum" => "number|string",
@@ -335,14 +314,36 @@ fn valueTypeName(comptime T: type) []const u8 {
 }
 
 const Mismatch = struct {
-    fn_name: ?*String = null,
-    arg_name: []const u8,
-    value_type: []const u8,
+    arena: std.heap.ArenaAllocator = undefined,
+    recorded: bool = false,
+    fn_name: ?*String = undefined,
+    arg_name: []const u8 = undefined,
+    value_type: []const u8 = undefined,
     index: ?usize = null,
-    value: Value,
-    err: anyerror,
+    value: Value = undefined,
+    err: anyerror = undefined,
 
-    pub fn report(self: @This()) error{FailureReported} {
+    pub fn deinit(self: *@This()) void {
+        if (self.recorded) {
+            self.arena.deinit();
+        }
+    }
+
+    pub fn record(self: *@This(), fn_name: *String, arg_name: []const u8, index: ?usize, comptime VT: type, value: ?Value, err: anyerror) void {
+        if (!self.recorded) {
+            self.arena = .init(php_al);
+            self.recorded = true;
+        }
+        self.fn_name = fn_name;
+        self.arg_name = arg_name;
+        self.index = index;
+        self.value = value orelse .fromNull();
+        self.value_type = getTypeName(self.arena.allocator(), VT);
+        self.err = err;
+    }
+
+    pub fn report(self: *@This()) error{FailureReported} {
+        defer self.arena.deinit();
         const fn_name = if (self.fn_name) |n| n.slice() else "(unknown)";
         if (self.index) |index| {
             return switch (self.err) {
