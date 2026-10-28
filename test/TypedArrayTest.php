@@ -96,6 +96,40 @@ final class TypedArrayTest extends ExtensionTestCase
         OUTPUT, implode(PHP_EOL, $lines));
     }
 
+    public function testIncludes(): void
+    {
+        $lines = $this->runTest("typed-array", "includes.php");
+        $this->assertSame(<<<OUTPUT
+        1
+        
+        
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testIndexOf(): void
+    {
+        $lines = $this->runTest("typed-array", "index-of.php");
+        $this->assertSame(<<<OUTPUT
+        4
+        -1
+        -1
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testLastIndexOf(): void
+    {
+        $lines = $this->runTest("typed-array", "last-index-of.php");
+        $this->assertSame(<<<OUTPUT
+        3
+        -1
+        3
+        0
+        0
+        3
+        OUTPUT, implode(PHP_EOL, $lines));
+        // echo implode(PHP_EOL, $lines);
+    }
+
     public function testSet(): void
     {
         $lines = $this->runTest("typed-array", "set.php");       
@@ -123,6 +157,35 @@ final class TypedArrayTest extends ExtensionTestCase
                     [5] => 3
                     [6] => 0
                     [7] => 0
+                )
+
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testSort(): void
+    {
+        $lines = $this->runTest("typed-array", "sort.php");
+        $this->assertSame(<<<OUTPUT
+        Uint8Array Object
+        (
+            [buffer] => ArrayBuffer Object
+                (
+                    [byteLength] => 4
+                    [detached] =>
+                    [maxByteLength] => 4
+                    [resizable] =>
+                )
+
+            [byteLength] => 4
+            [byteOffset] => 0
+            [length] => 4
+            [[ITEMS]] => Array
+                (
+                    [0] => 1
+                    [1] => 5
+                    [2] => 40
+                    [3] => 200
                 )
 
         )

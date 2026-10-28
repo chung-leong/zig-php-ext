@@ -180,6 +180,39 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             return elements[index];
         }
 
+        pub fn @"call includes"(self: *@This(), args: struct {
+            search_element: T,
+            from_index: isize = 0,
+        }) !bool {
+            const elements = try self.getElements();
+            const from = self.toAbsoluteIndex(args.from_index) catch return false;
+            const result = std.mem.findScalarPos(T, elements, from, args.search_element);
+            return result != null;
+        }
+
+        pub fn @"call indexOf"(self: *@This(), args: struct {
+            search_element: T,
+            from_index: isize = 0,
+        }) !isize {
+            const elements = try self.getElements();
+            const from = self.toAbsoluteIndex(args.from_index) catch return -1;
+            const result = std.mem.findScalarPos(T, elements, from, args.search_element);
+            return if (result) |i| @intCast(i) else -1;
+        }
+
+        pub fn @"call lastIndexOf"(self: *@This(), args: struct {
+            search_element: T,
+            from_index: ?isize = null,
+        }) !isize {
+            const elements = try self.getElements();
+            const from = if (args.from_index) |i|
+                self.toAbsoluteIndex(i) catch return -1
+            else
+                elements.len - 1;
+            const result = std.mem.findScalarLast(T, elements[0 .. from + 1], args.search_element);
+            return if (result) |i| @intCast(i) else -1;
+        }
+
         pub fn @"call reverse"(self: *@This(), _: struct {}) !*Object {
             const elements = try self.getElements();
             std.mem.reverse(T, elements);
@@ -200,6 +233,12 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             };
             if (args.offset + src.len > dest.len) return error.OutOfBound;
             @memcpy(dest[args.offset .. args.offset + src.len], src);
+        }
+
+        pub fn @"call sort"(self: *@This(), _: struct {}) !*Object {
+            const elements = try self.getElements();
+            std.mem.sortUnstable(T, elements, {}, std.sort.asc(T));
+            return Object.fromCustom(self);
         }
 
         fn toAbsoluteIndex(self: *@This(), i: isize) !usize {
