@@ -1,43 +1,39 @@
+const std = @import("std");
+
 const php = @import("../root.zig");
 const Array = php.Array;
 const List = php.List;
 const Object = php.Object;
 const String = php.String;
 const Value = php.Value;
-pub const Options = Array.Iterator.Options;
 
-pub fn init(list: List, options: Options) !@This() {
-    const len = try list.getLength();
-    return .{
-        .current = switch (options.dir) {
-            .forward => 0,
-            .backward => len - 1,
-        },
-        .step = switch (options.dir) {
-            .forward => 1,
-            .backward => -1,
-        },
-        .length = len,
-        .list = list.retain(),
-    };
+pub fn init(list: List) @This() {
+    return .{ .list = list.retain() };
 }
 
 pub fn deinit(self: *@This()) void {
-    if (self.source) |list| list.release();
+    self.list.release();
+    self.current_value.release();
 }
 
-pub fn next(self: *@This()) !?Value {
-    if (self.current >= self.length) return null;
-    const value = try self.list.read(self.current);
-    self.current +%= self.step;
-    return value;
+pub fn next(self: *@This()) ?Value {
+    self.current_index +%= 1;
+    self.current_value.release();
+    self.current_value = self.list.read(self.current_index) catch {
+        self.current_value = .fromNull();
+        return null;
+    };
+    return self.current_value;
+}
+
+pub fn reset(self: *@This()) void {
+    self.current_index = std.math.maxInt();
 }
 
 pub fn index(self: *@This()) usize {
-    return self.current;
+    return self.current_index;
 }
 
-current: usize,
-length: usize,
+current_index: usize = std.math.maxInt(usize),
+current_value: Value = .fromNull(),
 list: List,
-step: usize,

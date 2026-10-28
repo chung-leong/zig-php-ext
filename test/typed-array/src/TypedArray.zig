@@ -2,6 +2,7 @@ const std = @import("std");
 
 const ArrayBuffer = @import("ArrayBuffer.zig");
 const php = @import("php/root.zig");
+const List = php.List;
 const Object = php.Object;
 const String = php.String;
 const Value = php.Value;
@@ -15,6 +16,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                 length: usize,
                 buffer: *ArrayBuffer,
                 array: *TypedArray,
+                list: List,
             },
             byte_offset: ?usize,
             length: ?usize,
@@ -38,6 +40,22 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                             const ab: ArrayBuffer = .init(.{ .length = src.len * @sizeOf(T) });
                             const dest = ab.getElements(T, 0, ta.length) catch unreachable;
                             @memcpy(dest, src);
+                            break :init .createCustom(ArrayBuffer, ab);
+                        },
+                        .list => |li| {
+                            // received a regular array or an array-like object
+                            const len = try li.getLength();
+                            var ab: ArrayBuffer = .init(.{ .length = len * @sizeOf(T) });
+                            errdefer ab.deinit();
+                            var iter = li.iterate();
+                            defer iter.deinit();
+                            const dest = ab.getElements(T, 0, len) catch unreachable;
+                            var index: usize = 0;
+                            while (iter.next()) |value| {
+                                dest[index] = try value.convertTo(T);
+                                index += 1;
+                                if (index >= len) break;
+                            }
                             break :init .createCustom(ArrayBuffer, ab);
                         },
                     }
@@ -96,6 +114,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                 elements[index] = try value.convertTo(T);
             }
         }
+
+        pub const @"export BYTES_PER_ELEMENT" = @sizeOf(T);
 
         pub fn @"get buffer"(self: *@This()) *Object {
             return self.buffer;

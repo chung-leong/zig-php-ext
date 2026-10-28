@@ -17,4 +17,44 @@ final class TypedArrayTest extends ExtensionTestCase
         $this->assertSame("detached = 1", $lines[7]);
         $this->assertSame("byteLength = 80", $lines[8]);
     }
+
+    public function testInt32Array(): void
+    {
+        $lines = $this->runTest("typed-array", "int32-array.php");       
+        $this->assertSame(<<<OUTPUT
+        42
+        2
+        4
+        31
+        21
+        4
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testFloat64Array(): void
+    {
+        $lines = $this->runTest("typed-array", "float64-array.php");       
+        $this->assertSame(<<<OUTPUT
+        42.5
+        2
+        8
+        31.5
+        21.5
+        8
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testUint8ClampedArray(): void
+    {
+        $lines = $this->runTest("typed-array", "uint8-clamped-array.php");       
+        $this->assertSame(<<<OUTPUT
+        42
+        255
+        2
+        1
+        31
+        21
+        1
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
 }

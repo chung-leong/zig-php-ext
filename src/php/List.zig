@@ -53,8 +53,8 @@ pub const @"union" = union(enum) {
         };
     }
 
-    pub fn iterate(self: @This(), options: Iterator.Options) !Iterator {
-        return .init(self, options);
+    pub fn iterate(self: @This()) Iterator {
+        return .init(self);
     }
 
     pub fn toValue(self: @This()) Value {
