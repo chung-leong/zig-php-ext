@@ -2,6 +2,7 @@ const std = @import("std");
 
 const ArrayBuffer = @import("ArrayBuffer.zig");
 const php = @import("php/root.zig");
+const Array = php.Array;
 const List = php.List;
 const Object = php.Object;
 const String = php.String;
@@ -89,6 +90,30 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         pub fn getElements(self: *@This()) ![]T {
             const ab = self.buffer.custom(ArrayBuffer);
             return try ab.getElements(T, self.offset, self.length);
+        }
+
+        pub fn getProperties(self: *@This(), purpose: Object.PropertiesPurpose) !?*Array {
+            const elements = try self.getElements();
+            if (purpose != .debug) return null;
+            const arr: *Array = .create();
+            const items_arr: *Array = .create();
+            for (elements, 0..) |element, i| {
+                if (i == 50) {
+                    const remaining = elements.len - i;
+                    if (remaining > 1) {
+                        var buffer: [128]u8 = undefined;
+                        const text = try std.fmt.bufPrint(&buffer, "... {d} more items", .{remaining});
+                        const text_value: Value = .fromString(.create(text));
+                        items_arr.append(text_value);
+                        break;
+                    }
+                }
+                items_arr.append(.fromAny(element));
+            }
+            arr.set("[ITEMS]", .fromArray(items_arr));
+            // don't show items of ArrayBuffer
+            ArrayBuffer.bytes_debug_output = false;
+            return arr;
         }
 
         pub fn readDimension(self: *@This(), key: Value, _: Value.Access) !Value {

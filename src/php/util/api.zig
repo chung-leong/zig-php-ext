@@ -42,7 +42,7 @@ pub const object_prototypes = .{
         fn (anytype, *String) void,
         fn (anytype, *String, ?[*]?*anyopaque) void,
     },
-    .getProperties = fn (anytype, Object.PropertiesPurpose) *Array,
+    .getProperties = fn (anytype, Object.PropertiesPurpose) ?*Array,
     .getPropertyPointer = .{
         fn (anytype, *String, Value.Access) ?*Value,
         fn (anytype, *String, Value.Access, ?[*]?*anyopaque) ?*Value,

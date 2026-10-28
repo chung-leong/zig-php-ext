@@ -1,4 +1,7 @@
+const std = @import("std");
+
 const php = @import("php/root.zig");
+const Array = php.Array;
 const Object = php.Object;
 const String = php.String;
 const Value = php.Value;
@@ -43,6 +46,33 @@ pub fn castObject(self: *@This(), kind: Value.Kind) !Value {
         },
         else => error.InvalidOperation,
     };
+}
+
+pub fn getProperties(self: *@This(), purpose: Object.PropertiesPurpose) !?*Array {
+    const elements = try self.getElements(u8, 0, self.length);
+    if (purpose != .debug) return null;
+    if (!bytes_debug_output) {
+        // don't show items when a TypedArray is already showing them
+        bytes_debug_output = true;
+        return null;
+    }
+    const arr: *Array = .create();
+    const items_arr: *Array = .create();
+    for (elements, 0..) |element, i| {
+        if (i == 50) {
+            const remaining = elements.len - i;
+            if (remaining > 1) {
+                var buffer: [128]u8 = undefined;
+                const text = try std.fmt.bufPrint(&buffer, "... {d} more items", .{remaining});
+                const text_value: Value = .fromString(.create(text));
+                items_arr.append(text_value);
+                break;
+            }
+        }
+        items_arr.append(.fromAny(element));
+    }
+    arr.set("[ITEMS]", .fromArray(items_arr));
+    return arr;
 }
 
 pub fn @"get byteLength"(self: *@This()) usize {
@@ -110,6 +140,8 @@ pub fn @"call transferToFixedLength"(self: *@This(), args: struct {
         .length = new_len,
     });
 }
+
+pub threadlocal var bytes_debug_output: bool = true;
 
 fn toAbsoluteIndex(self: *@This(), arg: ?isize) ?usize {
     const i = arg orelse return null;
