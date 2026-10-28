@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const Iterator = @import("Dictionary/Iterator.zig");
 const php = @import("root.zig");
 const Array = php.Array;
@@ -55,36 +57,26 @@ pub const @"union" = union(enum) {
         };
     }
 
-    pub fn extract(self: *const @This(), comptime T: type) !T {
+    pub fn extract(self: *const @This(), allocator: std.mem.Allocator, comptime T: type) !T {
         const st = switch (@typeInfo(T)) {
             .@"struct" => |st| st,
             else => @compileError("Struct type expected, received: " ++ @typeName(T)),
         };
         var s: T = undefined;
-        {
-            var failure_at: usize = undefined;
-            errdefer {
-                inline for (st.field_names, 0..) |field_name, i| {
-                    if (i == failure_at) break;
-                    Value.freeConverted(@field(s, field_name));
+        inline for (st.field_names, st.field_types, 0..) |field_name, FT, i| {
+            @field(s, field_name) = get: {
+                if (self.has(N(field_name))) {
+                    const value = try self.read(N(field_name));
+                    defer value.release();
+                    break :get try value.extract(allocator, FT);
+                } else {
+                    const opaque_ptr = st.field_attrs[i].default_value_ptr orelse {
+                        return failure.report("Missing field value: {s}", .{field_name});
+                    };
+                    const field_value_ptr: *const FT = @ptrCast(@alignCast(opaque_ptr));
+                    break :get field_value_ptr.*;
                 }
-            }
-            inline for (st.field_names, st.field_types, 0..) |field_name, FT, i| {
-                errdefer failure_at = i;
-                @field(s, field_name) = get: {
-                    if (self.has(N(field_name))) {
-                        const value = try self.read(N(field_name));
-                        defer value.release();
-                        break :get try value.convertTo(FT);
-                    } else {
-                        const opaque_ptr = st.field_attrs[i].default_value_ptr orelse {
-                            return failure.report("Missing field value: {s}", .{field_name});
-                        };
-                        const field_value_ptr: *const FT = @ptrCast(@alignCast(opaque_ptr));
-                        break :get field_value_ptr.*;
-                    }
-                };
-            }
+            };
         }
         return s;
     }

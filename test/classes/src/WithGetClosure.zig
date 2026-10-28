@@ -10,7 +10,7 @@ const Value = php.Value;
 
 pub fn call(args: *Arguments, retval: *Value) !void {
     var arg_iter = args.iterate();
-    const arg_struct = try arg_iter.extract(struct {
+    const arg_struct = try arg_iter.extract(php.allocator, struct {
         number1: f64,
         number2: f64,
     });

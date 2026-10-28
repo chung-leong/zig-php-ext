@@ -184,8 +184,9 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
             const args: *Arguments = @ptrCast(zed);
             const retval: *Value = @ptrCast(zretval);
             var iter = args.iterate();
-            if (iter.extract(AT[0].?)) |arg0| {
-                defer Value.freeConverted(arg0);
+            var arena: std.heap.ArenaAllocator = .init(php_al);
+            defer arena.deinit();
+            if (iter.extract(arena.allocator(), AT[0].?)) |arg0| {
                 const result = switch (returning_error) {
                     true => func(arg0) catch |err| return failure.throw(err),
                     false => func(arg0),
@@ -215,8 +216,9 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
                 },
                 .none => unreachable,
             };
-            if (iter.extract(AT[1].?)) |arg1| {
-                defer Value.freeConverted(arg1);
+            var arena: std.heap.ArenaAllocator = .init(php_al);
+            defer arena.deinit();
+            if (iter.extract(arena.allocator(), AT[1].?)) |arg1| {
                 const result = switch (returning_error) {
                     true => func(arg0, arg1) catch |err| return failure.throw(err),
                     false => func(arg0, arg1),

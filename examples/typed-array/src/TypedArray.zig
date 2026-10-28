@@ -128,7 +128,21 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                 else
                     @intCast(int);
             } else {
-                elements[index] = try value.convertTo(T);
+                elements[index] = switch (@typeInfo(T)) {
+                    .int => |int| get: {
+                        const int_value = switch (int.signedness) {
+                            .signed => try value.getInteger(),
+                            .unsigned => try value.getUnsigned(),
+                        };
+                        if (int_value > std.math.maxInt(T) or int_value < std.math.minInt(T)) return error.OutOfBound;
+                        break :get @intCast(int_value);
+                    },
+                    .float => get: {
+                        const float_value = try value.getFloat();
+                        break :get @floatCast(float_value);
+                    },
+                    else => unreachable,
+                };
             }
         }
 

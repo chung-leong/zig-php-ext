@@ -97,7 +97,7 @@ pub fn makeThisFirst(self: *@This()) !void {
     }
 }
 
-pub fn extract(self: *@This(), comptime T: type) !T {
+pub fn extract(self: *@This(), allocator: std.mem.Allocator, comptime T: type) !T {
     std.debug.assert(self.index == 0);
     // make sure T is a struct/tuple
     if (@typeInfo(T) != .@"struct") @compileError("Struct type expected, received: " ++ @typeName(T));
@@ -134,8 +134,7 @@ pub fn extract(self: *@This(), comptime T: type) !T {
         if (comptime Function.isExtraArg(arg_name)) |variadic_type| {
             @field(set, arg_name) = switch (variadic_type) {
                 .named => if (self.named_params) |np| np.array() else null,
-                // need to duplicate the list because freeConverted() will free it
-                .unnamed => php_al.dupe(Value, self.remaining()) catch unreachable,
+                .unnamed => self.remaining(),
             };
         } else {
             const FT = @TypeOf(@field(set, arg_name));
@@ -144,7 +143,7 @@ pub fn extract(self: *@This(), comptime T: type) !T {
             // remaining required ones
             if (!optional or i + required_remaining < self.len) {
                 const arg = self.next().?;
-                const value = arg.convertTo(FT) catch |err| report: {
+                const value = arg.extract(allocator, FT) catch |err| report: {
                     // remember the first mismatch
                     mismatch.record(self.callee.name(), arg_name, i, FT, arg, err);
                     self.index -= 1;
@@ -166,7 +165,7 @@ pub fn extract(self: *@This(), comptime T: type) !T {
     return set;
 }
 
-pub fn extractNamed(self: *@This(), comptime T: type) !T {
+pub fn extractNamed(self: *@This(), allocator: std.mem.Allocator, comptime T: type) !T {
     // method should be called prior to actual iteration
     std.debug.assert(self.index == 0);
     // make sure T is a tuple
@@ -192,7 +191,7 @@ pub fn extractNamed(self: *@This(), comptime T: type) !T {
             }
         };
         if (arg_maybe) |arg| {
-            const value = arg.convertTo(VT) catch |err| {
+            const value = arg.extract(allocator, VT) catch |err| {
                 mismatch.record(self.callee.name(), arg_name, null, FT, arg, err);
                 break;
             };

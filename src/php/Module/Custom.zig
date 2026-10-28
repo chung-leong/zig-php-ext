@@ -13,6 +13,7 @@ const unsupported = failure.unsupported;
 const Function = php.Function;
 const IniEntry = php.IniEntry;
 const Module = php.Module;
+const php_al = php.allocator;
 const Singleton = php.Singleton;
 const String = php.String;
 const Value = php.Value;
@@ -243,7 +244,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                 },
                 else => get: {
                     const value: Value = .fromString(str);
-                    break :get value.convertTo(Arg);
+                    break :get value.extract(php_al, Arg);
                 },
             };
         }

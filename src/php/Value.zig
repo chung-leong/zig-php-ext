@@ -279,7 +279,7 @@ pub fn getEnum(self: *const @This(), comptime T: type) !T {
     }
 }
 
-pub fn getStruct(self: *const @This(), comptime T: type) !T {
+pub fn getStruct(self: *const @This(), allocator: std.mem.Allocator, comptime T: type) !T {
     if (@typeInfo(T) != .@"struct") @compileError("Struct type expected, received: " ++ @typeName(T));
     const st = @typeInfo(T).@"struct";
     if (self.kind() == .integer) {
@@ -294,7 +294,7 @@ pub fn getStruct(self: *const @This(), comptime T: type) !T {
     const dict = self.getDictionary() catch |err| {
         return if (st.backing_integer != null) error.NotIntegerOrAssociativeArray else err;
     };
-    return dict.extract(T);
+    return dict.extract(allocator, T);
 }
 
 pub fn getCustom(self: *const @This(), comptime T: type) !*T {
@@ -335,7 +335,7 @@ pub fn cast(self: *const @This(), comptime desired_kind: Kind) @This() {
     return tmp;
 }
 
-pub fn convertTo(self: *const @This(), comptime T: type) !T {
+pub fn extract(self: *const @This(), allocator: std.mem.Allocator, comptime T: type) !T {
     return switch (@typeInfo(T)) {
         .bool => try self.getBoolean(),
         .int => |int| get: {
@@ -351,7 +351,7 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
             break :get @floatCast(float_value);
         },
         .@"enum" => try self.getEnum(T),
-        .optional => |opt| if (self.isNull()) null else try self.convertTo(opt.child),
+        .optional => |opt| if (self.isNull()) null else try self.extract(allocator, opt.child),
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
                 String => try self.getString(),
@@ -369,82 +369,32 @@ pub fn convertTo(self: *const @This(), comptime T: type) !T {
                     break :get self.string().slice();
                 }
                 const list = try self.getList();
-                break :get list.extract(T);
+                break :get list.extract(allocator, T);
             },
             else => unsupported(T),
         },
         .array, .vector => get: {
             const list = try self.getList();
-            break :get list.extract(T);
+            break :get list.extract(allocator, T);
         },
         .@"struct" => switch (T) {
             @This() => self.*,
             Callable => try self.getCallable(),
-            else => try self.getStruct(T),
+            else => try self.getStruct(allocator, T),
         },
         .@"union" => |un| switch (T) {
             Dictionary => try self.getDictionary(),
             List => try self.getList(),
             else => switch (un.tag_type != null) {
                 true => inline for (un.field_types, 0..) |FT, i| {
-                    if (self.convertTo(FT)) |nv| break @unionInit(T, un.field_names[i], nv) else |_| {}
+                    if (self.extract(allocator, FT)) |nv| {
+                        break @unionInit(T, un.field_names[i], nv);
+                    } else |_| {}
                 } else error.NoMatch,
                 false => @compileError("Union must be tagged: " ++ @typeName(T)),
             },
         },
         else => unsupported(T),
-    };
-}
-
-pub fn freeConverted(arg: anytype) void {
-    const T = @TypeOf(arg);
-    if (comptime !php.util.hasPointer(T)) return;
-    return switch (@typeInfo(T)) {
-        .optional => {
-            if (arg) |payload| freeConverted(payload);
-        },
-        .error_union => if (arg) |payload| freeConverted(payload) else |_| {},
-        .pointer => |pt| switch (pt.size) {
-            .one => switch (pt.child) {
-                Array, Object, Reference, Resource, Stream, String, @This() => {},
-                else => {},
-            },
-            .slice => switch (pt.child) {
-                u8 => {},
-                else => {
-                    for (arg) |element| freeConverted(element);
-                    php_al.free(arg);
-                },
-            },
-            else => {},
-        },
-        .@"struct" => |st| switch (T) {
-            @This() => {},
-            else => if (st.backing_integer == null) {
-                inline for (st.field_names, st.field_types, st.field_attrs) |field_name, FT, attrs| {
-                    const value_ptr = &@field(arg, field_name);
-                    const freeing = if (attrs.default_value_ptr) |opaque_ptr| check: {
-                        const default_value_ptr: *const FT = @ptrCast(@alignCast(opaque_ptr));
-                        const value_mem = std.mem.asBytes(value_ptr);
-                        const default_value_mem = std.mem.asBytes(default_value_ptr);
-                        break :check !std.mem.eql(u8, value_mem, default_value_mem);
-                    } else true;
-                    if (freeing) {
-                        freeConverted(value_ptr.*);
-                    }
-                }
-            },
-        },
-        .@"union" => |un| switch (T) {
-            Dictionary, List => {},
-            else => switch (un.tag_type != null) {
-                true => switch (arg) {
-                    inline else => |payload| freeConverted(payload),
-                },
-                false => {},
-            },
-        },
-        else => {},
     };
 }
 

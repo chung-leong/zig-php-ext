@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const Iterator = @import("List/Iterator.zig");
 const php = @import("root.zig");
 const Array = php.Array;
@@ -64,24 +66,14 @@ pub const @"union" = union(enum) {
         };
     }
 
-    pub fn extract(self: *const @This(), comptime T: type) !T {
+    pub fn extract(self: *const @This(), allocator: std.mem.Allocator, comptime T: type) !T {
         switch (@typeInfo(T)) {
             .array => |ar| {
                 var result: T = undefined;
-                {
-                    var failure_at: usize = undefined;
-                    errdefer {
-                        for (0..ar.len) |i| {
-                            if (i == failure_at) break;
-                            Value.freeConverted(result[i]);
-                        }
-                    }
-                    for (0..ar.len) |i| {
-                        errdefer failure_at = i;
-                        const value = try self.read(i);
-                        defer value.release();
-                        result[i] = try value.convertTo(ar.child);
-                    }
+                for (0..ar.len) |i| {
+                    const value = try self.read(i);
+                    defer value.release();
+                    result[i] = try value.extract(allocator, ar.child);
                 }
                 return result;
             },
@@ -90,7 +82,7 @@ pub const @"union" = union(enum) {
                 inline for (0..ve.len) |i| {
                     const value = try self.read(i);
                     defer value.release();
-                    result[i] = try value.convertTo(ve.child);
+                    result[i] = try value.extract(allocator, ve.child);
                 }
                 return result;
             },
@@ -99,20 +91,10 @@ pub const @"union" = union(enum) {
                     const len = try self.getLength();
                     const result = try php_al.alloc(pt.child, len);
                     errdefer php_al.free(result);
-                    {
-                        var failure_at: usize = undefined;
-                        errdefer {
-                            for (0..len) |i| {
-                                if (i == failure_at) break;
-                                Value.freeConverted(result[i]);
-                            }
-                        }
-                        for (0..len) |i| {
-                            errdefer failure_at = i;
-                            const value = try self.read(i);
-                            defer value.release();
-                            result[i] = try value.convertTo(pt.child);
-                        }
+                    for (0..len) |i| {
+                        const value = try self.read(i);
+                        defer value.release();
+                        result[i] = try value.extract(allocator, pt.child);
                     }
                     return result;
                 },
