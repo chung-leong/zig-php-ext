@@ -1016,3 +1016,7 @@ number).
 Run `./package` in the extension's root directory to place it source code into a zip file.
 The script will exclude files in the `test` directory and unnecessary packages in the `vendor`
 directory like PHPUnit.
+
+## Complete examples
+
+* [Typed Array](https://github.com/chung-leong/zig-php-ext/tree/main/examples/typed-array) - An implementation of JavaScript's typed arrays
