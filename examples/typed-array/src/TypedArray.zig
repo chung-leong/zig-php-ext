@@ -89,6 +89,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             if (purpose != .debug) return null;
             const arr: *Array = .create();
             const items_arr: *Array = .create();
+            defer items_arr.release();
             for (elements, 0..) |element, i| {
                 if (i == 50) {
                     const remaining = elements.len - i;

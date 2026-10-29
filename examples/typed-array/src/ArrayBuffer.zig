@@ -58,6 +58,7 @@ pub fn getProperties(self: *@This(), purpose: Object.PropertiesPurpose) !?*Array
     }
     const arr: *Array = .create();
     const items_arr: *Array = .create();
+    defer items_arr.release();
     for (elements, 0..) |element, i| {
         if (i == 50) {
             const remaining = elements.len - i;

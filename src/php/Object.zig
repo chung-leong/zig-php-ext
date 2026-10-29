@@ -54,6 +54,7 @@ pub fn createStandard() *@This() {
 pub fn createCustom(comptime T: type, initializers: T) *@This() {
     const custom_obj = Object.Custom(T).create();
     custom_obj.custom().* = initializers;
+    custom_obj.flags.initialized = true;
     return custom_obj.object();
 }
 

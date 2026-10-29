@@ -89,8 +89,7 @@ pub const @"union" = union(enum) {
             .pointer => |pt| switch (pt.size) {
                 .slice => {
                     const len = try self.getLength();
-                    const result = try php_al.alloc(pt.child, len);
-                    errdefer php_al.free(result);
+                    const result = try allocator.alloc(pt.child, len);
                     for (0..len) |i| {
                         const value = try self.read(i);
                         defer value.release();
