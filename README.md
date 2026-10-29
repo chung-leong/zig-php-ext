@@ -71,7 +71,7 @@ const config = @import("config");
 const php = @import("php/root.zig");
 
 var module: php.Module.Custom(@import("extension.zig"), .{
-    // ext name and version are extract from composer.json by build.zig
+    // ext name and version are extracted from composer.json by build.zig
     .name = config.ext_name,
     .version = config.ext_version,
 }) = .init();
