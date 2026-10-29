@@ -999,6 +999,86 @@ cow = .string
 chicken = .integer
 ```
 
+## Module life-cycle handlers
+
+The following code shows the optional functions that a custom module can have:
+
+```zig
+const php = @import("php/root.zig");
+const getter = php.IniEntry.getter;
+const setter = php.IniEntry.setter;
+
+pub fn moduleStartup(_: *@This(), module_type: php.Module.Type, module_no: c_int) !void {
+    _ = module_no;
+    php.print("moduleStartup: {}\n", .{module_type});
+}
+
+pub fn moduleShutdown(_: *@This(), module_type: php.Module.Type, module_no: c_int) !void {
+    _ = module_no;
+    php.print("moduleShutdown: {}\n", .{module_type});
+}
+
+pub fn requestStartup(_: *@This(), module_type: php.Module.Type, module_no: c_int) !void {
+    _ = module_no;
+    php.print("requestStartup: {}\n", .{module_type});
+}
+
+pub fn requestShutdown(_: *@This(), module_type: php.Module.Type, module_no: c_int) !void {
+    _ = module_no;
+    php.print("requestShutdown: {}\n", .{module_type});
+}
+
+pub fn infoRequest(_: *@This(), module: *php.Module) !void {
+    var table: php.InfoTable = .init();
+    table.addTwoHeaders("Column A", "Column B");
+    table.addTwoColumns("aaaaaaaa", "bbbbbbbb");
+    table.end();
+    module.displayIniEntries();
+}
+
+pub const @"get string" = getter(@This(), .string);
+pub const @"set string" = setter(@This(), .string);
+
+pub const @"get integer" = getter(@This(), .integer);
+pub const @"set integer" = setter(@This(), .integer);
+
+pub const @"get boolean" = getter(@This(), .boolean);
+pub const @"set boolean" = setter(@This(), .boolean);
+
+pub const @"get pet" = getter(@This(), .pet);
+pub const @"set pet" = setter(@This(), .pet);
+
+pub const @"get flags" = getter(@This(), .flags);
+pub const @"set flags" = setter(@This(), .flags);
+
+string: [:0]const u8 = "Hello world",
+integer: i32 = 1234,
+float: f64 = 0.1234,
+boolean: bool = false,
+pet: enum { cat, dog, monkey, hippopotamus } = .hippopotamus,
+flags: packed struct {
+    option_a: bool = true,
+    option_b: bool = false,
+    option_c: bool = true,
+} = .{},
+```
+```php
+<?php
+
+echo "Hello world\n";
+
+?>
+```
+```
+moduleStartup: .persistent
+requestStartup: .persistent
+Hello world
+requestShutdown: .persistent
+moduleShutdown: .persistent
+```
+
+When `infoRequest()` is not defined, the default action is a call to `Module.displayIniEntries()`.
+
 ## Custom menu items
 
 You can add custom items to the build menu by adding a special entry in `composer.json`:
