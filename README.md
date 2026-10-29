@@ -482,7 +482,7 @@ show(new Superhero("Tony Stark", "Ironman", 'tech'));
 Ironman = Tony Stark (.tech)
 ```
 
-A function can also easily accepts a list of structs:
+A function can also easily accept a list of structs:
 
 ```zig
 pub fn @"call assemble"(_: *@This(), args: struct {
@@ -514,7 +514,7 @@ Black Widow = Natalia Romanov (.training)
 Blue Beetle = Peter Parker (.mutant)
 ```
 
-Notice that enum can accept either a integer or a string.
+Notice that enum can accept either an integer or a string.
 
 ## Returning structs
 
