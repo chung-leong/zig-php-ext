@@ -9,14 +9,17 @@ pub const vtable: std.mem.Allocator.VTable = .{
     .alloc = alloc,
     .resize = resize,
     .remap = remap,
-    .free = @This().free,
+    .free = free,
 };
 
 fn alloc(_: *anyopaque, len: usize, alignment: std.mem.Alignment, return_address: usize) ?[*]u8 {
     _ = return_address;
     _ = alignment;
     std.debug.assert(len > 0);
-    const ptr = pemalloc(len, @src());
+    const ptr = switch (mode) {
+        .persistent => malloc(len),
+        .per_request => emalloc(len, @src()),
+    };
     return @ptrCast(ptr);
 }
 
@@ -41,7 +44,10 @@ fn remap(ctx: *anyopaque, memory: []u8, alignment: std.mem.Alignment, new_len: u
 fn free(_: *anyopaque, memory: []u8, alignment: std.mem.Alignment, return_address: usize) void {
     _ = return_address;
     _ = alignment;
-    pefree(memory.ptr, @src());
+    switch (mode) {
+        .persistent => c.free(memory.ptr),
+        .per_request => efree(memory.ptr, @src()),
+    }
 }
 
 pub const Mode = enum { persistent, per_request };
@@ -73,18 +79,4 @@ fn malloc(size: usize) [*]u8 {
         else => @compileError("Unexpected __zend_malloc argument count"),
     };
     return @ptrCast(ptr);
-}
-
-fn pemalloc(size: usize, comptime src: std.builtin.SourceLocation) [*]u8 {
-    return switch (mode) {
-        .persistent => malloc(size),
-        .per_request => emalloc(size, src),
-    };
-}
-
-fn pefree(ptr: *anyopaque, comptime src: std.builtin.SourceLocation) void {
-    return switch (mode) {
-        .persistent => c.free(ptr),
-        .per_request => efree(ptr, src),
-    };
 }
