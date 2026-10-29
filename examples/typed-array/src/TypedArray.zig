@@ -231,7 +231,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         pub fn @"call reverse"(self: *@This(), _: struct {}) !*Object {
             const elements = try self.getElements();
             std.mem.reverse(T, elements);
-            return Object.fromCustom(self);
+            return Object.fromCustom(self).retain();
         }
 
         pub fn @"call set"(self: *@This(), args: struct {
@@ -253,7 +253,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         pub fn @"call sort"(self: *@This(), _: struct {}) !*Object {
             const elements = try self.getElements();
             std.mem.sortUnstable(T, elements, {}, std.sort.asc(T));
-            return Object.fromCustom(self);
+            return Object.fromCustom(self).retain();
         }
 
         fn toAbsoluteIndex(self: *@This(), i: isize) !usize {
