@@ -100,3 +100,7 @@ pub fn print(comptime fmt: []const u8, args: anytype) void {
         write(str);
     }
 }
+
+pub fn flush() void {
+    _ = imports.php_output_flush();
+}

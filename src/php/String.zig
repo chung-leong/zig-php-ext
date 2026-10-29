@@ -186,8 +186,13 @@ pub fn parseBoolean(self: *const @This()) bool {
 }
 
 pub fn parseInteger(self: *const @This()) c.zend_long {
-    const s = &self.slice();
+    const s = self.slice();
     return pi.zend_atol(s.ptr, s.len);
+}
+
+pub fn parseFloat(self: *const @This()) f64 {
+    const s = self.slice();
+    return pi.zend_strtod(s.ptr, null);
 }
 
 pub fn static(comptime s: []const u8) *@This() {

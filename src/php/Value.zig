@@ -282,14 +282,12 @@ pub fn getEnum(self: *const @This(), comptime T: type) !T {
 pub fn getStruct(self: *const @This(), allocator: std.mem.Allocator, comptime T: type) !T {
     if (@typeInfo(T) != .@"struct") @compileError("Struct type expected, received: " ++ @typeName(T));
     const st = @typeInfo(T).@"struct";
-    if (self.kind() == .integer) {
-        if (st.backing_integer) |Int| {
-            if (self.getInteger()) |int| {
-                const bits: @Int(@typeInfo(Int).int.signedness, @bitSizeOf(c.zend_long)) = @bitCast(int);
-                const backing_int: Int = @truncate(bits);
-                return @bitCast(backing_int);
-            } else |_| {}
-        }
+    if (st.backing_integer) |Int| {
+        if (self.getInteger()) |int| {
+            const bits: @Int(@typeInfo(Int).int.signedness, @bitSizeOf(c.zend_long)) = @bitCast(int);
+            const backing_int: Int = @truncate(bits);
+            return @bitCast(backing_int);
+        } else |_| {}
     }
     const dict = self.getDictionary() catch |err| {
         return if (st.backing_integer != null) error.NotIntegerOrAssociativeArray else err;

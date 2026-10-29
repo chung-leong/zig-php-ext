@@ -9,3 +9,4 @@ zig-pkg/
 *.ini
 composer.lock
 .*
+*.zip

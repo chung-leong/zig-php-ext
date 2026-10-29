@@ -14,14 +14,18 @@ pub fn build(b: *std.Build) !void {
 
     // extra options from composer.json
     var ext = try std.json.parseFromSliceLeaky(struct {
-        name: [:0]const u8,
-        version: [:0]const u8,
+        name: [:0]u8,
+        version: [:0]u8,
         zig: ?struct {
             config: ?std.json.Value = null,
         } = null,
     }, b.allocator, @embedFile("composer.json"), .{ .ignore_unknown_fields = true });
     if (std.mem.indexOfScalar(u8, ext.name, '/')) |index| {
         ext.name = ext.name[index + 1 ..];
+    }
+    for (ext.name, 0..) |ch, i| {
+        // replace dashes with underscores
+        if (ch == '-') ext.name[i] = '_';
     }
     const options = b.addOptions();
     options.addOption([:0]const u8, "ext_name", ext.name);

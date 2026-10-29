@@ -218,19 +218,19 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             const Arg = @TypeOf(arg);
             return switch (@typeInfo(Arg)) {
                 .bool => if (arg) "On" else "Off",
-                .int, .float => try std.fmt.allocPrintSentinel(allocator, "{d}", 0, .{arg}),
+                .int, .float => try std.fmt.allocPrintSentinel(allocator, "{d}", .{arg}, 0),
                 .pointer => |pt| switch (pt.child) {
                     u8 => if (pt.sentinel() == 0)
                         arg
                     else
-                        try std.fmt.allocPrintSentinel(allocator, "{s}", 0, .{arg}),
+                        try std.fmt.allocPrintSentinel(allocator, "{s}", .{arg}, 0),
                     String => arg.slice(),
                     else => unsupported(Arg),
                 },
                 else => get: {
-                    var value: Value = .fromAny(arg).cast(.string);
-                    const slice = value.string().slice();
-                    break :get slice.ptr;
+                    const value: Value = .fromAny(arg);
+                    const str = value.cast(.string).string();
+                    break :get str.slice();
                 },
             };
         }
@@ -238,8 +238,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         fn fromIniString(comptime Arg: type, str: *String) !Arg {
             return switch (@typeInfo(Arg)) {
                 .bool => pi.zend_ini_parse_bool(@ptrCast(str)),
-                .int => pi.zend_atol(@ptrCast(str)),
-                .float => pi.zend_strtod(@ptrCast(str)),
+                .int => @truncate(str.parseInteger()),
+                .float => @floatCast(str.parseFloat()),
                 .pointer => |pt| switch (pt.child) {
                     u8 => str.slice(),
                     String => str.retain(),
