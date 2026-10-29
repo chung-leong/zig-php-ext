@@ -660,7 +660,9 @@ const php = @import("php/root.zig");
 const getter = php.Object.getter;
 const setter = php.Object.setter;
 
-pub const @"export marvel\\Avenger" = php.Class.Custom(struct {
+pub const @"export marvel\\Avenger" = php.Class.Custom(Avenger);
+
+const Avenger = struct {
     pub const @"export Power" = Power;
 
     pub const @"get real_name" = getter(@This(), .real_name);
@@ -680,7 +682,7 @@ pub const @"export marvel\\Avenger" = php.Class.Custom(struct {
         } else return error.InvalidPower;
     }
 
-    pub fn @"call show"(self: *@This(), _: struct {}) !void {
+    pub fn @"call show"(self: *@This(), _: struct {}) void {
         php.print("{s} = {s} ({})\n", .{
             self.superhero_name,
             self.real_name,
@@ -693,7 +695,7 @@ pub const @"export marvel\\Avenger" = php.Class.Custom(struct {
     real_name: []const u8 = "",
     superhero_name: []const u8 = "",
     power: Power = .training,
-});
+};
 ```
 ```
 <?php
@@ -712,8 +714,7 @@ Tony Stark = Ironman (.tech)
 Tony Stark = Ironman (.mutant)
 ```
 
-The code above defines the custom struct in an inline statement. Typically you would have the
-definition in a separate file.
+Typically you would have the definition of the custom struct in a separate file.
 
 When the struct doesn't implement `init()` or `initSelf()`, the class's constructor would 
 initialize its fields using its setters, with the arguments in the same order as the setters. In 
@@ -798,6 +799,110 @@ echo Power::mutant, "\n";
 ```
 
 Sub-classes can be exported in the same manner.
+
+## Accepting objects of custom classes as argument
+
+Use pointers to the custom struct in the argument struct to accept objects of the custom class:
+
+```zig
+pub fn @"call assemble"(_: *@This(), args: struct {
+    avengers: []*Avenger,
+}) void {
+    for (args.avengers) |avenger| avenger.@"call show"(.{});
+}
+```
+```php
+<?php
+
+assemble([ 
+    new Avenger("Ironman", "Tony Stark", "tech"),
+    new Avenger("Thor", "Thor Odinson", "alien"),
+    new Avenger("Hulk", "Bruce Banner", "mutant"),
+    new Avenger("Peter Parker", "Wolverine", "mutant"),
+]);
+
+?>
+```
+```
+Tony Stark = Ironman (.tech)
+Thor Odinson = Thor (.alien)
+Bruce Banner = Hulk (.mutant)
+Wolverine = Peter Parker (.mutant)
+```
+
+## Returning objects of custom classes
+
+The custom struct is stored within a PHP object. You can obtain a pointer to the container object 
+using `Object.fromCustom()`:
+
+```zig
+pub fn @"call same"(_: *@This(), args: struct {
+    avenger: *Avenger,
+}) *php.Object {
+    const object = php.Object.fromCustom(args.avenger);
+    return object.retain();
+}
+```
+```php
+$ironman = new Avenger("Ironman", "Tony Stark", "tech");
+debug_zval_dump(same($ironman));
+debug_zval_dump(same($ironman));
+```
+```
+object(marvel\Avenger)#5 (3) refcount(2){
+  ["real_name"]=>
+  string(7) "Ironman" refcount(1)
+  ["superhero_name"]=>
+  string(10) "Tony Stark" refcount(1)
+  ["power"]=>
+  string(4) "tech" interned
+}
+object(marvel\Avenger)#5 (3) refcount(2){
+  ["real_name"]=>
+  string(7) "Ironman" refcount(1)
+  ["superhero_name"]=>
+  string(10) "Tony Stark" refcount(1)
+  ["power"]=>
+  string(4) "tech" interned
+}
+```
+
+The function uses [@fieldParentPtr()](https://ziglang.org/documentation/0.17.0/#fieldParentPtr) to
+obtain a pointer to the container.
+
+`Object.retain()` bumps the refcount up by one and returns the object. We have to call it here 
+since we're creating a new reference to the object by returning it.
+
+Use `Object.createCustom()` to create new instances of the custom class:
+
+```zig
+pub fn @"call make_worthy"(_: *@This(), args: struct {
+    real_name: []const u8,
+}) !*php.Object {
+    const avenger: Avenger = .{
+        .superhero_name = try php.allocator.dupe(u8, "Thor"),
+        .real_name = try php.allocator.dupe(u8, args.real_name),
+        .power = .alien,
+    };
+    return .createCustom(Avenger, avenger);
+}
+```
+```php
+<?php
+
+$joe = make_worthy("Random Joe");
+print_r($joe);
+
+?>
+```
+```
+marvel\Avenger Object
+(
+    [real_name] => Random Joe
+    [superhero_name] => Thor
+    [power] => alien
+)
+```
 
 ## Passing arguments by reference
 

@@ -4,7 +4,9 @@ const php = @import("php/root.zig");
 const getter = php.Object.getter;
 const setter = php.Object.setter;
 
-pub const @"export marvel\\Avenger" = php.Class.Custom(struct {
+pub const @"export marvel\\Avenger" = php.Class.Custom(Avenger);
+
+const Avenger = struct {
     pub const @"export Power" = Power;
 
     pub const @"get real_name" = getter(@This(), .real_name);
@@ -24,7 +26,7 @@ pub const @"export marvel\\Avenger" = php.Class.Custom(struct {
         } else return error.InvalidPower;
     }
 
-    pub fn @"call show"(self: *@This(), _: struct {}) !void {
+    pub fn @"call show"(self: *@This(), _: struct {}) void {
         php.print("{s} = {s} ({})\n", .{
             self.superhero_name,
             self.real_name,
@@ -37,4 +39,28 @@ pub const @"export marvel\\Avenger" = php.Class.Custom(struct {
     real_name: []const u8 = "",
     superhero_name: []const u8 = "",
     power: Power = .training,
-});
+};
+
+pub fn @"call assemble"(_: *@This(), args: struct {
+    avengers: []*Avenger,
+}) void {
+    for (args.avengers) |avenger| avenger.@"call show"(.{});
+}
+
+pub fn @"call same"(_: *@This(), args: struct {
+    avenger: *Avenger,
+}) *php.Object {
+    const object = php.Object.fromCustom(args.avenger);
+    return object.retain();
+}
+
+pub fn @"call make_worthy"(_: *@This(), args: struct {
+    real_name: []const u8,
+}) !*php.Object {
+    const avenger: Avenger = .{
+        .superhero_name = try php.allocator.dupe(u8, "Thor"),
+        .real_name = try php.allocator.dupe(u8, args.real_name),
+        .power = .alien,
+    };
+    return .createCustom(Avenger, avenger);
+}

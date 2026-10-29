@@ -20,4 +20,18 @@ echo Avenger::Power, "\n";
 echo Avenger::Power::mutant, "\n";
 echo Power::mutant, "\n";
 
+assemble([ 
+    new Avenger("Ironman", "Tony Stark", "tech"),
+    new Avenger("Thor", "Thor Odinson", "alien"),
+    new Avenger("Hulk", "Bruce Banner", "mutant"),
+    new Avenger("Peter Parker", "Wolverine", "mutant"),
+]);
+
+$ironman = new Avenger("Ironman", "Tony Stark", "tech");
+debug_zval_dump(same($ironman));
+debug_zval_dump(same($ironman));
+
+$joe = make_worthy("Random Joe");
+print_r($joe);
+
 ?>
