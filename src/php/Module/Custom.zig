@@ -156,7 +156,10 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
 
         fn tryInfoRequest(module: *Module) !void {
             Allocator.mode = .per_request;
-            if (!@hasDecl(T, "infoRequest")) return;
+            if (!@hasDecl(T, "infoRequest")) {
+                module.displayIniEntries();
+                return;
+            }
             const self = Singleton(T).get();
             return T.infoRequest(self, module);
         }
