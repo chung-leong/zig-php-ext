@@ -744,8 +744,8 @@ marvel\Avenger Object
 )
 ```
 
-When the struct lacks a `iterate()` method, the default iteration method is used, which returns
-results from the getter functions:
+When the struct lacks an `iterate()` method, the default iteration method is used, which returns
+results from every getter function:
 
 ```php
 <?php
