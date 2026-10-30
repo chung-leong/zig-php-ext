@@ -251,7 +251,6 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
                 .free_pointer = true,
                 .get_string_from_slice = php.util.hasU8Slice(RT) and !php.util.hasCustomObject(RT),
             };
-            std.debug.print("{}\n", .{conv_opts});
             const allocator = conv_opts.getDisposalAllocator().?;
             const result = switch (returning_error) {
                 true => func(arg0, allocator) catch |err| return failure.throw(err),

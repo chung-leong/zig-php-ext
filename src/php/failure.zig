@@ -4,7 +4,7 @@ const php = @import("root.zig");
 const php_al = php.allocator;
 const c = php.c;
 const pi = php.imports;
-const decamelize = php.util.decamelize;
+const decamelizeAlloc = php.util.decamelizeAlloc;
 const WithoutError = php.util.WithoutError;
 
 pub fn report(comptime fmt: []const u8, params: anytype) error{FailureReported} {
@@ -13,7 +13,7 @@ pub fn report(comptime fmt: []const u8, params: anytype) error{FailureReported} 
     return error.FailureReported;
 }
 
-const oom_msg = "out of memory";
+const oom_msg: []const u8 = "out of memory";
 threadlocal var error_message: ?[]const u8 = null;
 
 pub fn hasMessage() bool {
@@ -32,22 +32,15 @@ pub fn acquireMessage(err: anytype) []const u8 {
         error_message = null;
         return msg;
     }
-    const text = errorMessage(err);
-    return php_al.dupe(u8, text) catch oom_msg;
+    return getErrorMessage(err);
+}
+
+pub fn getErrorMessage(err: anytype) []const u8 {
+    return decamelizeAlloc(php_al, @errorName(err)) catch oom_msg;
 }
 
 pub fn freeMessage(msg: []const u8) void {
     if (msg.ptr != oom_msg.ptr) php_al.free(msg);
-}
-
-pub fn errorMessage(err: anytype) [:0]const u8 {
-    @setEvalBranchQuota(2000000);
-    return switch (err) {
-        inline else => |possible_error| comptime init: {
-            const name = decamelize(@errorName(possible_error));
-            break :init withSentinel(name);
-        },
-    };
 }
 
 pub fn withSentinel(str: []const u8) [:0]const u8 {

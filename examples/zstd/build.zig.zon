@@ -1,0 +1,13 @@
+.{
+    .name = .zstd,
+    .version = "0.0.1",
+    .dependencies = .{
+        .zstd = .{
+            .url = "https://github.com/muhammad-fiaz/zstd.zig/archive/refs/tags/0.0.5.tar.gz",
+            .hash = "zstd-0.0.5-biH4jJKuEQCetrZbOjd3uTyQdcMT8BGkkV1HF0jgujkH",
+        },
+    },
+    .minimum_zig_version = "0.17.0",
+    .paths = .{""},
+    .fingerprint = 0x72fd505e845559ac,
+}

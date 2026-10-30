@@ -128,7 +128,6 @@ pub fn extract(self: *@This(), allocator: std.mem.Allocator, comptime T: type) !
     try self.verifyCount(min, max);
     var set: T = undefined;
     var mismatch: Mismatch = .{};
-    defer mismatch.deinit();
     var required_remaining = min;
     inline for (st.field_names, 0..) |arg_name, i| {
         if (comptime Function.isExtraArg(arg_name)) |variadic_type| {
@@ -145,7 +144,7 @@ pub fn extract(self: *@This(), allocator: std.mem.Allocator, comptime T: type) !
                 const arg = self.next().?;
                 const value = arg.extract(allocator, FT) catch |err| report: {
                     // remember the first mismatch
-                    mismatch.record(self.callee.name(), arg_name, i, FT, arg, err);
+                    mismatch.record(self.callee.name(), arg_name, i, arg, err);
                     self.index -= 1;
                     // break out of for loop if argument is required
                     if (!optional) break;
@@ -176,7 +175,6 @@ pub fn extractNamed(self: *@This(), allocator: std.mem.Allocator, comptime T: ty
     if (!valid) @compileError("Struct type expected, received: " ++ @typeName(T));
     var set: T = undefined;
     var mismatch: Mismatch = null;
-    defer mismatch.deinit();
     inline for (@typeInfo(T).@"struct".field_names, 0..) |arg_name, i| {
         const FT = @TypeOf(@field(set, arg_name));
         const VT, const optional = switch (@typeInfo(FT)) {
@@ -192,7 +190,7 @@ pub fn extractNamed(self: *@This(), allocator: std.mem.Allocator, comptime T: ty
         };
         if (arg_maybe) |arg| {
             const value = arg.extract(allocator, VT) catch |err| {
-                mismatch.record(self.callee.name(), arg_name, null, FT, arg, err);
+                mismatch.record(self.callee.name(), arg_name, null, arg, err);
                 break;
             };
             @field(set, arg_name) = value;
@@ -200,7 +198,7 @@ pub fn extractNamed(self: *@This(), allocator: std.mem.Allocator, comptime T: ty
             if (optional) {
                 @field(set, arg_name) = fieldDefaultValue(T, i);
             } else {
-                mismatch.record(self.callee.name(), arg_name, null, FT, null, error.Missing);
+                mismatch.record(self.callee.name(), arg_name, null, null, error.Missing);
                 break;
             }
         }
@@ -253,132 +251,40 @@ fn fieldDefaultValue(comptime T: type, comptime index: usize) @typeInfo(T).@"str
     return default_value_ptr.*;
 }
 
-fn getTypeName(allocator: std.mem.Allocator, comptime T: type) []const u8 {
-    @setEvalBranchQuota(2_000_000);
-    return switch (@typeInfo(T)) {
-        .bool => "boolean",
-        .int => "int",
-        .float => "float",
-        .array, .vector => "array",
-        .pointer => |pt| switch (pt.size) {
-            .one => switch (pt.child) {
-                String => "string",
-                Array => "array",
-                Object => "object",
-                Resource => "resource",
-                Value => "reference",
-                else => switch (@typeInfo(pt.child)) {
-                    .@"struct" => get: {
-                        const custom_class = Class.Custom(pt.child).get();
-                        const name = custom_class.name().slice();
-                        break :get if (std.mem.lastIndexOfScalar(u8, name, '\\')) |slash_index|
-                            name[slash_index + 1 ..]
-                        else
-                            name;
-                    },
-                    else => unsupported(T),
-                },
-            },
-            .slice => switch (pt.child) {
-                u8 => "string|array",
-                else => "array",
-            },
-            else => unsupported(T),
-        },
-        .optional => |opt| std.fmt.allocPrint(allocator, "?{s}", .{
-            getTypeName(allocator, opt.child),
-        }) catch unreachable,
-        .@"struct" => |st| switch (T) {
-            Callable => "callable",
-            else => switch (st.backing_integer != null) {
-                true => "number|array|object",
-                false => "array|object",
-            },
-        },
-        .@"union" => |un| switch (T) {
-            Dictionary => "array|object",
-            else => format: {
-                const len = un.field_types.len;
-                var names: [len][]const u8 = undefined;
-                inline for (un.field_types, 0..) |FT, i| {
-                    const name = getTypeName(allocator, FT);
-                    names[i] = name;
-                }
-                break :format std.mem.join(allocator, "|", &names) catch unreachable;
-            },
-        },
-        .@"enum" => "number|string",
-        else => unsupported(T),
-    };
-}
-
 const Mismatch = struct {
-    arena: std.heap.ArenaAllocator = undefined,
     recorded: bool = false,
     fn_name: ?*String = undefined,
     arg_name: []const u8 = undefined,
-    value_type: []const u8 = undefined,
     index: ?usize = null,
     value: Value = undefined,
     err: anyerror = undefined,
 
-    pub fn deinit(self: *@This()) void {
-        if (self.recorded) {
-            self.arena.deinit();
-        }
-    }
-
-    pub fn record(self: *@This(), fn_name: *String, arg_name: []const u8, index: ?usize, comptime VT: type, value: ?Value, err: anyerror) void {
-        if (!self.recorded) {
-            self.arena = .init(php_al);
-            self.recorded = true;
-        }
+    pub fn record(self: *@This(), fn_name: *String, arg_name: []const u8, index: ?usize, value: ?Value, err: anyerror) void {
+        self.recorded = true;
         self.fn_name = fn_name;
         self.arg_name = arg_name;
         self.index = index;
         self.value = value orelse .fromNull();
-        self.value_type = getTypeName(self.arena.allocator(), VT);
         self.err = err;
     }
 
     pub fn report(self: *@This()) error{FailureReported} {
-        defer self.arena.deinit();
         const fn_name = if (self.fn_name) |n| n.slice() else "(unknown)";
+        const error_message = failure.getErrorMessage(self.err);
+        defer failure.freeMessage(error_message);
         if (self.index) |index| {
-            return switch (self.err) {
-                error.NegativeValue => failure.report("{s}(): Argument #{d} ${s} must be a positive integer, received {d}", .{
-                    fn_name,
-                    index + 1,
-                    self.arg_name,
-                    self.value.getInteger() catch unreachable,
-                }),
-                else => failure.report("{s}(): Argument #{d} (${s}) must be of type {s}, {s} given", .{
-                    fn_name,
-                    index + 1,
-                    self.arg_name,
-                    self.value_type,
-                    self.value.kind().name(),
-                }),
-            };
+            return failure.report("{s}(): Argument #{d} ${s} is incorrect: {s}", .{
+                fn_name,
+                index + 1,
+                self.arg_name,
+                error_message,
+            });
         } else {
-            return switch (self.err) {
-                error.NegativeValue => failure.report("{s}(): Named argument ${s} must be a positive integer, received {d}", .{
-                    fn_name,
-                    self.arg_name,
-                    self.value.getInteger() catch unreachable,
-                }),
-                error.Missing => failure.report("{s}(): Named argument ${s} is required and expected to be of type {s}", .{
-                    fn_name,
-                    self.arg_name,
-                    self.value_type,
-                }),
-                else => failure.report("{s}(): Named argument ${s} must be of type {s}, {s} given", .{
-                    fn_name,
-                    self.arg_name,
-                    self.value_type,
-                    self.value.kind().name(),
-                }),
-            };
+            return failure.report("{s}(): Named argument ${s} is incorrect: {s}", .{
+                fn_name,
+                self.arg_name,
+                error_message,
+            });
         }
     }
 };

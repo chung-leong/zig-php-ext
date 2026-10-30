@@ -13,7 +13,7 @@ pub fn castObject(self: *@This(), kind: Value.Kind) !Value {
         .boolean => .fromBoolean(self.float != 0),
         .integer => .fromInteger(@trunc(self.float)),
         .float => .fromFloat(self.float),
-        .string => .fromString(.allocPrint("{d}", .{self.float})),
+        .string => .fromString(.print("{d}", .{self.float})),
         else => error.InvalidOperation,
     };
 }

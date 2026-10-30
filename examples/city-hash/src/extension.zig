@@ -8,16 +8,16 @@ const Options = struct {
     uppercase: bool = false,
 };
 
-pub fn @"call city_hash"(_: *@This(), args: struct {
+pub fn @"call city_hash"(_: *@This(), allocator: std.mem.Allocator, args: struct {
     data: []const u8,
     options: Options = .{},
-}) *php.String {
+}) ![]const u8 {
     const hash = if (args.options.seed) |seed|
         CityHash64.hashWithSeed(args.data, seed)
     else
         CityHash64.hash(args.data);
     return switch (args.options.uppercase) {
-        true => .allocPrint("{X}", .{hash}),
-        false => .allocPrint("{x}", .{hash}),
+        true => try allocator.print("{X}", .{hash}),
+        false => try allocator.print("{x}", .{hash}),
     };
 }

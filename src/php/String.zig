@@ -97,7 +97,7 @@ pub fn createFromAny(arg: anytype) *@This() {
     };
 }
 
-pub fn allocPrint(comptime fmt: []const u8, args: anytype) *@This() {
+pub fn print(comptime fmt: []const u8, args: anytype) *@This() {
     const offset = @offsetOf(c.zend_string, "val");
     const offset_bytes = comptime init: {
         var bytes: [offset]u8 = undefined;
@@ -200,6 +200,12 @@ pub fn parseFloat(self: *const @This()) f64 {
 pub fn fromOwnSlice(s: []const u8) *@This() {
     const field_ptr: *@FieldType(c.zend_string, "val") = @ptrCast(@constCast(s.ptr));
     const zstr: *c.zend_string = @alignCast(@fieldParentPtr("val", field_ptr));
+    if (zstr.len != s.len) {
+        // more memory was allocated than used by the slice
+        zstr.len = s.len;
+        const ptr: [*]u8 = @ptrCast(&zstr.val);
+        ptr[s.len] = 0;
+    }
     return @ptrCast(zstr);
 }
 
