@@ -565,11 +565,22 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
                 },
             },
             .slice => convert: {
-                defer if (options.getDisposalAllocator()) |al| al.free(arg);
-                break :convert switch (pt.child) {
-                    u8 => .fromString(.create(arg)),
-                    else => .fromArray(.createFromAny(arg)),
+                defer if (pt.child != u8 or !options.get_string_from_slice) {
+                    if (options.getDisposalAllocator()) |al| al.free(arg);
                 };
+                switch (pt.child) {
+                    u8 => {
+                        const str: *String = switch (options.get_string_from_slice) {
+                            true => .fromOwnSlice(arg),
+                            false => .create(arg),
+                        };
+                        break :convert .fromString(str);
+                    },
+                    else => {
+                        defer if (options.getDisposalAllocator()) |al| al.free(arg);
+                        break :convert .fromArray(.createFromAny(arg));
+                    },
+                }
             },
             else => unsupported(T),
         },

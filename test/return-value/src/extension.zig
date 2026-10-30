@@ -24,7 +24,7 @@ pub fn @"call returnString"(_: *@This(), args: struct {
 pub fn @"call returnNewString"(_: *@This(), allocator: std.mem.Allocator, args: struct {
     name: []const u8 = "Alice",
 }) ![]const u8 {
-    return try std.fmt.allocPrint(allocator, "Hello, {s}\n", .{args.name});
+    return try allocator.print("Hello, {s}\n", .{args.name});
 }
 
 pub fn @"call returnEnum"(_: *@This()) enum { cat, dog, turkey } {
