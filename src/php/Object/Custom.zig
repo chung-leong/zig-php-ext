@@ -672,7 +672,7 @@ pub fn @"fn"(comptime T: type) type {
         fn callGetter(self: *@This(), comptime getter_name: []const u8) !Value {
             const get = @field(getters, getter_name);
             const payload = get(self.custom());
-            return Value.fromAny(payload);
+            return Value.fromAny(payload, .{});
         }
 
         fn callSetter(self: *@This(), comptime setter_name: []const u8, value: Value) !void {

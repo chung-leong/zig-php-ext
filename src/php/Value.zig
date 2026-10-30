@@ -508,7 +508,7 @@ pub fn fromEnum(arg: anytype) @This() {
     return fromInteger(int);
 }
 
-pub fn fromStruct(arg: anytype) @This() {
+pub fn fromStruct(arg: anytype, options: ConversionOptions) @This() {
     const T = @TypeOf(arg);
     if (@typeInfo(T) != .@"struct") @compileError("Struct expected, received: " ++ @typeName(T));
     const st = @typeInfo(T).@"struct";
@@ -517,12 +517,12 @@ pub fn fromStruct(arg: anytype) @This() {
         const long: c.zend_long = @intCast(int);
         return .fromInteger(long);
     } else {
-        const obj: *Object = .createFromStruct(arg);
+        const obj: *Object = .createFromStruct(arg, options);
         return .fromObject(obj);
     }
 }
 
-pub fn fromAny(arg: anytype) switch (@typeInfo(@TypeOf(arg))) {
+pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@TypeOf(arg))) {
     .error_union => |eu| eu.error_set!@This(),
     else => @This(),
 } {
@@ -538,9 +538,9 @@ pub fn fromAny(arg: anytype) switch (@typeInfo(@TypeOf(arg))) {
         .comptime_int => .fromInteger(arg),
         .float, .comptime_float => .fromFloat(arg),
         .@"enum" => .fromEnum(arg),
-        .error_union => if (arg) |payload| .fromAny(payload) else |err| err,
-        .array, .vector => .fromArray(.createFromAny(arg)),
-        .optional => if (arg) |p| fromAny(p) else .fromNull(),
+        .error_union => if (arg) |payload| .fromAny(payload, options) else |err| err,
+        .array, .vector => .fromArray(.createFromAny(arg, options)),
+        .optional => if (arg) |p| fromAny(p, .{}) else .fromNull(),
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
                 String => .fromString(arg),
@@ -568,11 +568,11 @@ pub fn fromAny(arg: anytype) switch (@typeInfo(@TypeOf(arg))) {
         },
         .@"struct" => switch (T) {
             Callable => arg.value,
-            else => .fromStruct(arg),
+            else => .fromStruct(arg, options),
         },
         .@"union" => |un| if (un.tag_type) |Tag|
             inline for (un.field_names) |name| {
-                if (arg == @field(Tag, name)) break .fromAny(@field(arg, name));
+                if (arg == @field(Tag, name)) break .fromAny(@field(arg, name), options);
             } else unsupported(T)
         else
             unsupported(T),
@@ -629,6 +629,10 @@ pub const State = enum(c_int) {
     not_null,
     not_false,
     present,
+};
+pub const ConversionOptions = packed struct {
+    free_pointer: bool = false,
+    get_string_from_slice: bool = false,
 };
 
 fn floatToInteger(value: f64) !c.zend_long {

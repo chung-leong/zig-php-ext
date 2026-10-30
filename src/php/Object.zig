@@ -63,7 +63,7 @@ pub fn createFromName(name: anytype, params: []const Value) !*@This() {
     return .create(ce, params);
 }
 
-pub fn createFromStruct(arg: anytype) *@This() {
+pub fn createFromStruct(arg: anytype, options: Value.ConversionOptions) *@This() {
     const T = @TypeOf(arg);
     if (@typeInfo(T) != .@"struct") @compileError("Struct expected, received: " ++ @typeName(T));
     const st = @typeInfo(T).@"struct";
@@ -71,7 +71,7 @@ pub fn createFromStruct(arg: anytype) *@This() {
     const arr: *Array = .create();
     inline for (st.field_names) |field_name| {
         const field_value = @field(arg, field_name);
-        const value: Value = .fromAny(field_value);
+        const value: Value = .fromAny(field_value, options);
         defer value.release();
         arr.set(String.static(field_name), value);
     }

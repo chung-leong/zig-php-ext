@@ -57,7 +57,7 @@ pub fn createNonDestructive() *@This() {
     return @ptrCast(arr);
 }
 
-pub fn createFromAny(list: anytype) *@This() {
+pub fn createFromAny(list: anytype, options: Value.ConversionOptions) *@This() {
     const T = @TypeOf(list);
     const supported = switch (@typeInfo(T)) {
         .array, .vector => true,
@@ -69,13 +69,13 @@ pub fn createFromAny(list: anytype) *@This() {
         .vector => |ve| {
             // vectors require an unrolled loop
             const arr = createWithLength(ve.len);
-            inline for (0..ve.len) |i| arr.append(.fromAny(list[i]));
+            inline for (0..ve.len) |i| arr.append(.fromAny(list[i], options));
             return arr;
         },
         else => {
             const arr = createWithLength(list.len);
             for (list) |item| {
-                const value: Value = .fromAny(item);
+                const value: Value = .fromAny(item, options);
                 defer value.release();
                 arr.append(value);
             }

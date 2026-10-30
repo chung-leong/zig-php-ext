@@ -70,7 +70,7 @@ pub fn getProperties(self: *@This(), purpose: Object.PropertiesPurpose) !?*Array
                 break;
             }
         }
-        items_arr.append(.fromAny(element));
+        items_arr.append(.fromAny(element, .{}));
     }
     arr.set("[ITEMS]", .fromArray(items_arr));
     return arr;

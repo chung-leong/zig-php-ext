@@ -101,7 +101,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                         break;
                     }
                 }
-                items_arr.append(.fromAny(element));
+                items_arr.append(.fromAny(element, .{}));
             }
             arr.set("[ITEMS]", .fromArray(items_arr));
             // don't show items of ArrayBuffer
@@ -113,7 +113,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             const elements = try self.getElements();
             const index = try key.getUnsigned();
             if (index >= elements.len) return error.OutOfBound;
-            return .fromAny(elements[index]);
+            return .fromAny(elements[index], .{});
         }
 
         pub fn writeDimension(self: *@This(), key: Value, value: Value) !void {

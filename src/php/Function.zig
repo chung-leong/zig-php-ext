@@ -81,10 +81,12 @@ pub fn handlerType(comptime F: type, comptime self_src: SelfSource) HandlerType 
         .error_union => |eu| eu.payload,
         else => RT,
     };
+    if (AT.len == 1 and @typeInfo(AT[0].?) == .@"struct") return .regular;
     if (AT.len == 2 and AT[0] == *Arguments and AT[1] == *Value and PT == void) return .raw;
-    if (AT.len == 1 and @typeInfo(AT[0].?) == .@"struct") return .handler;
-    if (AT.len == 2 and self_src.match(AT[0].?)) {
-        if (@typeInfo(AT[1].?) == .@"struct") return .method;
+    if (AT.len > 1 and self_src.match(AT[0].?)) {
+        if (AT.len == 1) return .method0;
+        if (AT.len == 2 and @typeInfo(AT[1].?) == .@"struct") return .method1;
+        if (AT.len == 3 and AT[1].? == std.mem.Allocator and @typeInfo(AT[2].?) == .@"struct") return .method2;
         @compileError("Improper method handler: " ++ @typeName(F));
     }
     @compileError("Improper function handler: " ++ @typeName(F));
@@ -104,10 +106,15 @@ pub fn handlerInfo(comptime func: anytype, comptime self_src: SelfSource) Handle
     const handler_type = handlerType(F, self_src);
     const arg_names, const arg_types, const arg_attrs, const is_raw = switch (handler_type) {
         .raw => .{ &.{}, &.{}, &.{}, true },
-        .handler, .method => init: {
+        else => init: {
             const f = @typeInfo(F).@"fn";
             const AT = f.param_types;
-            const offset = if (handler_type == .method) 1 else 0;
+            const offset = switch (handler_type) {
+                .regular => 0,
+                .method0, .method1 => 1,
+                .method2 => 2,
+                .raw => unreachable,
+            };
             const Struct = AT[offset].?;
             const st = @typeInfo(Struct).@"struct";
             break :init .{ st.field_names, st.field_types, st.field_attrs, false };
@@ -180,7 +187,16 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
     const returning_error = @typeInfo(f.return_type.?) == .error_union;
     const cc: std.lang.CallingConvention = @typeInfo(Handler).@"fn".attrs.@"callconv";
     const ns = struct {
-        pub fn handler(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
+        pub fn raw(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
+            const args: *Arguments = @ptrCast(zed);
+            const retval: *Value = @ptrCast(zretval);
+            switch (returning_error) {
+                true => func(args, retval) catch |err| return failure.throw(err),
+                false => func(args, retval),
+            }
+        }
+
+        pub fn regular(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
             const args: *Arguments = @ptrCast(zed);
             const retval: *Value = @ptrCast(zretval);
             var iter = args.iterate();
@@ -191,31 +207,31 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
                     true => func(arg0) catch |err| return failure.throw(err),
                     false => func(arg0),
                 };
-                retval.* = .fromAny(result);
+                retval.* = .fromAny(result, .{});
             } else |err| failure.throw(err);
         }
 
-        pub fn method(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
+        pub fn method0(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
+            const php_args: *Arguments = @ptrCast(zed);
+            const retval: *Value = @ptrCast(zretval);
+            const iter = php_args.iterate();
+            // the self variable is either a singleton or held in PHP's $this variable
+            const arg0 = getSelf(iter.this);
+            var arena: std.heap.ArenaAllocator = .init(php_al);
+            defer arena.deinit();
+            const result = switch (returning_error) {
+                true => func(arg0) catch |err| return failure.throw(err),
+                false => func(arg0),
+            };
+            retval.* = .fromAny(result, .{});
+        }
+
+        pub fn method1(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
             const php_args: *Arguments = @ptrCast(zed);
             const retval: *Value = @ptrCast(zretval);
             var iter = php_args.iterate();
             // the self variable is either a singleton or held in PHP's $this variable
-            const arg0 = switch (self_src) {
-                .singleton => |T| Singleton(T).get(),
-                .this_object => |T| get: {
-                    const obj = iter.this.getObject() catch |err| return failure.throw(err);
-                    break :get switch (T) {
-                        Object => obj, // self is a standard object
-                        else => obj.custom(T), // self is a custom object
-                    };
-                },
-                .this_pointer => |T| get: {
-                    // self is some data structure that we reference by a pointer
-                    const ptr = iter.this.getPointer() catch |err| return failure.throw(err);
-                    break :get @as(*T, @ptrCast(@alignCast(ptr)));
-                },
-                .none => unreachable,
-            };
+            const arg0 = getSelf(iter.this) catch |err| return failure.throw(err);
             var arena: std.heap.ArenaAllocator = .init(php_al);
             defer arena.deinit();
             if (iter.extract(arena.allocator(), AT[1].?)) |arg1| {
@@ -223,17 +239,46 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
                     true => func(arg0, arg1) catch |err| return failure.throw(err),
                     false => func(arg0, arg1),
                 };
-                retval.* = .fromAny(result);
+                retval.* = .fromAny(result, .{});
             } else |err| failure.throw(err);
         }
 
-        pub fn raw(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
-            const args: *Arguments = @ptrCast(zed);
+        pub fn method2(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
+            const php_args: *Arguments = @ptrCast(zed);
             const retval: *Value = @ptrCast(zretval);
-            switch (returning_error) {
-                true => func(args, retval) catch |err| return failure.throw(err),
-                false => func(args, retval),
-            }
+            var iter = php_args.iterate();
+            // the self variable is either a singleton or held in PHP's $this variable
+            const arg0 = getSelf(iter.this) catch |err| return failure.throw(err);
+            var arena: std.heap.ArenaAllocator = .init(php_al);
+            defer arena.deinit();
+            if (iter.extract(arena.allocator(), AT[2].?)) |arg2| {
+                const result = switch (returning_error) {
+                    true => func(arg0, php_al, arg2) catch |err| return failure.throw(err),
+                    false => func(arg0, php_al, arg2),
+                };
+                retval.* = .fromAny(result, .{ .free_pointer = true });
+            } else |err| failure.throw(err);
+        }
+
+        fn getSelf(this: Value) !*switch (self_src) {
+            inline else => |T| T,
+        } {
+            return switch (self_src) {
+                .singleton => |T| Singleton(T).get(),
+                .this_object => |T| get: {
+                    const obj = try this.getObject();
+                    break :get switch (T) {
+                        Object => obj, // self is a standard object
+                        else => obj.custom(T), // self is a custom object
+                    };
+                },
+                .this_pointer => |T| get: {
+                    // self is some data structure that we reference by a pointer
+                    const ptr = try this.getPointer();
+                    break :get @as(*T, @ptrCast(@alignCast(ptr)));
+                },
+                .none => unreachable,
+            };
         }
     };
     return @field(ns, @tagName(handler_type));
@@ -280,7 +325,13 @@ pub const ArgumentInfo = struct {
     required: bool,
     by_ref: bool,
 };
-pub const HandlerType = enum { handler, raw, method };
+pub const HandlerType = enum {
+    regular,
+    raw,
+    method0,
+    method1,
+    method2,
+};
 pub const SelfSource = union(enum) {
     this_object: type,
     this_pointer: type,

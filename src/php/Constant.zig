@@ -24,7 +24,7 @@ pub fn find(n: *String) ?*@This() {
 pub fn create(const_name: []const u8, arg: anytype) *@This() {
     const self = php_al.create(@This()) catch unreachable;
     const name_str: *String = .create(const_name);
-    var v: Value = .fromAny(arg);
+    var v: Value = .fromAny(arg, .{});
     v.impl.u2.constant_flags = c.CONST_PERSISTENT;
     self.* = .{
         .impl = .{

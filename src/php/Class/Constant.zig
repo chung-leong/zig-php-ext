@@ -15,7 +15,7 @@ pub fn value(self: *const @This()) Value {
 
 pub fn create(cls: *Class, arg: anytype) *@This() {
     const self = php_al.create(@This()) catch unreachable;
-    var v: Value = .fromAny(arg);
+    var v: Value = .fromAny(arg, .{});
     v.impl.u2.constant_flags = c.CONST_PERSISTENT;
     self.* = .{
         .impl = .{
