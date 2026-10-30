@@ -2,7 +2,7 @@ const std = @import("std");
 
 const php = @import("php/root.zig");
 
-pub fn @"call print"(self: *@This(), _: struct {}) !void {
+pub fn @"call print"(self: *@This()) !void {
     for (self.list) |animal| {
         php.print("{s} ({})\n", .{ animal.name, animal.type });
     }

@@ -32,14 +32,14 @@ pub fn @"call assemble"(_: *@This(), args: struct {
     }
 }
 
-pub fn @"call get"(_: *@This(), _: struct {}) !Avenger {
+pub fn @"call get"(_: *@This()) !Avenger {
     return .{
         .superhero_name = "Captain America",
         .real_name = "Steve Rogers",
     };
 }
 
-pub fn @"call get_two"(_: *@This(), _: struct {}) ![2]Avenger {
+pub fn @"call get_two"(_: *@This()) ![2]Avenger {
     return .{
         .{
             .superhero_name = "Captain America",

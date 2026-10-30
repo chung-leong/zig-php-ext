@@ -549,20 +549,27 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
                 Resource => .fromResource(arg),
                 Stream => .fromStream(arg),
                 Reference => .fromReference(arg),
-                else => switch (@typeInfo(pt.child)) {
-                    .array => |ar| switch (ar.child == u8) {
-                        true => switch (@inComptime()) {
-                            true => .fromString(.static(arg)),
-                            false => .fromString(.create(arg)),
+                else => convert: {
+                    defer if (options.getDisposalAllocator()) |al| al.destroy(arg);
+                    break :convert switch (@typeInfo(pt.child)) {
+                        .array => |ar| switch (ar.child == u8) {
+                            true => switch (@inComptime()) {
+                                true => .fromString(.static(arg)),
+                                false => .fromString(.create(arg)),
+                            },
+                            false => fromAny(arg.*),
                         },
-                        false => unsupported(T),
-                    },
-                    else => unsupported(T),
+                        .@"struct" => .fromObject(.createCustom(pt.child, arg.*)),
+                        else => unsupported(T),
+                    };
                 },
             },
-            .slice => switch (pt.child) {
-                u8 => .fromString(.create(arg)),
-                else => unsupported(T),
+            .slice => convert: {
+                defer if (options.getDisposalAllocator()) |al| al.free(arg);
+                break :convert switch (pt.child) {
+                    u8 => .fromString(.create(arg)),
+                    else => .fromArray(.createFromAny(arg)),
+                };
             },
             else => unsupported(T),
         },
@@ -633,6 +640,10 @@ pub const State = enum(c_int) {
 pub const ConversionOptions = packed struct {
     free_pointer: bool = false,
     get_string_from_slice: bool = false,
+
+    pub fn getDisposalAllocator(self: @This()) ?std.mem.Allocator {
+        return if (self.free_pointer) php_al else null;
+    }
 };
 
 fn floatToInteger(value: f64) !c.zend_long {

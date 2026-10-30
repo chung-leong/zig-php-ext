@@ -37,9 +37,8 @@ pub fn @"call print_point"(_: *@This(), args: struct {
     php.print("x = {d}, y = {d}\n", .{ args.point.x, args.point.y });
 }
 
-pub fn @"call get_point"(_: *@This(), _: struct {}) *Object {
-    return .createCustom(Point, .{
-        .x = 1234.5,
-        .y = 4567.8,
-    });
+pub fn @"call get_point"(_: *@This(), allocator: std.mem.Allocator) !*Point {
+    const point = try allocator.create(Point);
+    point.* = .{ .x = 1234.5, .y = 4567.8 };
+    return point;
 }

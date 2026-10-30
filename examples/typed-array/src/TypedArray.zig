@@ -228,7 +228,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             return if (result) |i| @intCast(i) else -1;
         }
 
-        pub fn @"call reverse"(self: *@This(), _: struct {}) !*Object {
+        pub fn @"call reverse"(self: *@This()) !*Object {
             const elements = try self.getElements();
             std.mem.reverse(T, elements);
             return Object.fromCustom(self).retain();
@@ -250,7 +250,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             @memcpy(dest[args.offset .. args.offset + src.len], src);
         }
 
-        pub fn @"call sort"(self: *@This(), _: struct {}) !*Object {
+        pub fn @"call sort"(self: *@This()) !*Object {
             const elements = try self.getElements();
             std.mem.sortUnstable(T, elements, {}, std.sort.asc(T));
             return Object.fromCustom(self).retain();

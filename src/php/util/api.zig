@@ -207,10 +207,21 @@ fn checkMethods(comptime T: type) void {
 
 fn checkMethod(comptime Self: type, comptime FT: type) !void {
     const fi = @typeInfo(FT).@"fn";
-    if (fi.param_types.len != 2) return error.IncorrectArgumentCount;
-    try checkSelf(Self, fi.param_types[0] orelse return);
-    if (@typeInfo(fi.param_types[1] orelse return) != .@"struct") {
-        return error.ArgumentIsNotAStruct;
+    switch (fi.param_types.len) {
+        1, 2, 3 => |count| {
+            const Arg0 = fi.param_types[0] orelse return;
+            try checkSelf(Self, Arg0);
+            if (count == 2) {
+                const Arg1 = fi.param_types[1] orelse return;
+                if (@typeInfo(Arg1) != .@"struct") return error.ArgumentIsNotStruct;
+            } else if (count == 3) {
+                const Arg1 = fi.param_types[1] orelse return;
+                const Arg2 = fi.param_types[1] orelse return;
+                if (Arg1 != std.mem.Allocator) return error.ArgumentIsNotAllocator;
+                if (@typeInfo(Arg2) != .@"struct") return error.ArgumentIsNotStruct;
+            }
+        },
+        else => return error.IncorrectArgumentCount,
     }
 }
 

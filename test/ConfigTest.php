@@ -8,7 +8,7 @@ final class ConfigTest extends ExtensionTestCase
     {
         $lines = $this->runTest("custom-config", "print.php");
         $this->assertSame(<<<OUTPUT
-        ext_name = custom-config
+        ext_name = custom_config
         ext_version = 0.1.0
         cfg_string = Hello world
         cfg_int = 1234

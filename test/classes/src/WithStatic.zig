@@ -7,7 +7,7 @@ const Static = struct {
     text: []const u8 = "Chicken",
 };
 
-pub fn @"static call print"(static: *Static, _: struct {}) !void {
+pub fn @"static call print"(static: *Static) !void {
     php.print("number = {d}\n", .{static.number});
     php.print("text = {s}\n", .{static.text});
 }

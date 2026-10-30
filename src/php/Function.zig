@@ -83,10 +83,11 @@ pub fn handlerType(comptime F: type, comptime self_src: SelfSource) HandlerType 
     };
     if (AT.len == 1 and @typeInfo(AT[0].?) == .@"struct") return .regular;
     if (AT.len == 2 and AT[0] == *Arguments and AT[1] == *Value and PT == void) return .raw;
-    if (AT.len > 1 and self_src.match(AT[0].?)) {
+    if (AT.len >= 1 and self_src.match(AT[0].?)) {
         if (AT.len == 1) return .method0;
+        if (AT.len == 2 and AT[1].? == std.mem.Allocator) return .method1a;
         if (AT.len == 2 and @typeInfo(AT[1].?) == .@"struct") return .method1;
-        if (AT.len == 3 and AT[1].? == std.mem.Allocator and @typeInfo(AT[2].?) == .@"struct") return .method2;
+        if (AT.len == 3 and AT[1].? == std.mem.Allocator and @typeInfo(AT[2].?) == .@"struct") return .method2a;
         @compileError("Improper method handler: " ++ @typeName(F));
     }
     @compileError("Improper function handler: " ++ @typeName(F));
@@ -105,15 +106,15 @@ pub fn handlerInfo(comptime func: anytype, comptime self_src: SelfSource) Handle
     const F = @TypeOf(func);
     const handler_type = handlerType(F, self_src);
     const arg_names, const arg_types, const arg_attrs, const is_raw = switch (handler_type) {
-        .raw => .{ &.{}, &.{}, &.{}, true },
+        .raw, .method0, .method1a => .{ &.{}, &.{}, &.{}, true },
         else => init: {
             const f = @typeInfo(F).@"fn";
             const AT = f.param_types;
             const offset = switch (handler_type) {
                 .regular => 0,
-                .method0, .method1 => 1,
-                .method2 => 2,
-                .raw => unreachable,
+                .method1 => 1,
+                .method2a => 2,
+                else => unreachable,
             };
             const Struct = AT[offset].?;
             const st = @typeInfo(Struct).@"struct";
@@ -215,10 +216,7 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
             const php_args: *Arguments = @ptrCast(zed);
             const retval: *Value = @ptrCast(zretval);
             const iter = php_args.iterate();
-            // the self variable is either a singleton or held in PHP's $this variable
-            const arg0 = getSelf(iter.this);
-            var arena: std.heap.ArenaAllocator = .init(php_al);
-            defer arena.deinit();
+            const arg0 = getSelf(iter.this) catch |err| return failure.throw(err);
             const result = switch (returning_error) {
                 true => func(arg0) catch |err| return failure.throw(err),
                 false => func(arg0),
@@ -230,7 +228,6 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
             const php_args: *Arguments = @ptrCast(zed);
             const retval: *Value = @ptrCast(zretval);
             var iter = php_args.iterate();
-            // the self variable is either a singleton or held in PHP's $this variable
             const arg0 = getSelf(iter.this) catch |err| return failure.throw(err);
             var arena: std.heap.ArenaAllocator = .init(php_al);
             defer arena.deinit();
@@ -243,11 +240,22 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
             } else |err| failure.throw(err);
         }
 
-        pub fn method2(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
+        pub fn method1a(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
+            const php_args: *Arguments = @ptrCast(zed);
+            const retval: *Value = @ptrCast(zretval);
+            const iter = php_args.iterate();
+            const arg0 = getSelf(iter.this) catch |err| return failure.throw(err);
+            const result = switch (returning_error) {
+                true => func(arg0, php_al) catch |err| return failure.throw(err),
+                false => func(arg0, php_al),
+            };
+            retval.* = .fromAny(result, .{ .free_pointer = true });
+        }
+
+        pub fn method2a(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
             const php_args: *Arguments = @ptrCast(zed);
             const retval: *Value = @ptrCast(zretval);
             var iter = php_args.iterate();
-            // the self variable is either a singleton or held in PHP's $this variable
             const arg0 = getSelf(iter.this) catch |err| return failure.throw(err);
             var arena: std.heap.ArenaAllocator = .init(php_al);
             defer arena.deinit();
@@ -263,6 +271,7 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
         fn getSelf(this: Value) !*switch (self_src) {
             inline else => |T| T,
         } {
+            // the self variable is either a singleton or held in PHP's $this variable
             return switch (self_src) {
                 .singleton => |T| Singleton(T).get(),
                 .this_object => |T| get: {
@@ -330,7 +339,8 @@ pub const HandlerType = enum {
     raw,
     method0,
     method1,
-    method2,
+    method1a,
+    method2a,
 };
 pub const SelfSource = union(enum) {
     this_object: type,

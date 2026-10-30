@@ -2,15 +2,15 @@ const php = @import("php/root.zig");
 const Function = php.Function;
 const String = php.String;
 
-pub fn @"call foo"(_: *@This(), _: struct {}) void {
+pub fn @"call foo"(_: *@This()) void {
     php.print("foo\n", .{});
 }
 
-pub fn @"call helloWorld"(_: *@This(), _: struct {}) void {
+pub fn @"call helloWorld"(_: *@This()) void {
     php.print("hello world\n", .{});
 }
 
-pub fn bar(_: *@This(), _: struct {}) void {
+pub fn bar(_: *@This()) void {
     php.print("bar\n", .{});
 }
 

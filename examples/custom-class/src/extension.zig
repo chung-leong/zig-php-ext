@@ -26,7 +26,7 @@ const Avenger = struct {
         } else return error.InvalidPower;
     }
 
-    pub fn @"call show"(self: *@This(), _: struct {}) void {
+    pub fn @"call show"(self: *@This()) void {
         php.print("{s} = {s} ({})\n", .{
             self.superhero_name,
             self.real_name,
