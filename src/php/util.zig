@@ -78,6 +78,42 @@ pub fn hasPointer(comptime T: anytype) bool {
     };
 }
 
+pub fn hasU8Slice(comptime T: anytype) bool {
+    return switch (@typeInfo(T)) {
+        .error_union => |eu| hasU8Slice(eu.payload),
+        .pointer => |pt| switch (pt.size) {
+            .slice => switch (pt.child) {
+                u8 => true,
+                else => hasU8Slice(pt.child),
+            },
+            else => false,
+        },
+        .optional => |op| hasU8Slice(op.child),
+        inline .@"struct", .@"union" => |st| inline for (st.field_types) |FT| {
+            if (hasU8Slice(FT)) break true;
+        } else false,
+        else => false,
+    };
+}
+
+pub fn hasCustomObject(comptime T: anytype) bool {
+    return switch (@typeInfo(T)) {
+        .error_union => |eu| hasCustomObject(eu.payload),
+        .pointer => |pt| switch (pt.size) {
+            .one => switch (@typeInfo(pt.child)) {
+                .@"struct" => true,
+                else => false,
+            },
+            else => false,
+        },
+        .optional => |op| hasCustomObject(op.child),
+        inline .@"struct", .@"union" => |st| inline for (st.field_types) |FT| {
+            if (hasCustomObject(FT)) break true;
+        } else false,
+        else => false,
+    };
+}
+
 pub fn getFieldDefaultValue(comptime T: type, comptime field_name: []const u8) ?@FieldType(T, field_name) {
     const st = @typeInfo(T).@"struct";
     const field_attr, const FT: type = comptime for (st.field_names, st.field_attrs, st.field_types) |name, attrs, FT| {

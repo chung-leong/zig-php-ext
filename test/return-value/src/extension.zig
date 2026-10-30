@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const php = @import("php/root.zig");
 const Module = php.Module;
 
@@ -17,6 +19,12 @@ pub fn @"call returnString"(_: *@This(), args: struct {
     string: []const u8 = "Hello world",
 }) []const u8 {
     return args.string;
+}
+
+pub fn @"call returnNewString"(_: *@This(), allocator: std.mem.Allocator, args: struct {
+    name: []const u8 = "Alice",
+}) ![]const u8 {
+    return try std.fmt.allocPrint(allocator, "Hello, {s}\n", .{args.name});
 }
 
 pub fn @"call returnEnum"(_: *@This()) enum { cat, dog, turkey } {

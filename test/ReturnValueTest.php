@@ -17,6 +17,7 @@ final class ReturnValueTest extends ExtensionTestCase
         $lines = $this->runTest("return-value", "string.php");
         $this->assertSame("This is a test", $lines[0]);
         $this->assertSame("Hello world", $lines[1]);
+        $this->assertSame("Hello, Alice", $lines[2]);
     }   
 
     public function testEnumRetval(): void

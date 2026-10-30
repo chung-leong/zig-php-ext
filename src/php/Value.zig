@@ -642,7 +642,10 @@ pub const ConversionOptions = packed struct {
     get_string_from_slice: bool = false,
 
     pub fn getDisposalAllocator(self: @This()) ?std.mem.Allocator {
-        return if (self.free_pointer) php_al else null;
+        return if (self.free_pointer) switch (self.get_string_from_slice) {
+            false => php_al,
+            true => String.allocator,
+        } else null;
     }
 };
 

@@ -1,13 +1,15 @@
 const std = @import("std");
 
 const php = @import("root.zig");
-const Allocator = php.Allocator;
 const c = php.c;
 const deref = php.deref;
 const pi = php.imports;
 const php_al = php.allocator;
 const unsupported = php.failure.unsupported;
 const Value = php.Value;
+pub const Allocator = @import("String/Allocator.zig");
+
+pub const allocator: std.mem.Allocator = .{ .ptr = undefined, .vtable = &Allocator.vtable };
 
 pub fn slice(self: *const @This()) [:0]const u8 {
     const s: [*]const u8 = @ptrCast(&self.impl.val[0]);
@@ -51,7 +53,7 @@ pub fn createUninitialized(len: usize) *@This() {
             const bytes = php_al.alloc(u8, aligned_size) catch unreachable;
             const zs: *c.zend_string = @ptrCast(@alignCast(bytes.ptr));
             var type_info: u32 = c.GC_STRING;
-            if (Allocator.mode == .persistent) type_info |= c.IS_STR_PERSISTENT;
+            if (php.Allocator.mode == .persistent) type_info |= c.IS_STR_PERSISTENT;
             zs.* = .{
                 .gc = .{ .refcount = 1, .u = .{ .type_info = type_info } },
                 .h = 0,
@@ -105,7 +107,7 @@ pub fn allocPrint(comptime fmt: []const u8, args: anytype) *@This() {
     const bytes = std.fmt.allocPrintSentinel(php_al, offset_bytes ++ fmt, args, 0) catch unreachable;
     const zs: *c.zend_string = @ptrCast(@alignCast(bytes.ptr));
     var type_info: u32 = c.GC_STRING;
-    if (Allocator.mode == .persistent) type_info |= c.IS_STR_PERSISTENT;
+    if (php.Allocator.mode == .persistent) type_info |= c.IS_STR_PERSISTENT;
     zs.gc = .{ .refcount = 1, .u = .{ .type_info = type_info } };
     zs.h = 0;
     zs.len = @intCast(bytes.len - offset);
@@ -193,6 +195,12 @@ pub fn parseInteger(self: *const @This()) c.zend_long {
 pub fn parseFloat(self: *const @This()) f64 {
     const s = self.slice();
     return pi.zend_strtod(s.ptr, null);
+}
+
+pub fn fromOwnSlice(s: []const u8) *@This() {
+    const field_ptr: *@FieldType(c.zend_string, "val") = @ptrCast(@constCast(s.ptr));
+    const zstr: *c.zend_string = @alignCast(@fieldParentPtr("val", field_ptr));
+    return @ptrCast(zstr);
 }
 
 pub fn static(comptime s: []const u8) *@This() {

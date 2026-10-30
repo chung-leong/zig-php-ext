@@ -185,7 +185,8 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
     const handler_type = handlerType(F, self_src);
     const f = @typeInfo(F).@"fn";
     const AT = f.param_types;
-    const returning_error = @typeInfo(f.return_type.?) == .error_union;
+    const RT = f.return_type.?;
+    const returning_error = @typeInfo(RT) == .error_union;
     const cc: std.lang.CallingConvention = @typeInfo(Handler).@"fn".attrs.@"callconv";
     const ns = struct {
         pub fn raw(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
@@ -229,6 +230,7 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
             const retval: *Value = @ptrCast(zretval);
             var iter = php_args.iterate();
             const arg0 = getSelf(iter.this) catch |err| return failure.throw(err);
+            // create an arena allocator for argument conversions that require memory allocations
             var arena: std.heap.ArenaAllocator = .init(php_al);
             defer arena.deinit();
             if (iter.extract(arena.allocator(), AT[1].?)) |arg1| {
@@ -245,9 +247,15 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
             const retval: *Value = @ptrCast(zretval);
             const iter = php_args.iterate();
             const arg0 = getSelf(iter.this) catch |err| return failure.throw(err);
+            const conv_opts: Value.ConversionOptions = .{
+                .free_pointer = true,
+                .get_string_from_slice = php.util.hasU8Slice(RT) and !php.util.hasCustomObject(RT),
+            };
+            std.debug.print("{}\n", .{conv_opts});
+            const allocator = conv_opts.getDisposalAllocator().?;
             const result = switch (returning_error) {
-                true => func(arg0, php_al) catch |err| return failure.throw(err),
-                false => func(arg0, php_al),
+                true => func(arg0, allocator) catch |err| return failure.throw(err),
+                false => func(arg0, allocator),
             };
             retval.* = .fromAny(result, .{ .free_pointer = true });
         }
@@ -259,12 +267,17 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
             const arg0 = getSelf(iter.this) catch |err| return failure.throw(err);
             var arena: std.heap.ArenaAllocator = .init(php_al);
             defer arena.deinit();
+            const conv_opts: Value.ConversionOptions = .{
+                .free_pointer = true,
+                .get_string_from_slice = php.util.hasU8Slice(RT) and !php.util.hasCustomObject(RT),
+            };
+            const allocator = conv_opts.getDisposalAllocator().?;
             if (iter.extract(arena.allocator(), AT[2].?)) |arg2| {
                 const result = switch (returning_error) {
-                    true => func(arg0, php_al, arg2) catch |err| return failure.throw(err),
-                    false => func(arg0, php_al, arg2),
+                    true => func(arg0, allocator, arg2) catch |err| return failure.throw(err),
+                    false => func(arg0, allocator, arg2),
                 };
-                retval.* = .fromAny(result, .{ .free_pointer = true });
+                retval.* = .fromAny(result, conv_opts);
             } else |err| failure.throw(err);
         }
 

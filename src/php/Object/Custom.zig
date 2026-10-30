@@ -146,6 +146,9 @@ pub fn @"fn"(comptime T: type) type {
                 false => {
                     if (comptime php.util.hasPointer(T)) {
                         // free memory allocated by setters
+                        if (!comptime php.util.autoFreeable(T)) {
+                            @compileError("Unable to free custom struct automatically");
+                        }
                         php.util.freeAny(self.custom_struct);
                     }
                 },
