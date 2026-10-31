@@ -683,7 +683,9 @@ pub fn @"fn"(comptime T: type) type {
         fn callSetter(self: *@This(), comptime setter_name: []const u8, value: Value) !void {
             const set = @field(setters, setter_name);
             const PT = php.util.ArgType(@TypeOf(set), 1);
-            const payload = try value.extract(php_al, PT);
+            var arena: std.heap.ArenaAllocator = .init(php_al);
+            defer arena.deinit();
+            const payload = try value.extract(arena.allocator(), PT);
             return set(self.custom(), payload);
         }
 

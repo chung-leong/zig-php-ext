@@ -215,7 +215,9 @@ pub fn freeAny(arg: anytype) void {
                 },
             },
             .slice => {
-                for (arg) |element| freeAny(element);
+                if (comptime !hasPointer(pt.child)) {
+                    for (arg) |element| freeAny(element);
+                }
                 php_al.free(arg);
             },
             else => unsupported(T),

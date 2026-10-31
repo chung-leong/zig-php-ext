@@ -571,7 +571,7 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
                     },
                     else => {
                         defer if (options.getDisposalAllocator()) |al| al.free(arg);
-                        break :convert .fromArray(.createFromAny(arg));
+                        break :convert .fromArray(.createFromAny(arg, options));
                     },
                 }
             },
