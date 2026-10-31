@@ -1,6 +1,6 @@
 <?php
 
-$compressed = Zstd::compress(<<<INPUT
+$compressed = zstd\compress(<<<INPUT
     To-morrow, and to-morrow, and to-morrow,
     Creeps in this petty pace from day to day,
     To the last syllable of recorded time;
@@ -12,5 +12,5 @@ $compressed = Zstd::compress(<<<INPUT
     Told by an idiot, full of sound and fury,
     Signifying nothing.
 INPUT);
-$decompressed = Zstd::decompress($compressed);
+$decompressed = zstd\decompress($compressed);
 echo $decompressed;

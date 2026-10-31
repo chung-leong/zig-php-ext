@@ -6,7 +6,7 @@ final class ConfigTest extends ExtensionTestCase
 {   
     public function testCustomConfig(): void
     {
-        $lines = $this->runTest("custom-config", "print.php");
+        $lines = $this->runTest("custom-config", "test.php");
         $this->assertSame(<<<OUTPUT
         ext_name = custom_config
         ext_version = 0.1.0

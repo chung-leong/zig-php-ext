@@ -277,12 +277,12 @@ pub fn decamelize(comptime name: []const u8) []const u8 {
     return @ptrCast(&array);
 }
 
-pub fn decamelizeAlloc(allocator: std.mem.Allocator, name: []const u8) ![]const u8 {
+pub fn decamelizeAlloc(allocator: std.mem.Allocator, name: []const u8) ![:0]const u8 {
     const buffer = try allocator.alloc(u8, name.len * 2);
     return decamelizeInto(name, buffer);
 }
 
-fn decamelizeInto(name: []const u8, buffer: []u8) []const u8 {
+fn decamelizeInto(name: []const u8, buffer: []u8) [:0]const u8 {
     var len: usize = 0;
     for (name, 0..) |char, i| {
         const conversion_needed = check: {
@@ -309,6 +309,7 @@ fn decamelizeInto(name: []const u8, buffer: []u8) []const u8 {
             buffer[len] = char;
             len += 1;
         }
+        buffer[len] = 0;
     }
-    return buffer[0..len];
+    return @ptrCast(buffer[0..len]);
 }

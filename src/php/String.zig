@@ -198,6 +198,7 @@ pub fn parseFloat(self: *const @This()) f64 {
 }
 
 pub fn fromOwnSlice(s: []const u8) *@This() {
+    if (s.len == 0) return create(s);
     const field_ptr: *@FieldType(c.zend_string, "val") = @ptrCast(@constCast(s.ptr));
     const zstr: *c.zend_string = @alignCast(@fieldParentPtr("val", field_ptr));
     if (zstr.len != s.len) {

@@ -13,8 +13,8 @@ pub fn report(comptime fmt: []const u8, params: anytype) error{FailureReported} 
     return error.FailureReported;
 }
 
-const oom_msg: []const u8 = "out of memory";
-threadlocal var error_message: ?[]const u8 = null;
+const oom_msg: [:0]const u8 = "out of memory";
+threadlocal var error_message: ?[:0]const u8 = null;
 
 pub fn hasMessage() bool {
     return error_message != null;
@@ -27,7 +27,7 @@ pub fn clearMessage() void {
     }
 }
 
-pub fn acquireMessage(err: anytype) []const u8 {
+pub fn acquireMessage(err: anytype) [:0]const u8 {
     if (error_message) |msg| {
         error_message = null;
         return msg;
@@ -35,7 +35,7 @@ pub fn acquireMessage(err: anytype) []const u8 {
     return getErrorMessage(err);
 }
 
-pub fn getErrorMessage(err: anytype) []const u8 {
+pub fn getErrorMessage(err: anytype) [:0]const u8 {
     return decamelizeAlloc(php_al, @errorName(err)) catch oom_msg;
 }
 

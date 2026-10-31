@@ -20,4 +20,24 @@ final class ZstdTest extends ExtensionTestCase
             Signifying nothing.
         OUTPUT, implode(PHP_EOL, $lines));
     }
+
+    public function testCompressor(): void
+    {
+        $lines = $this->runTest("zstd", "compressor.php");
+        $this->assertSame(<<<OUTPUT
+        complete = 81008
+        combined = 81008
+        complete == combined => 1
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testDecompressor(): void
+    {
+        $lines = $this->runTest("zstd", "decompressor.php");
+        $this->assertSame(<<<OUTPUT
+        complete = 100124
+        combined = 100124
+        complete == combined => 1
+        OUTPUT, implode(PHP_EOL, $lines));
+    }   
 }

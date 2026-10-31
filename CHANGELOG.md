@@ -4,3 +4,4 @@
 * Allowing the returning of pointers
 * Implemented specialized allocators
 * Fixed problem when function returns anyerror
+* Fixed confusing argument mismatch messages
