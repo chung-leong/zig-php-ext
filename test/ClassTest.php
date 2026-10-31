@@ -405,4 +405,23 @@ final class ClassTest extends ExtensionTestCase
         )
         OUTPUT, implode(PHP_EOL, $lines));
     }
+
+    public function testMixedReturnValue(): void
+    {
+        $lines = $this->runTest("classes", "mixed-retval.php");
+        $this->assertSame(<<<OUTPUT
+        Array
+        (
+            [0] => Point Object
+                (
+                    [x] => 1234.5
+                    [y] => 4567.8
+                    [normal] => 4731.6790983751
+                )
+
+            [1] => Hello world
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
 }

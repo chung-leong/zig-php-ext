@@ -42,3 +42,12 @@ pub fn @"call get_point"(_: *@This(), allocator: std.mem.Allocator) !*Point {
     point.* = .{ .x = 1234.5, .y = 4567.8 };
     return point;
 }
+
+pub fn @"call get_point_and_text"(_: *@This(), allocator: std.mem.Allocator) !@Tuple(&.{ *Point, []const u8 }) {
+    const point = try allocator.create(Point);
+    point.* = .{ .x = 1234.5, .y = 4567.8 };
+    return .{
+        point,
+        try allocator.dupe(u8, "Hello world"),
+    };
+}

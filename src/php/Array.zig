@@ -62,26 +62,37 @@ pub fn createFromAny(list: anytype, options: Value.ConversionOptions) *@This() {
     const supported = switch (@typeInfo(T)) {
         .array, .vector => true,
         .pointer => |pt| pt.size == .slice,
+        .@"struct" => |st| st.is_tuple,
         else => false,
     };
-    if (!supported) @compileError("Array, slice, or vector expected, received: " ++ @typeName(T));
+    if (!supported) @compileError("Array, slice, vector, or tuple expected, received: " ++ @typeName(T));
+    const len = switch (@typeInfo(T)) {
+        .vector => |ve| ve.len,
+        else => list.len,
+    };
+    const arr = createWithLength(len);
     switch (@typeInfo(T)) {
-        .vector => |ve| {
+        .vector => {
             // vectors require an unrolled loop
-            const arr = createWithLength(ve.len);
-            inline for (0..ve.len) |i| arr.append(.fromAny(list[i], options));
-            return arr;
+            inline for (0..len) |i| arr.append(.fromAny(list[i], options));
+        },
+        .@"struct" => {
+            // tuple also
+            inline for (list) |item| {
+                const value: Value = .fromAny(item, options);
+                defer value.release();
+                arr.append(value);
+            }
         },
         else => {
-            const arr = createWithLength(list.len);
             for (list) |item| {
                 const value: Value = .fromAny(item, options);
                 defer value.release();
                 arr.append(value);
             }
-            return arr;
         },
     }
+    return arr;
 }
 
 pub fn retain(self: *@This()) *@This() {

@@ -21,6 +21,7 @@ fn alloc(_: *anyopaque, len: usize, alignment: std.mem.Alignment, return_address
 fn resize(_: *anyopaque, memory: []u8, alignment: std.mem.Alignment, new_len: usize, return_address: usize) bool {
     _ = alignment;
     _ = return_address;
+    std.debug.print("(String) resize: {d}\n", .{memory.len});
     std.debug.assert(new_len > 0);
     if (new_len <= memory.len) {
         return true; // in-place shrink always works

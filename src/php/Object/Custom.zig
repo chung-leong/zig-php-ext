@@ -32,17 +32,12 @@ pub fn @"fn"(comptime T: type) type {
 
         pub fn fromCustom(custom_ptr: *const T) *@This() {
             const self: *const @This() = @fieldParentPtr("custom_struct", custom_ptr);
-            std.debug.assert(self.object().isCustom(T));
             return @constCast(self);
         }
 
         pub fn create() *@This() {
-            const cls: *const Class = Class.Custom(T).get().class();
             const self = php_al.create(@This()) catch unreachable;
-            // initialize the PHP portion
-            pi.zend_object_std_init(@ptrCast(&self.php_object), @ptrCast(@constCast(cls)));
-            // handlers need to be set after zend_object_std_init() due to change in PHP 8.3
-            self.php_object.handlers = &handlers;
+            self.initPhpPortion();
             // set fields of custom struct to their default values (when available)
             inline for (comptime std.meta.fieldNames(T)) |field_name| {
                 if (php.util.getFieldDefaultValue(T, field_name)) |def_value| {
@@ -50,6 +45,13 @@ pub fn @"fn"(comptime T: type) type {
                 }
             }
             return self;
+        }
+
+        pub fn initPhpPortion(self: *@This()) void {
+            const cls: *Class = Class.Custom(T).get().class();
+            pi.zend_object_std_init(@ptrCast(&self.php_object), @ptrCast(@constCast(cls)));
+            // handlers need to be set after zend_object_std_init() due to change in PHP 8.3
+            self.php_object.handlers = &handlers;
         }
 
         pub fn getIterator(obj: *Object) ?*Iterator {
@@ -691,14 +693,6 @@ pub fn @"fn"(comptime T: type) type {
             return if (@typeInfo(PT) == .optional) set(self.custom(), null) else error.CannotBeNull;
         }
 
-        const ObjectLite = init: {
-            const st = @typeInfo(c.zend_object).@"struct";
-            const len = st.field_names.len;
-            const field_names = st.field_names[0 .. len - 1];
-            const field_types = st.field_types[0 .. len - 1];
-            const field_attrs = st.field_attrs[0 .. len - 1];
-            break :init @Struct(st.layout, null, field_names, field_types, field_attrs);
-        };
         const getters = php.util.symbol.GetterExporter(T, .instance).get();
         const setters = php.util.symbol.SetterExporter(T, .instance).get();
         const methods = php.util.symbol.MethodExporter(T, .instance).get();
@@ -800,4 +794,12 @@ pub const PropertyIterator = struct {
 
     array: *Array,
     iter: Array.Iterator,
+};
+pub const ObjectLite = init: {
+    const st = @typeInfo(c.zend_object).@"struct";
+    const len = st.field_names.len;
+    const field_names = st.field_names[0 .. len - 1];
+    const field_types = st.field_types[0 .. len - 1];
+    const field_attrs = st.field_attrs[0 .. len - 1];
+    break :init @Struct(st.layout, null, field_names, field_types, field_attrs);
 };

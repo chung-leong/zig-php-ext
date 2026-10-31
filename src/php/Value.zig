@@ -540,7 +540,7 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
         .@"enum" => .fromEnum(arg),
         .error_union => if (arg) |payload| .fromAny(payload, options) else |err| err,
         .array, .vector => .fromArray(.createFromAny(arg, options)),
-        .optional => if (arg) |p| fromAny(p, .{}) else .fromNull(),
+        .optional => if (arg) |p| fromAny(p, options) else .fromNull(),
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
                 String => .fromString(arg),
@@ -549,32 +549,25 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
                 Resource => .fromResource(arg),
                 Stream => .fromStream(arg),
                 Reference => .fromReference(arg),
-                else => convert: {
-                    defer if (options.getDisposalAllocator()) |al| al.destroy(arg);
-                    break :convert switch (@typeInfo(pt.child)) {
-                        .array => |ar| switch (ar.child == u8) {
-                            true => switch (@inComptime()) {
-                                true => .fromString(.static(arg)),
-                                false => .fromString(.create(arg)),
-                            },
-                            false => fromAny(arg.*),
-                        },
-                        .@"struct" => .fromObject(.createCustom(pt.child, arg.*)),
-                        else => unsupported(T),
-                    };
+                else => switch (@typeInfo(pt.child)) {
+                    .array => |ar| convert: {
+                        defer if (options.getDisposalAllocator()) |al| al.destroy(arg);
+                        break :convert switch (ar.child == u8) {
+                            true => .fromString(if (@inComptime()) .static(arg) else .create(arg)),
+                            false => fromAny(arg.*, .{}),
+                        };
+                    },
+                    .@"struct" => .fromObject(.fromCustom(arg)),
+                    else => unsupported(T),
                 },
             },
             .slice => convert: {
-                defer if (pt.child != u8 or !options.get_string_from_slice) {
-                    if (options.getDisposalAllocator()) |al| al.free(arg);
-                };
                 switch (pt.child) {
-                    u8 => {
-                        const str: *String = switch (options.get_string_from_slice) {
-                            true => .fromOwnSlice(arg),
-                            false => .create(arg),
-                        };
-                        break :convert .fromString(str);
+                    u8 => if (options.get_string_from_slice) {
+                        break :convert .fromString(.fromOwnSlice(arg));
+                    } else {
+                        defer if (options.getDisposalAllocator()) |al| al.free(arg);
+                        break :convert .fromString(.create(arg));
                     },
                     else => {
                         defer if (options.getDisposalAllocator()) |al| al.free(arg);
@@ -584,9 +577,12 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
             },
             else => unsupported(T),
         },
-        .@"struct" => switch (T) {
+        .@"struct" => |st| switch (T) {
             Callable => arg.value,
-            else => .fromStruct(arg, options),
+            else => if (st.is_tuple)
+                .fromArray(.createFromAny(arg, options))
+            else
+                .fromStruct(arg, options),
         },
         .@"union" => |un| if (un.tag_type) |Tag|
             inline for (un.field_names) |name| {
@@ -651,12 +647,28 @@ pub const State = enum(c_int) {
 pub const ConversionOptions = packed struct {
     free_pointer: bool = false,
     get_string_from_slice: bool = false,
+    get_object_from_custom: bool = false,
+
+    pub fn freeReturnedPointers(comptime RT: type) @This() {
+        const has_obj = php.util.hasCustomObject(RT);
+        const has_str = php.util.hasU8Slice(RT);
+        return .{
+            .free_pointer = true,
+            .get_object_from_custom = has_obj,
+            .get_string_from_slice = has_str and !has_obj,
+        };
+    }
 
     pub fn getDisposalAllocator(self: @This()) ?std.mem.Allocator {
-        return if (self.free_pointer) switch (self.get_string_from_slice) {
-            false => php_al,
-            true => String.allocator,
-        } else null;
+        return if (self.free_pointer)
+            if (self.get_object_from_custom)
+                Object.allocator
+            else if (self.get_string_from_slice)
+                String.allocator
+            else
+                php_al
+        else
+            null;
     }
 };
 

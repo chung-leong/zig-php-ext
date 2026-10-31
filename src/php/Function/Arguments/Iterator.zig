@@ -174,7 +174,7 @@ pub fn extractNamed(self: *@This(), allocator: std.mem.Allocator, comptime T: ty
     };
     if (!valid) @compileError("Struct type expected, received: " ++ @typeName(T));
     var set: T = undefined;
-    var mismatch: Mismatch = null;
+    var mismatch: Mismatch = .{};
     inline for (@typeInfo(T).@"struct".field_names, 0..) |arg_name, i| {
         const FT = @TypeOf(@field(set, arg_name));
         const VT, const optional = switch (@typeInfo(FT)) {

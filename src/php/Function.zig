@@ -247,16 +247,13 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
             const retval: *Value = @ptrCast(zretval);
             const iter = php_args.iterate();
             const arg0 = getSelf(iter.this) catch |err| return failure.throw(err);
-            const conv_opts: Value.ConversionOptions = .{
-                .free_pointer = true,
-                .get_string_from_slice = php.util.hasU8Slice(RT) and !php.util.hasCustomObject(RT),
-            };
+            const conv_opts: Value.ConversionOptions = .freeReturnedPointers(RT);
             const allocator = conv_opts.getDisposalAllocator().?;
             const result = switch (returning_error) {
                 true => func(arg0, allocator) catch |err| return failure.throw(err),
                 false => func(arg0, allocator),
             };
-            retval.* = .fromAny(result, .{ .free_pointer = true });
+            retval.* = .fromAny(result, conv_opts);
         }
 
         pub fn method2a(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
@@ -266,10 +263,7 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
             const arg0 = getSelf(iter.this) catch |err| return failure.throw(err);
             var arena: std.heap.ArenaAllocator = .init(php_al);
             defer arena.deinit();
-            const conv_opts: Value.ConversionOptions = .{
-                .free_pointer = true,
-                .get_string_from_slice = php.util.hasU8Slice(RT) and !php.util.hasCustomObject(RT),
-            };
+            const conv_opts: Value.ConversionOptions = .freeReturnedPointers(RT);
             const allocator = conv_opts.getDisposalAllocator().?;
             if (iter.extract(arena.allocator(), AT[2].?)) |arg2| {
                 const result = switch (returning_error) {

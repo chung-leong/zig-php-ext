@@ -1,5 +1,7 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
+pub const Allocator = @import("Object/Allocator.zig");
 pub const Custom = @import("Object/Custom.zig").@"fn";
 pub const Iterator = @import("Object/Iterator.zig");
 pub const MethodSet = @import("Object/MethodSet.zig").@"fn";
@@ -16,6 +18,8 @@ const Function = php.Function;
 const String = php.String;
 const Value = php.Value;
 pub const Handlers = c.zend_object_handlers;
+
+pub const allocator: std.mem.Allocator = .{ .ptr = undefined, .vtable = &Allocator.vtable };
 
 pub fn class(self: *const @This()) *const Class {
     return @ptrCast(self.impl.ce);
@@ -105,6 +109,10 @@ pub fn subtractRef(self: *@This()) void {
 
 pub fn toValue(self: *const @This()) Value {
     return .fromObject(self);
+}
+
+pub fn isUninitialized(self: *const @This()) bool {
+    return self.impl.handlers == null;
 }
 
 pub fn isInstanceOf(self: *const @This(), ce: *const Class) bool {
@@ -205,7 +213,14 @@ pub fn custom(self: *const @This(), comptime T: type) *T {
 pub fn fromCustom(custom_ptr: anytype) *@This() {
     const T = @TypeOf(custom_ptr.*);
     const custom_obj = Custom(T).fromCustom(custom_ptr);
-    return custom_obj.object();
+    const self = custom_obj.object();
+    if (self.isUninitialized()) {
+        // set class, handlers, etc. and register object with PHP
+        custom_obj.initPhpPortion();
+    } else if (builtin.mode == .debug and !self.isCustom(T)) {
+        @panic("pointer to " ++ @typeName(T) ++ " not within a proper object");
+    }
+    return self;
 }
 
 pub fn standardHandlers() *const Handlers {
