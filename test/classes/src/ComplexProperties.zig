@@ -36,19 +36,44 @@ pub fn init() !@This() {
             }
             break :init children;
         },
+        .twins = init: {
+            const child1 = try php.Object.allocator.create(Child);
+            child1.* = .{ .number = 201 };
+            const child2 = try php.Object.allocator.create(Child);
+            child2.* = .{ .number = 202 };
+            break :init .{ child1, child2 };
+        },
+        .friends = init: {
+            const child1 = try php.Object.allocator.create(Child);
+            child1.* = .{ .number = 41 };
+            const child2 = try php.Object.allocator.create(Child);
+            child2.* = .{ .number = 42 };
+            break :init .{ .bob = child1, .jack = child2 };
+        },
     };
 }
 
-pub fn deinit(self: *@This()) void {
-    self.string.release();
-    for (self.strings) |str| str.release();
-    php.allocator.free(self.strings);
-    self.array.release();
-    self.object.release();
-    php.Object.fromCustom(self.child).release();
-    for (self.children) |child| php.Object.fromCustom(child).release();
-    php.allocator.free(self.children);
-}
+// pub fn deinit(self: *@This()) void {
+//     // self.string.release();
+//     php.util.freeAny(self.string);
+//     // for (self.strings) |str| str.release();
+//     // php.allocator.free(self.strings);
+//     php.util.freeAny(self.strings);
+//     // self.array.release();
+//     php.util.freeAny(self.array);
+//     // self.object.release();
+//     php.util.freeAny(self.object);
+//     // php.Object.fromCustom(self.child).release();
+//     php.util.freeAny(self.child);
+//     // for (self.children) |child| php.Object.fromCustom(child).release();
+//     // php.allocator.free(self.children);
+//     php.util.freeAny(self.children);
+//     // for (self.twins) |twin| php.Object.fromCustom(twin).release();
+//     php.util.freeAny(self.twins);
+//     // php.Object.fromCustom(self.friends.bob).release();
+//     // php.Object.fromCustom(self.friends.jack).release();
+//     php.util.freeAny(self.friends);
+// }
 
 pub const @"export Child" = php.Class.Custom(Child);
 
@@ -70,9 +95,20 @@ pub const @"set child" = setter(@This(), .child);
 pub const @"get children" = getter(@This(), .children);
 pub const @"set children" = setter(@This(), .children);
 
+pub const @"get twins" = getter(@This(), .twins);
+pub const @"set twins" = setter(@This(), .twins);
+
+pub const @"get friends" = getter(@This(), .friends);
+pub const @"set friends" = setter(@This(), .friends);
+
 string: *php.String,
 strings: []*php.String,
 array: *php.Array,
 object: *php.Object,
 child: *Child,
 children: []*Child,
+twins: [2]*Child,
+friends: struct {
+    bob: *Child,
+    jack: *Child,
+},

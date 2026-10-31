@@ -396,7 +396,155 @@ final class ClassTest extends ExtensionTestCase
     public function testComplexProperties(): void
     {
         $lines = $this->runTest("classes", "complex.php");
-        echo implode(PHP_EOL, $lines);
+        $this->assertSame(<<<OUTPUT
+        ComplexProperties Object
+        (
+            [string] =>
+            [strings] => Array
+                (
+                    [0] => A
+                    [1] => B
+                )
+
+            [array] => Array
+                (
+                )
+
+            [object] => stdClass Object
+                (
+                )
+
+            [child] => ComplexProperties\Child Object
+                (
+                    [number] => 1
+                )
+
+            [children] => Array
+                (
+                    [0] => ComplexProperties\Child Object
+                        (
+                            [number] => 100
+                        )
+
+                    [1] => ComplexProperties\Child Object
+                        (
+                            [number] => 101
+                        )
+
+                    [2] => ComplexProperties\Child Object
+                        (
+                            [number] => 102
+                        )
+
+                )
+
+            [twins] => Array
+                (
+                    [0] => ComplexProperties\Child Object
+                        (
+                            [number] => 201
+                        )
+
+                    [1] => ComplexProperties\Child Object
+                        (
+                            [number] => 202
+                        )
+
+                )
+
+            [friends] => stdClass Object
+                (
+                    [bob] => ComplexProperties\Child Object
+                        (
+                            [number] => 41
+                        )
+
+                    [jack] => ComplexProperties\Child Object
+                        (
+                            [number] => 42
+                        )
+
+                )
+
+        )
+        ComplexProperties Object
+        (
+            [string] => This is a test
+            [strings] => Array
+                (
+                    [0] => Hello
+                    [1] => world
+                    [2] => Whatever
+                    [3] => ?
+                )
+
+            [array] => Array
+                (
+                    [0] => 1
+                    [1] => 2
+                    [2] => 3
+                )
+
+            [object] => stdClass Object
+                (
+                    [chicken] => 5
+                    [cow] => 10
+                )
+
+            [child] => ComplexProperties\Child Object
+                (
+                    [number] => 77
+                )
+
+            [children] => Array
+                (
+                    [0] => ComplexProperties\Child Object
+                        (
+                            [number] => 100
+                        )
+
+                    [1] => ComplexProperties\Child Object
+                        (
+                            [number] => 101
+                        )
+
+                    [2] => ComplexProperties\Child Object
+                        (
+                            [number] => 102
+                        )
+
+                )
+
+            [twins] => Array
+                (
+                    [0] => ComplexProperties\Child Object
+                        (
+                            [number] => 301
+                        )
+
+                    [1] => ComplexProperties\Child Object
+                        (
+                            [number] => 302
+                        )
+
+                )
+
+            [friends] => stdClass Object
+                (
+                    [bob] => ComplexProperties\Child Object
+                        (
+                            [number] => 51
+                        )
+
+                    [jack] => ComplexProperties\Child Object
+                        (
+                            [number] => 52
+                        )
+
+                )
+
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testObjectReturnValue(): void

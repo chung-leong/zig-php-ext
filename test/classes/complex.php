@@ -8,5 +8,7 @@ $object->strings = [ "Hello", "world", "Whatever", "?" ];
 $object->array = [ 1, 2, 3];
 $object->object = (object) [ 'chicken' => 5, 'cow' => 10 ];
 $object->child = new ComplexProperties\Child(77);
+$object->twins = [ new ComplexProperties\Child(301), new ComplexProperties\Child(302) ];
+$object->friends = [ 'bob' => new ComplexProperties\Child(51), 'jack' => new ComplexProperties\Child(52) ];
 print_r($object);
 

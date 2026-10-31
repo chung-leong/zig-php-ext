@@ -71,6 +71,7 @@ pub fn hasPointer(comptime T: anytype) bool {
         .error_union => |eu| hasPointer(eu.payload),
         .pointer => true,
         .optional => |op| hasPointer(op.child),
+        .array => |ar| hasPointer(ar.child),
         inline .@"struct", .@"union" => |st| inline for (st.field_types) |FT| {
             if (hasPointer(FT)) break true;
         } else false,
@@ -182,14 +183,21 @@ pub fn retainAny(arg: anytype, options: struct {
             else => unsupported(T),
         },
         .optional => if (arg) |payload| retainAny(payload, options) else null,
+        .array => retain: {
+            var new_array: T = undefined;
+            for (arg, 0..) |value, i| {
+                new_array[i] = retainAny(value, options);
+            }
+            break :retain new_array;
+        },
         .@"struct" => |st| switch (T) {
             Value => arg.retain(),
             else => if (st.backing_integer == null) retain: {
-                var result: T = undefined;
+                var new_struct: T = undefined;
                 inline for (st.field_names) |field_name| {
-                    @field(result, field_name) = retainAny(@field(arg, field_name), options);
+                    @field(new_struct, field_name) = retainAny(@field(arg, field_name), options);
                 }
-                break :retain result;
+                break :retain new_struct;
             } else arg,
         },
         .@"union" => |un| switch (T) {
@@ -215,7 +223,7 @@ pub fn freeAny(arg: anytype) void {
                 },
             },
             .slice => {
-                if (comptime !hasPointer(pt.child)) {
+                if (comptime hasPointer(pt.child)) {
                     for (arg) |element| freeAny(element);
                 }
                 php_al.free(arg);
@@ -223,6 +231,7 @@ pub fn freeAny(arg: anytype) void {
             else => unsupported(T),
         },
         .optional => if (arg) |payload| freeAny(payload),
+        .array => for (arg) |value| freeAny(value),
         .@"struct" => |st| switch (T) {
             Value => arg.release(),
             else => if (st.backing_integer == null) {
