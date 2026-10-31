@@ -236,7 +236,7 @@ pub fn getter(comptime T: type, field: std.meta.FieldEnum(T)) RT: {
     const FT = @FieldType(T, field_name);
     const ns = struct {
         fn @"fn"(self: *const T) FT {
-            return @field(self, field_name);
+            return php.util.retainAny(@field(self, field_name), .{ .duplicate_slice = false });
         }
     };
     return ns.@"fn";
@@ -255,7 +255,7 @@ pub fn setter(comptime T: type, field: std.meta.FieldEnum(T)) RT: {
                 if (!php.util.fieldHasDefaultValue(self, field_name)) {
                     php.util.freeAny(@field(self, field_name));
                 }
-                @field(self, field_name) = php.util.retainAny(value);
+                @field(self, field_name) = php.util.retainAny(value, .{});
             } else {
                 @field(self, field_name) = value;
             }

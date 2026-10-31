@@ -11,7 +11,7 @@ pub fn @"call print"(self: *@This()) !void {
 pub fn init(args: struct {
     list: []const Animal = &.{},
 }) !@This() {
-    return .{ .list = php.util.retainAny(args.list) };
+    return .{ .list = php.util.retainAny(args.list, .{}) };
 }
 
 pub fn deinit(self: *@This()) void {

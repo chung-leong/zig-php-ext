@@ -393,6 +393,12 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame("x = 1.23, y = 4.56", $lines[0]);
     }
 
+    public function testComplexProperties(): void
+    {
+        $lines = $this->runTest("classes", "complex.php");
+        echo implode(PHP_EOL, $lines);
+    }
+
     public function testObjectReturnValue(): void
     {
         $lines = $this->runTest("classes", "obj-retval.php");
@@ -423,5 +429,4 @@ final class ClassTest extends ExtensionTestCase
         )
         OUTPUT, implode(PHP_EOL, $lines));
     }
-
 }

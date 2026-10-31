@@ -54,7 +54,13 @@ pub fn ClassExporter(comptime T: type) type {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "export", .instance) orelse return null;
             return switch (@typeInfo(@TypeOf(decl))) {
-                .type => if (php.util.api.isCustomType(decl)) name else null,
+                .type => if (php.util.api.isCustomType(decl)) check: {
+                    if (decl.custom_type == .object) {
+                        const tag = @tagName(decl.custom_type);
+                        @compileError("@\"" ++ decl_name ++ "\" is not a valid export: received custom " ++ tag ++ " type instead of custom class type");
+                    }
+                    break :check name;
+                } else null,
                 else => null,
             };
         }

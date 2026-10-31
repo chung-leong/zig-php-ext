@@ -215,7 +215,6 @@ pub fn @"fn"(comptime T: type) type {
             constant.value().release();
         }
 
-        pub const CustomOpaque = php.util.api.CustomOpaque;
         pub const Instance = Object.Custom(T);
         pub const Static = init: {
             var S: ?type = null;
@@ -251,6 +250,7 @@ pub fn @"fn"(comptime T: type) type {
             }
             break :init S orelse NoStatic;
         };
+        pub const custom_type: php.util.api.custom.Type = .class;
         const NoStatic = struct {};
 
         const methods = php.util.symbol.MethodExporter(T, .static).get();

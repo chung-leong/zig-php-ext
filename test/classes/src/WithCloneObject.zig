@@ -11,10 +11,7 @@ pub const @"set text" = setter(@This(), .text);
 
 pub fn cloneObject(self: *@This()) !*Object {
     php.print("cloneObject\n", .{});
-    const new_custom_obj = Object.Custom(@This()).create();
-    new_custom_obj.custom_struct = php.util.retainAny(self.*);
-    new_custom_obj.flags.initialized = true;
-    return new_custom_obj.object();
+    return Object.createCustom(@This(), php.util.retainAny(self.*, .{}));
 }
 
 number: i32 = 1234,

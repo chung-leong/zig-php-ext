@@ -11,7 +11,7 @@ pub const @"set text" = setter(@This(), .text);
 
 pub fn clone(self: *@This()) !@This() {
     php.print("clone\n", .{});
-    return php.util.retainAny(self.*);
+    return php.util.retainAny(self.*, .{});
 }
 
 number: i32 = 1234,

@@ -543,12 +543,12 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
         .optional => if (arg) |p| fromAny(p, options) else .fromNull(),
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
-                String => .fromString(arg),
                 Array => .fromArray(arg),
                 Object => .fromObject(arg),
+                Reference => .fromReference(arg),
                 Resource => .fromResource(arg),
                 Stream => .fromStream(arg),
-                Reference => .fromReference(arg),
+                String => .fromString(arg),
                 else => switch (@typeInfo(pt.child)) {
                     .array => |ar| convert: {
                         defer if (options.getDisposalAllocator()) |al| al.destroy(arg);

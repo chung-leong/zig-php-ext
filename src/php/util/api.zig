@@ -137,11 +137,13 @@ pub fn ClassValidator(comptime T: type) type {
     };
 }
 
-pub const CustomOpaque = opaque {};
+pub const custom = opaque {
+    pub const Type = enum { class, object, iterator };
+};
 
 pub fn isCustomType(comptime T: type) bool {
     return switch (@typeInfo(T)) {
-        .@"struct" => @hasDecl(T, "CustomOpaque") and T.CustomOpaque == CustomOpaque,
+        .@"struct" => @hasDecl(T, "custom_type") and @TypeOf(T.custom_type) == custom.Type,
         else => false,
     };
 }

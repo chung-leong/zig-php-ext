@@ -31,7 +31,7 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         pub fn fromCustom(custom_ptr: *const T) *@This() {
-            const self: *const @This() = @fieldParentPtr("custom_struct", custom_ptr);
+            const self: *const @This() = @alignCast(@fieldParentPtr("custom_struct", custom_ptr));
             return @constCast(self);
         }
 
@@ -85,7 +85,6 @@ pub fn @"fn"(comptime T: type) type {
             return custom_iter.iterator();
         }
 
-        pub const CustomOpaque = php.util.api.CustomOpaque;
         pub const Custom = T;
         pub const has_iterator = init: {
             if (@hasDecl(T, "getIterator")) break :init true;
@@ -119,6 +118,7 @@ pub fn @"fn"(comptime T: type) type {
             .do_operation = @ptrCast(&doOperation),
             .compare = @ptrCast(&compareWith),
         };
+        pub const custom_type: php.util.api.custom.Type = .object;
 
         fn construct(obj: *Object, args: init_fn.Args) !void {
             const self: *@This() = @ptrCast(obj);

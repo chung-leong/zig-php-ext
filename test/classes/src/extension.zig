@@ -30,6 +30,7 @@ pub const @"export WithGetGarbageCollection" = Class.Custom(@import("WithGetGarb
 pub const @"export WithGetIterator" = Class.Custom(@import("WithGetIterator.zig"));
 pub const @"export WithIterate" = Class.Custom(@import("WithIterate.zig"));
 pub const @"export hello\\world\\WithSubclasses" = Class.Custom(@import("WithSubclasses.zig"));
+pub const @"export ComplexProperties" = Class.Custom(@import("ComplexProperties.zig"));
 
 pub fn @"call print_point"(_: *@This(), args: struct {
     point: *Point,

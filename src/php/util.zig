@@ -139,38 +139,63 @@ pub fn fieldHasDefaultValue(arg: anytype, comptime field_name: []const u8) bool 
     };
 }
 
-pub fn retainAny(arg: anytype) @TypeOf(arg) {
+pub fn retainAny(arg: anytype, options: struct {
+    duplicate_slice: bool = true,
+}) @TypeOf(arg) {
     const T = @TypeOf(arg);
     if (comptime !php.util.hasPointer(T)) return arg;
     return switch (@typeInfo(T)) {
-        .error_union => if (arg) |payload| retainAny(payload) else |err| err,
+        .error_union => if (arg) |payload| retainAny(payload, options) else |err| err,
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
                 Array, Object, Reference, Resource, Stream, String => arg.retain(),
-                else => copy: {
-                    const result = php_al.create(T) catch unreachable;
-                    result.* = retainAny(arg);
-                    break :copy result;
+                else => if (@typeInfo(pt.child) == .@"struct") retain: {
+                    Object.fromCustom(arg).addRef();
+                    break :retain arg;
+                } else {
+                    unsupported(T);
                 },
             },
-            .slice => php_al.dupe(pt.child, arg) catch unreachable,
+            .slice => retain: {
+                if (options.duplicate_slice) {
+                    if (comptime php.util.hasPointer(T)) {
+                        const sentinel, const extra: usize = if (comptime pt.sentinel()) |sentinel|
+                            .{ sentinel, 1 }
+                        else
+                            .{ undefined, 0 };
+                        const new_slice = php_al.alloc(pt.child, arg.len + extra) catch unreachable;
+                        for (arg, 0..) |element, i| {
+                            new_slice[i] = retainAny(element, options);
+                        }
+                        break :retain if (extra == 1) new_slice[0..arg.len :sentinel] else new_slice;
+                    } else {
+                        break :retain if (pt.sentinel()) |sentinel|
+                            php_al.dupeSentinel(pt.child, arg, sentinel)
+                        else
+                            php_al.dupe(pt.child, arg);
+                    }
+                } else {
+                    for (arg) |element| _ = retainAny(element, options);
+                    break :retain arg;
+                }
+            },
             else => unsupported(T),
         },
-        .optional => if (arg) |payload| retainAny(payload) else null,
+        .optional => if (arg) |payload| retainAny(payload, options) else null,
         .@"struct" => |st| switch (T) {
             Value => arg.retain(),
-            else => if (st.backing_integer == null) copy: {
+            else => if (st.backing_integer == null) retain: {
                 var result: T = undefined;
                 inline for (st.field_names) |field_name| {
-                    @field(result, field_name) = retainAny(@field(arg, field_name));
+                    @field(result, field_name) = retainAny(@field(arg, field_name), options);
                 }
-                break :copy result;
+                break :retain result;
             } else arg,
         },
         .@"union" => |un| switch (T) {
             Dictionary, List => arg.retain(),
             else => if (un.tag_type) |_| switch (arg) {
-                inline else => |payload, tag| @unionInit(T, @tagName(tag), retainAny(payload)),
+                inline else => |payload, tag| @unionInit(T, @tagName(tag), retainAny(payload, options)),
             },
         },
         else => unreachable,
@@ -180,12 +205,14 @@ pub fn retainAny(arg: anytype) @TypeOf(arg) {
 pub fn freeAny(arg: anytype) void {
     const T = @TypeOf(arg);
     if (comptime !hasPointer(T)) return;
-    return switch (@typeInfo(T)) {
+    switch (@typeInfo(T)) {
         .error_union => if (arg) |payload| freeAny(payload) else |_| {},
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
                 Array, Object, Reference, Resource, Stream, String => arg.release(),
-                else => Object.fromCustom(arg).release(),
+                else => if (@typeInfo(pt.child) == .@"struct") {
+                    Object.fromCustom(arg).release();
+                },
             },
             .slice => {
                 for (arg) |element| freeAny(element);
@@ -215,7 +242,7 @@ pub fn freeAny(arg: anytype) void {
             } else unsupported(T),
         },
         else => {},
-    };
+    }
 }
 
 pub fn autoFreeable(comptime T: type) bool {
