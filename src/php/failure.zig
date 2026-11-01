@@ -7,14 +7,14 @@ const pi = php.imports;
 const decamelizeAlloc = php.util.decamelizeAlloc;
 const WithoutError = php.util.WithoutError;
 
+const oom_msg: [:0]const u8 = "out of memory";
+threadlocal var error_message: ?[:0]const u8 = null;
+
 pub fn report(comptime fmt: []const u8, params: anytype) error{FailureReported} {
     if (error_message) |msg| freeMessage(msg);
     error_message = std.fmt.allocPrintSentinel(php_al, fmt, params, 0) catch oom_msg;
     return error.FailureReported;
 }
-
-const oom_msg: [:0]const u8 = "out of memory";
-threadlocal var error_message: ?[:0]const u8 = null;
 
 pub fn hasMessage() bool {
     return error_message != null;
@@ -32,10 +32,6 @@ pub fn acquireMessage(err: anytype) [:0]const u8 {
         error_message = null;
         return msg;
     }
-    return getErrorMessage(err);
-}
-
-pub fn getErrorMessage(err: anytype) [:0]const u8 {
     return decamelizeAlloc(php_al, @errorName(err)) catch oom_msg;
 }
 

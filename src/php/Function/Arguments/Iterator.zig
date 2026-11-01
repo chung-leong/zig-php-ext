@@ -270,17 +270,17 @@ const Mismatch = struct {
 
     pub fn report(self: *@This()) error{FailureReported} {
         const fn_name = if (self.fn_name) |n| n.slice() else "(unknown)";
-        const error_message = failure.getErrorMessage(self.err);
+        const error_message = failure.acquireMessage(self.err);
         defer failure.freeMessage(error_message);
         if (self.index) |index| {
-            return failure.report("{s}(): Argument #{d} ${s} is incorrect: {s}", .{
+            return failure.report("{s}(): argument #{d} ${s} is incorrect: {s}", .{
                 fn_name,
                 index + 1,
                 self.arg_name,
                 error_message,
             });
         } else {
-            return failure.report("{s}(): Named argument ${s} is incorrect: {s}", .{
+            return failure.report("{s}(): named argument ${s} is incorrect: {s}", .{
                 fn_name,
                 self.arg_name,
                 error_message,

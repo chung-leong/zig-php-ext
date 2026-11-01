@@ -267,14 +267,19 @@ pub fn getEnum(self: *const @This(), comptime T: type) !T {
             if (str.matchStatic(field_name)) return @field(T, field_name);
         } else {
             const list = comptime join: {
-                var text: []const u8 = "";
-                for (field_names) |field_name| {
+                const last = field_names.len - 1;
+                var combined: []const u8 = "";
+                for (field_names, 0..) |field_name, i| {
                     const quoted = "'" ++ field_name ++ "'";
-                    text = if (text.len == 0) quoted else text ++ ", " ++ quoted;
+                    const sep = if (i == last)
+                        if (last != 1) ", or " else " or "
+                    else
+                        ", ";
+                    combined = if (i == 0) quoted else combined ++ sep ++ quoted;
                 }
-                break :join text;
+                break :join combined;
             };
-            return failure.report("Enum can be {s}, received: '{s}'", .{ list, str.slice() });
+            return failure.report("enum can be {s}, received: '{s}'", .{ list, str.slice() });
         }
     }
 }
@@ -388,7 +393,11 @@ pub fn extract(self: *const @This(), allocator: std.mem.Allocator, comptime T: t
                     if (self.extract(allocator, FT)) |nv| {
                         break @unionInit(T, un.field_names[i], nv);
                     } else |_| {}
-                } else error.NoMatch,
+                } else report: {
+                    const type_list = php.util.getArgumentType(T);
+                    defer php_al.free(type_list);
+                    break :report failure.report("not {s}", .{type_list});
+                },
                 false => @compileError("Union must be tagged: " ++ @typeName(T)),
             },
         },

@@ -284,6 +284,91 @@ pub fn autoFreeable(comptime T: type) bool {
     };
 }
 
+pub fn getArgumentType(comptime Argument: type) []const u8 {
+    var helper: struct {
+        pub fn init() @This() {
+            return .{ .arena = .init(php_al) };
+        }
+
+        pub fn deinit(self: *@This()) void {
+            self.arena.deinit();
+        }
+
+        pub fn getName(self: *@This()) ![]const u8 {
+            const list = try self.getAcceptable(Argument);
+            return switch (list.len) {
+                0 => unreachable,
+                1 => try php_al.dupe(u8, list[0]),
+                2 => try std.mem.join(php_al, " or ", list),
+                else => try std.mem.join(php_al, ", or ", &.{
+                    try std.mem.join(self.arena.allocator(), ", ", list[0 .. list.len - 1]),
+                    list[list.len - 1],
+                }),
+            };
+        }
+
+        pub fn getAcceptable(self: *@This(), comptime T: type) ![]const []const u8 {
+            return switch (@typeInfo(T)) {
+                .bool => &.{"boolean"},
+                .int => &.{"int"},
+                .float => &.{"float"},
+                .array, .vector => &.{"array"},
+                .pointer => |pt| switch (pt.size) {
+                    .one => switch (pt.child) {
+                        String => &.{"string"},
+                        Array => &.{"array"},
+                        Object => &.{"object"},
+                        Resource => &.{"resource"},
+                        Value => &.{"reference"},
+                        else => get: {
+                            const al = self.arena.allocator();
+                            const list = try al.alloc([]const u8, 1);
+                            list[0] = Class.Custom(pt.child).get().name().slice();
+                            break :get list;
+                        },
+                    },
+                    .slice => switch (pt.child) {
+                        u8 => &.{ "string", "array" },
+                        else => &.{"array"},
+                    },
+                    else => unsupported(T),
+                },
+                .optional => |opt| try self.getAcceptable(opt.child),
+                .error_union => |eu| try self.getAcceptable(eu.payload),
+                .@"struct" => |st| switch (T) {
+                    php.Callable => &.{"callable"},
+                    else => if (st.backing_integer != null)
+                        &.{ "number", "associative array", "object" }
+                    else
+                        &.{"associative array"},
+                },
+                .@"union" => |un| switch (T) {
+                    Dictionary => &.{ "associative array", "object" },
+                    else => get: {
+                        const al = self.arena.allocator();
+                        var list: std.ArrayList([]const u8) = .empty;
+                        inline for (un.field_types) |FT| {
+                            for (try self.getAcceptable(FT)) |name| {
+                                const included = for (list.items) |item| {
+                                    if (std.mem.eql(u8, item, name)) break true;
+                                } else false;
+                                if (!included) try list.append(al, name);
+                            }
+                        }
+                        break :get list.items;
+                    },
+                },
+                .@"enum" => &.{ "number", "string" },
+                else => unsupported(T),
+            };
+        }
+
+        arena: std.heap.ArenaAllocator = undefined,
+    } = .init();
+    defer helper.deinit();
+    return helper.getName() catch unreachable;
+}
+
 pub inline fn camelize(comptime name: []const u8) [:0]const u8 {
     var buffer: [name.len + 1]u8 = undefined;
     var len: usize = 0;

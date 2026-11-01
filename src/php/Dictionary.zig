@@ -63,22 +63,34 @@ pub const @"union" = union(enum) {
             else => @compileError("Struct type expected, received: " ++ @typeName(T)),
         };
         var s: T = undefined;
-        inline for (st.field_names, st.field_types, 0..) |field_name, FT, i| {
-            @field(s, field_name) = get: {
-                if (self.has(N(field_name))) {
-                    const value = try self.read(N(field_name));
-                    defer value.release();
-                    break :get try value.extract(allocator, FT);
-                } else {
-                    const opaque_ptr = st.field_attrs[i].default_value_ptr orelse {
-                        return failure.report("Missing field value: {s}", .{field_name});
-                    };
-                    const field_value_ptr: *const FT = @ptrCast(@alignCast(opaque_ptr));
-                    break :get field_value_ptr.*;
-                }
+        inline for (st.field_names, st.field_attrs, st.field_types) |field_name, attr, FT| {
+            const value = self.extractField(allocator, field_name, FT, attr.default_value_ptr) catch |err| {
+                return failure.report(
+                    "Unable to obtain value for field '{s}': {s}",
+                    .{ field_name, failure.acquireMessage(err) },
+                );
             };
+            @field(s, field_name) = value;
         }
         return s;
+    }
+
+    fn extractField(
+        self: *const @This(),
+        allocator: std.mem.Allocator,
+        comptime field_name: []const u8,
+        comptime FT: type,
+        default: ?*const anyopaque,
+    ) !FT {
+        if (self.has(N(field_name))) {
+            const value = try self.read(N(field_name));
+            defer value.release();
+            return try value.extract(allocator, FT);
+        } else {
+            const opaque_ptr = default orelse return error.Missing;
+            const field_value_ptr: *const FT = @ptrCast(@alignCast(opaque_ptr));
+            return field_value_ptr.*;
+        }
     }
 
     array: *Array,
