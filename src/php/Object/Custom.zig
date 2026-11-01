@@ -665,7 +665,7 @@ pub fn @"fn"(comptime T: type) type {
             } else {
                 const message = failure.acquireMessage(err);
                 defer failure.freeMessage(message);
-                return failure.report("unable to {s} field '{s}' in {s}: {s}", .{
+                return failure.report("unable to {s} field '{s}' in {s} - {s}", .{
                     @tagName(access),
                     name.slice(),
                     obj.class().name().slice(),

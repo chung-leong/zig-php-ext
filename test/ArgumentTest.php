@@ -133,4 +133,24 @@ final class ArgumentTest extends ExtensionTestCase
         options = .{ .alpha = true, .beta = .cow }
         OUTPUT, implode(PHP_EOL, $lines));
     }
+
+    public function testArgumentErrorMessages(): void
+    {
+        $lines = $this->runTest("arguments", "errors.php");
+        $this->assertSame(<<<OUTPUT
+        printBool() expects exactly 1 argument, 0 given
+        printIntFloats() expects at most 3 arguments, 4 given
+        printIntFloats(): argument #1 (\$int) is incorrect - not integer
+        printBool(): argument #1 (\$boolean) is incorrect - not boolean
+        printUnion(): argument #1 (\$input) is incorrect - not string, array, or floating pointer number
+        printIntOrFloat(): argument #1 (\$input) is incorrect - not integer or floating pointer number
+        acceptPoultry(): argument #1 (\$animal) is incorrect - not Chicken or Turkey
+        acceptOptions(): argument #2 (\$options) is incorrect - unable to obtain value for field 'alpha' - not boolean
+        acceptOptions(): argument #2 (\$options) is incorrect - unable to obtain value for field 'beta' - 'hello' is not a recognized enum member, which has to be 'cow', 'pig', or 'chicken'
+        acceptOptions(): argument #2 (\$options) is incorrect - encountered unknown field 'gamma', expecting 'alpha' and 'beta'
+        printStruct(): argument #1 (\$data) is incorrect - 'number' is a required field
+        printStructRequireTwo(): argument #1 (\$data) is incorrect - 'list' and 'number' are required fields
+        printStructRequireMultiple(): argument #1 (\$data) is incorrect - 'list', 'number', and 'boolean' are required fields
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
 }

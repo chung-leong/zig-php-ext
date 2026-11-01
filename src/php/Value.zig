@@ -266,20 +266,10 @@ pub fn getEnum(self: *const @This(), comptime T: type) !T {
         inline for (field_names) |field_name| {
             if (str.matchStatic(field_name)) return @field(T, field_name);
         } else {
-            const list = comptime join: {
-                const last = field_names.len - 1;
-                var combined: []const u8 = "";
-                for (field_names, 0..) |field_name, i| {
-                    const quoted = "'" ++ field_name ++ "'";
-                    const sep = if (i == last)
-                        if (last != 1) ", or " else " or "
-                    else
-                        ", ";
-                    combined = if (i == 0) quoted else combined ++ sep ++ quoted;
-                }
-                break :join combined;
-            };
-            return failure.report("enum can be {s}, received: '{s}'", .{ list, str.slice() });
+            return failure.report(
+                "'{s}' is not a recognized enum member, which has to be {s}",
+                .{ str.slice(), php.util.getFieldList(T, "or") },
+            );
         }
     }
 }
@@ -394,7 +384,7 @@ pub fn extract(self: *const @This(), allocator: std.mem.Allocator, comptime T: t
                         break @unionInit(T, un.field_names[i], nv);
                     } else |_| {}
                 } else report: {
-                    const type_list = php.util.getArgumentType(T);
+                    const type_list = php.util.getArgumentType(php_al, T);
                     defer php_al.free(type_list);
                     break :report failure.report("not {s}", .{type_list});
                 },

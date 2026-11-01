@@ -201,6 +201,10 @@ pub fn getProperties(self: *const @This()) *Array {
     return @ptrCast(ht);
 }
 
+pub fn getDynamicProperties(self: *const @This()) ?*Array {
+    return @ptrCast(self.impl.properties);
+}
+
 pub fn isCustom(self: *const @This(), comptime T: type) bool {
     return @intFromPtr(self.impl.handlers) == @intFromPtr(&Custom(T).handlers);
 }

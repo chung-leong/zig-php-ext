@@ -284,10 +284,10 @@ pub fn autoFreeable(comptime T: type) bool {
     };
 }
 
-pub fn getArgumentType(comptime Argument: type) []const u8 {
+pub fn getArgumentType(allocator: std.mem.Allocator, comptime Argument: type) []const u8 {
     var helper: struct {
-        pub fn init() @This() {
-            return .{ .arena = .init(php_al) };
+        pub fn init(a: std.mem.Allocator) @This() {
+            return .{ .arena = .init(a), .allocator = a };
         }
 
         pub fn deinit(self: *@This()) void {
@@ -295,14 +295,14 @@ pub fn getArgumentType(comptime Argument: type) []const u8 {
         }
 
         pub fn getName(self: *@This()) ![]const u8 {
-            const list = try self.getAcceptable(Argument);
-            return switch (list.len) {
+            const items = try self.getAcceptable(Argument);
+            return switch (items.len) {
                 0 => unreachable,
-                1 => try php_al.dupe(u8, list[0]),
-                2 => try std.mem.join(php_al, " or ", list),
-                else => try std.mem.join(php_al, ", or ", &.{
-                    try std.mem.join(self.arena.allocator(), ", ", list[0 .. list.len - 1]),
-                    list[list.len - 1],
+                1 => try self.allocator.dupe(u8, items[0]),
+                2 => try std.mem.join(self.allocator, " or ", items),
+                else => try std.mem.join(self.allocator, ", or ", &.{
+                    try std.mem.join(self.arena.allocator(), ", ", items[0 .. items.len - 1]),
+                    items[items.len - 1],
                 }),
             };
         }
@@ -310,8 +310,8 @@ pub fn getArgumentType(comptime Argument: type) []const u8 {
         pub fn getAcceptable(self: *@This(), comptime T: type) ![]const []const u8 {
             return switch (@typeInfo(T)) {
                 .bool => &.{"boolean"},
-                .int => &.{"int"},
-                .float => &.{"float"},
+                .int => &.{"integer"},
+                .float => &.{"floating pointer number"},
                 .array, .vector => &.{"array"},
                 .pointer => |pt| switch (pt.size) {
                     .one => switch (pt.child) {
@@ -321,8 +321,7 @@ pub fn getArgumentType(comptime Argument: type) []const u8 {
                         Resource => &.{"resource"},
                         Value => &.{"reference"},
                         else => get: {
-                            const al = self.arena.allocator();
-                            const list = try al.alloc([]const u8, 1);
+                            const list = try self.arena.allocator().alloc([]const u8, 1);
                             list[0] = Class.Custom(pt.child).get().name().slice();
                             break :get list;
                         },
@@ -345,14 +344,13 @@ pub fn getArgumentType(comptime Argument: type) []const u8 {
                 .@"union" => |un| switch (T) {
                     Dictionary => &.{ "associative array", "object" },
                     else => get: {
-                        const al = self.arena.allocator();
                         var list: std.ArrayList([]const u8) = .empty;
                         inline for (un.field_types) |FT| {
                             for (try self.getAcceptable(FT)) |name| {
                                 const included = for (list.items) |item| {
                                     if (std.mem.eql(u8, item, name)) break true;
                                 } else false;
-                                if (!included) try list.append(al, name);
+                                if (!included) try list.append(self.arena.allocator(), name);
                             }
                         }
                         break :get list.items;
@@ -363,10 +361,29 @@ pub fn getArgumentType(comptime Argument: type) []const u8 {
             };
         }
 
-        arena: std.heap.ArenaAllocator = undefined,
-    } = .init();
+        arena: std.heap.ArenaAllocator,
+        allocator: std.mem.Allocator,
+    } = .init(allocator);
     defer helper.deinit();
     return helper.getName() catch unreachable;
+}
+
+pub fn getFieldList(comptime T: type, comptime conjunction: []const u8) [:0]const u8 {
+    return comptime join: {
+        const field_names = std.meta.fieldNames(T);
+        const last = field_names.len - 1;
+        var combined: []const u8 = "";
+        for (field_names, 0..) |field_name, i| {
+            const quoted = "'" ++ field_name ++ "'";
+            const sep_prefix = if (last != 1) ", " else " ";
+            const sep = if (i == last)
+                sep_prefix ++ conjunction ++ " "
+            else
+                sep_prefix;
+            combined = if (i == 0) quoted else combined ++ sep ++ quoted;
+        }
+        break :join combined[0.. :0];
+    };
 }
 
 pub inline fn camelize(comptime name: []const u8) [:0]const u8 {

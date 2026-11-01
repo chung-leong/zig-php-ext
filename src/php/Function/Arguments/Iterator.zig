@@ -273,7 +273,7 @@ const Mismatch = struct {
         const error_message = failure.acquireMessage(self.err);
         defer failure.freeMessage(error_message);
         if (self.index) |index| {
-            return failure.report("{s}(): argument #{d} ${s} is incorrect: {s}", .{
+            return failure.report("{s}(): argument #{d} (${s}) is incorrect - {s}", .{
                 fn_name,
                 index + 1,
                 self.arg_name,

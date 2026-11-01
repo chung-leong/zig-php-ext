@@ -2,6 +2,7 @@ const std = @import("std");
 
 const php = @import("php/root.zig");
 const Array = php.Array;
+const Class = php.Class;
 const Module = php.Module;
 const Value = php.Value;
 
@@ -82,6 +83,32 @@ pub fn @"call printStruct"(_: *@This(), args: struct {
     }
 }
 
+pub fn @"call printStructRequireTwo"(_: *@This(), args: struct {
+    data: struct {
+        list: []const []const u8,
+        number: f64,
+    },
+}) void {
+    php.print("number = {d}\n", .{args.data.number});
+    for (args.data.list, 0..) |item, i| {
+        php.print("{d}: {s}\n", .{ i, item });
+    }
+}
+
+pub fn @"call printStructRequireMultiple"(_: *@This(), args: struct {
+    data: struct {
+        list: []const []const u8,
+        number: f64,
+        boolean: bool,
+    },
+}) void {
+    php.print("number = {d}\n", .{args.data.number});
+    php.print("boolean = {}\n", .{args.data.boolean});
+    for (args.data.list, 0..) |item, i| {
+        php.print("{d}: {s}\n", .{ i, item });
+    }
+}
+
 pub fn @"call printUnion"(_: *@This(), args: struct {
     input: union(enum) {
         string: []const u8,
@@ -91,6 +118,18 @@ pub fn @"call printUnion"(_: *@This(), args: struct {
     switch (args.input) {
         .string => |str| php.print("string = {s}\n", .{str}),
         .number => |num| php.print("number = {d}\n", .{num}),
+    }
+}
+
+pub fn @"call printIntOrFloat"(_: *@This(), args: struct {
+    input: union(enum) {
+        integer: i64,
+        float: f64,
+    },
+}) void {
+    switch (args.input) {
+        .integer => |int| php.print("integer = {d}\n", .{int}),
+        .float => |float| php.print("float = {d}\n", .{float}),
     }
 }
 
@@ -174,3 +213,24 @@ pub fn @"call acceptOptions"(
     php.print("arg1 = {d}\n", .{args.arg1});
     php.print("options = {}\n", .{args.options});
 }
+
+pub fn @"call acceptPoultry"(
+    _: *@This(),
+    args: struct {
+        animal: union(enum) {
+            chicken: *Chicken,
+            turkey: *Turkey,
+        },
+    },
+) void {
+    switch (args.animal) {
+        .chicken => php.print("Got chicken", .{}),
+        .turkey => php.print("Got turkey", .{}),
+    }
+}
+
+pub const @"export Chicken" = Class.Custom(Chicken);
+pub const @"export Turkey" = Class.Custom(Turkey);
+
+const Chicken = struct {};
+const Turkey = struct {};

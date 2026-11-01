@@ -8,16 +8,16 @@ const String = php.String;
 const Value = php.Value;
 pub const Options = Array.Iterator.Options;
 
-pub fn init(dict: Dictionary, options: Options) !@This() {
-    const arr, const props = switch (dict) {
-        .array => |a| .{ a, null },
-        .object => |o| get: {
-            const p = o.getProperties();
-            break :get .{ p, p };
+pub fn init(dict: Dictionary, options: Options) @This() {
+    const list, const props = switch (dict) {
+        .array => |arr| .{ arr, null },
+        .object => |obj| get: {
+            const props = obj.getProperties();
+            break :get .{ props, props };
         },
     };
     return .{
-        .array_iter = arr.iterate(options),
+        .array_iter = list.iterate(options),
         .object_props = props,
     };
 }
