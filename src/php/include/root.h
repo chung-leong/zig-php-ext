@@ -5,6 +5,7 @@
 #define zval_addref_p inline_zval_addref_p
 #include <php.h>
 #include <zend_builtin_functions.h>
+#include <zend_enum.h>
 #include <zend_exceptions.h>
 #include <zend_fibers.h>
 #include <zend_interfaces.h>

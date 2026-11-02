@@ -46,7 +46,7 @@ pub fn @"fn"(comptime T: type) type {
             return self.class_entry.flags();
         }
 
-        pub fn create(class_name: []const u8, parent_class: ?*Class) *@This() {
+        pub fn create(class_name: *String, parent_class: ?*Class) *@This() {
             const self = php_al.create(@This()) catch unreachable;
             errdefer php_al.destroy(self);
             // determine what interfaces the class supports based on implementation of certain methods
@@ -84,11 +84,10 @@ pub fn @"fn"(comptime T: type) type {
             };
             const class_pce = parent_class orelse Class.builtin(.standard);
             const zce = &self.class_entry.impl;
-            const name_str: *String = .create(class_name);
             zce.* = .{};
             zce.type = c.ZEND_INTERNAL_CLASS;
             zce.refcount = 1;
-            zce.name = @ptrCast(name_str);
+            zce.name = @ptrCast(class_name);
             zce.ce_flags = @bitCast(class_flags);
             zce.num_interfaces = @intCast(interfaces.len);
             zce.unnamed_0.parent = @ptrCast(@constCast(class_pce));
@@ -150,11 +149,11 @@ pub fn @"fn"(comptime T: type) type {
             inline for (st.field_names) |class_name| {
                 const CustomClass = @field(classes, class_name);
                 const full_class_name = parent_class_name ++ "\\" ++ class_name;
-                const cls: *CustomClass = .create(full_class_name, null);
+                const cls: *CustomClass = .create(.static(full_class_name), null);
                 try cls.register();
                 try cls.registerChildren(full_class_name);
                 // add the full class path as a constant
-                const constant: *Class.Constant = .create(self.class(), full_class_name);
+                const constant: *Class.Constant = .create(self.class(), .fromString(.static(full_class_name)));
                 arr.set(class_name, .fromPointer(constant));
             }
         }
@@ -164,13 +163,12 @@ pub fn @"fn"(comptime T: type) type {
             const arr = self.class().constants();
             inline for (st.field_names) |enum_name| {
                 const ET = @field(enums, enum_name);
-                const CustomEnum = Enumeration.Custom(ET);
                 const full_enum_name = parent_class_name ++ "\\" ++ enum_name;
-                const enumeration: *CustomEnum = .create(full_enum_name);
-                try enumeration.register();
+                const enumeration: *Enumeration = .createFromType(.static(full_enum_name), ET);
+                _ = enumeration;
                 // add the full enum path as a constant
-                const constant: *Class.Constant = .create(self.class(), full_enum_name);
-                arr.set(enum_name, .fromPointer(constant));
+                const constant: *Class.Constant = .create(self.class(), .fromString(.static(full_enum_name)));
+                arr.set(String.static(enum_name), .fromPointer(constant));
             }
         }
 
@@ -179,7 +177,7 @@ pub fn @"fn"(comptime T: type) type {
             const arr = self.class().constants();
             inline for (st.field_names) |field_name| {
                 const value = @field(constants, field_name);
-                const constant: *Class.Constant = .create(self.class(), value);
+                const constant: *Class.Constant = .create(self.class(), .fromAny(value, .{}));
                 arr.set(field_name, .fromPointer(constant));
             }
         }

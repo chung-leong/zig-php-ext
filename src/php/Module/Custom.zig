@@ -256,7 +256,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             const st = @typeInfo(@TypeOf(classes)).@"struct";
             inline for (st.field_names) |class_name| {
                 const CustomClass = @field(classes, class_name);
-                const cls: *CustomClass = .create(class_name, null);
+                const cls: *CustomClass = .create(.static(class_name), null);
                 try cls.register();
                 try cls.registerChildren(class_name);
             }
@@ -266,9 +266,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             const st = @typeInfo(@TypeOf(enums)).@"struct";
             inline for (st.field_names) |enum_name| {
                 const ET = @field(enums, enum_name);
-                const CustomEnum = Enumeration.Custom(ET);
-                const enumeration: *CustomEnum = .create(enum_name);
-                try enumeration.register();
+                const enumeration: *Enumeration = .createFromType(.static(enum_name), ET);
+                _ = enumeration;
             }
         }
 

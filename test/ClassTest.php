@@ -170,7 +170,7 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame("(writeProperty: cow)", $lines[6]);
         $this->assertSame("no field named 'cow' in WithReadProperty", $lines[7]);
         $this->assertSame("(writeProperty: bar)", $lines[8]);
-        $this->assertSame("unable to write field 'bar' in WithReadProperty: read only", $lines[9]);
+        $this->assertSame("unable to write field 'bar' in WithReadProperty - read only", $lines[9]);
         $this->assertSame("true", $lines[10]);
         $this->assertSame("(hasProperty: foo) (readProperty: foo) true", $lines[11]);
         $this->assertSame("(hasProperty: bar) (readProperty: bar) true", $lines[12]);
@@ -179,7 +179,7 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame("optional =", $lines[15]);
         $this->assertSame("(unsetProperty: foo)", $lines[16]);
         $this->assertSame("foo = (readProperty: foo) -1", $lines[17]);
-        $this->assertSame("unable to unset field 'number' in WithReadProperty: cannot be null", $lines[18]);
+        $this->assertSame("unable to unset field 'number' in WithReadProperty - cannot be null", $lines[18]);
         $this->assertSame("(unsetProperty: cow)", $lines[19]);
         $this->assertSame("no field named 'cow' in WithReadProperty", $lines[20]);
     }
@@ -196,7 +196,7 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame("(writeProperty: cow)", $lines[6]);
         $this->assertSame("no field named 'cow' in WithReadPropertyCache", $lines[7]);
         $this->assertSame("(writeProperty: bar)", $lines[8]);
-        $this->assertSame("unable to write field 'bar' in WithReadPropertyCache: read only", $lines[9]);
+        $this->assertSame("unable to write field 'bar' in WithReadPropertyCache - read only", $lines[9]);
         $this->assertSame("true", $lines[10]);
         $this->assertSame("(hasProperty: foo) (readProperty: foo) true", $lines[11]);
         $this->assertSame("(hasProperty: bar) (readProperty: bar) true", $lines[12]);
@@ -205,7 +205,7 @@ final class ClassTest extends ExtensionTestCase
         $this->assertSame("optional =", $lines[15]);
         $this->assertSame("(unsetProperty: foo)", $lines[16]);
         $this->assertSame("foo = (readProperty: foo) -1", $lines[17]);
-        $this->assertSame("unable to unset field 'number' in WithReadPropertyCache: cannot be null", $lines[18]);
+        $this->assertSame("unable to unset field 'number' in WithReadPropertyCache - cannot be null", $lines[18]);
         $this->assertSame("(unsetProperty: cow)", $lines[19]);
         $this->assertSame("no field named 'cow' in WithReadPropertyCache", $lines[20]);
     }
