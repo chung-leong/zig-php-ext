@@ -2,13 +2,13 @@
 
 require_once __DIR__ . '/ExtensionTestCase.php';
 
-final class ConfigTest extends ExtensionTestCase
+final class ComptimeConfigTest extends ExtensionTestCase
 {   
     public function testCustomConfig(): void
     {
-        $lines = $this->runTest("custom-config", "test.php");
+        $lines = $this->runTest("comptime-config", "test.php");
         $this->assertSame(<<<OUTPUT
-        ext_name = custom_config
+        ext_name = comptime_config
         ext_version = 0.1.0
         cfg_string = Hello world
         cfg_int = 1234

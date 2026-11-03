@@ -1,5 +1,5 @@
 {
-    "name": "mycompany/classes",
+    "name": "mycompany/class",
     "description": "A description of my application",    
     "version": "0.1.0",
     "require-dev": {

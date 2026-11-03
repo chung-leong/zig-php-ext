@@ -6,7 +6,7 @@ final class ClassTest extends ExtensionTestCase
 {   
     public function testSimpleClass(): void
     {
-        $lines = $this->runTest("classes", "simple.php");
+        $lines = $this->runTest("class", "simple.php");
         $this->assertSame("Hello, Bob!", $lines[0]);
         $this->assertSame("Hello", $lines[1]);
         $this->assertSame("Hi, Alice!", $lines[2]);
@@ -14,7 +14,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testOptionalFields(): void
     {
-        $lines = $this->runTest("classes", "optional.php");
+        $lines = $this->runTest("class", "optional.php");
         $this->assertSame(<<<OUTPUT
         Superhero Object
         (
@@ -31,7 +31,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testDefaultConstructor(): void
     {
-        $lines = $this->runTest("classes", "def-constructor.php");
+        $lines = $this->runTest("class", "def-constructor.php");
         $this->assertSame(<<<OUTPUT
         Point Object
         (
@@ -56,14 +56,14 @@ final class ClassTest extends ExtensionTestCase
 
     public function testComputedProperty(): void
     {
-        $lines = $this->runTest("classes", "computed.php");
+        $lines = $this->runTest("class", "computed.php");
         $this->assertSame("normal = 5", $lines[0]);
         $this->assertSame("template = Hi, \$name!", $lines[1]);
     }
 
     public function testConstructor(): void
     {
-        $lines = $this->runTest("classes", "constructor.php");
+        $lines = $this->runTest("class", "constructor.php");
         $this->assertSame(<<<OUTPUT
         Cat (.pet)
         Martin (.wild)
@@ -73,7 +73,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testStaticMethod(): void
     {
-        $lines = $this->runTest("classes", "static-method.php");
+        $lines = $this->runTest("class", "static-method.php");
         $this->assertSame(<<<OUTPUT
         number = 123
         text = Chicken
@@ -82,7 +82,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testStaticConstant(): void
     {
-        $lines = $this->runTest("classes", "static-constant.php");
+        $lines = $this->runTest("class", "static-constant.php");
         $this->assertSame(<<<OUTPUT
         number = 1234
         text = Hello world
@@ -103,7 +103,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testFreeObject(): void
     {
-        $lines = $this->runTest("classes", "free-object.php");
+        $lines = $this->runTest("class", "free-object.php");
         $this->assertSame(<<<OUTPUT
         destroyObject
         freeObject
@@ -112,7 +112,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testGetConstructor(): void
     {
-        $lines = $this->runTest("classes", "get-constructor.php");
+        $lines = $this->runTest("class", "get-constructor.php");
         // no "init" or "deinit"
         $this->assertSame(<<<OUTPUT
         getConstructor
@@ -124,7 +124,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testCloneObject(): void
     {
-        $lines = $this->runTest("classes", "clone-object.php");
+        $lines = $this->runTest("class", "clone-object.php");
         $this->assertSame(<<<OUTPUT
         WithCloneObject Object
         (
@@ -142,7 +142,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testClone(): void
     {
-        $lines = $this->runTest("classes", "clone.php");
+        $lines = $this->runTest("class", "clone.php");
         $this->assertSame(<<<OUTPUT
         WithClone Object
         (
@@ -160,7 +160,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testReadProperty(): void
     {
-        $lines = $this->runTest("classes", "properties.php");
+        $lines = $this->runTest("class", "properties.php");
         $this->assertSame("number = 2001", $lines[0]);
         $this->assertSame("foo = (readProperty: foo) 4567", $lines[1]);
         $this->assertSame("bar = (readProperty: bar) Rats live on no evil star", $lines[2]);
@@ -186,7 +186,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testReadPropertyWithCache(): void
     {
-        $lines = $this->runTest("classes", "properties-cache.php");
+        $lines = $this->runTest("class", "properties-cache.php");
         $this->assertSame("number = 2001", $lines[0]);
         $this->assertSame("foo = (readProperty: foo) 4567", $lines[1]);
         $this->assertSame("bar = (readProperty: bar) Rats live on no evil star", $lines[2]);
@@ -212,7 +212,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testReadDimension(): void
     {
-        $lines = $this->runTest("classes", "dimension.php");
+        $lines = $this->runTest("class", "dimension.php");
         $this->assertSame(<<<OUTPUT
         len = 8
         count = 8
@@ -234,7 +234,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testGetClassName(): void
     {
-        $lines = $this->runTest("classes", "class-name.php");
+        $lines = $this->runTest("class", "class-name.php");
         $this->assertSame(<<<OUTPUT
         getClassName
         DingoPower Object
@@ -246,7 +246,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testGetProperties(): void
     {
-        $lines = $this->runTest("classes", "property-array.php");
+        $lines = $this->runTest("class", "property-array.php");
         $this->assertSame(<<<OUTPUT
         (getProperties: .debug) WithGetProperties Object
         (
@@ -261,7 +261,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testGetPropertiesNoGetter(): void
     {
-        $lines = $this->runTest("classes", "property-array-no-getters.php");
+        $lines = $this->runTest("class", "property-array-no-getters.php");
         $this->assertSame(<<<OUTPUT
         (getProperties: .debug) WithGetPropertiesNoGetters Object
         (
@@ -274,7 +274,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testGetMethod(): void
     {
-        $lines = $this->runTest("classes", "method.php");        
+        $lines = $this->runTest("class", "method.php");        
         echo 
         $this->assertSame(<<<OUTPUT
         foo
@@ -289,7 +289,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testCompareWith(): void
     {
-        $lines = $this->runTest("classes", "compare.php");        
+        $lines = $this->runTest("class", "compare.php");        
         $this->assertSame(<<<OUTPUT
         compareWith: 4
         less than 4
@@ -303,7 +303,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testGetClosure(): void
     {
-        $lines = $this->runTest("classes", "closure.php");        
+        $lines = $this->runTest("class", "closure.php");        
         $this->assertSame(<<<OUTPUT
         getClosure: false
         .{ .number1 = 2.5, .number2 = 10 }
@@ -313,7 +313,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testCastObject(): void
     {
-        $lines = $this->runTest("classes", "cast.php");        
+        $lines = $this->runTest("class", "cast.php");        
         $this->assertSame(<<<OUTPUT
         to bool => castObject
         true
@@ -328,7 +328,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testDoOperation(): void
     {
-        $lines = $this->runTest("classes", "operation.php");        
+        $lines = $this->runTest("class", "operation.php");        
         $this->assertSame(<<<OUTPUT
         doOperation: .add 3.141592653589793 2
         5.1415926535898
@@ -343,13 +343,13 @@ final class ClassTest extends ExtensionTestCase
 
     public function testGetGarbageCollection(): void
     {
-        $lines = $this->runTest("classes", "gc.php");
+        $lines = $this->runTest("class", "gc.php");
         $this->assertSame("getGarbageCollection", $lines[0]);
     }
 
     public function testIterate(): void
     {
-        $lines = $this->runTest("classes", "iterate.php");
+        $lines = $this->runTest("class", "iterate.php");
         $this->assertSame(<<<OUTPUT
         iterate
         0: 0
@@ -365,7 +365,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testGetIterator(): void
     {
-        $lines = $this->runTest("classes", "get-iterator.php");
+        $lines = $this->runTest("class", "get-iterator.php");
         $this->assertSame(<<<OUTPUT
         getIterator
         0: 0
@@ -378,7 +378,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testSubclass(): void
     {
-        $lines = $this->runTest("classes", "subclass.php");
+        $lines = $this->runTest("class", "subclass.php");
         $this->assertSame(<<<OUTPUT
         Hello
         2
@@ -389,13 +389,13 @@ final class ClassTest extends ExtensionTestCase
 
     public function testObjectArgument(): void
     {
-        $lines = $this->runTest("classes", "obj-argument.php");
+        $lines = $this->runTest("class", "obj-argument.php");
         $this->assertSame("x = 1.23, y = 4.56", $lines[0]);
     }
 
     public function testComplexProperties(): void
     {
-        $lines = $this->runTest("classes", "complex.php");
+        $lines = $this->runTest("class", "complex.php");
         $this->assertSame(<<<OUTPUT
         ComplexProperties Object
         (
@@ -549,7 +549,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testObjectReturnValue(): void
     {
-        $lines = $this->runTest("classes", "obj-retval.php");
+        $lines = $this->runTest("class", "obj-retval.php");
         $this->assertSame(<<<OUTPUT
         Point Object
         (
@@ -562,7 +562,7 @@ final class ClassTest extends ExtensionTestCase
 
     public function testMixedReturnValue(): void
     {
-        $lines = $this->runTest("classes", "mixed-retval.php");
+        $lines = $this->runTest("class", "mixed-retval.php");
         $this->assertSame(<<<OUTPUT
         Array
         (

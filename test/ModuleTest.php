@@ -2,11 +2,11 @@
 
 require_once __DIR__ . '/ExtensionTestCase.php';
 
-final class ModuleHandlerTest extends ExtensionTestCase
+final class ModuleTest extends ExtensionTestCase
 {   
     public function testHandlers(): void
     {
-        $lines = $this->runTest("module-handlers", "test.php");
+        $lines = $this->runTest("module", "test.php");
         $this->assertSame(<<<OUTPUT
         moduleStartup: .persistent
         requestStartup: .persistent

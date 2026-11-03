@@ -6,7 +6,7 @@ final class ConstantTest extends ExtensionTestCase
 {   
     public function testSimpleConstant(): void
     {
-        $lines = $this->runTest("constants", "simple.php");
+        $lines = $this->runTest("constant", "simple.php");
         $this->assertSame("bool = 1", $lines[0]);
         $this->assertSame("int = 1234", $lines[1]);
         $this->assertSame("float = 3.1415926535898", $lines[2]);
@@ -14,13 +14,13 @@ final class ConstantTest extends ExtensionTestCase
 
     public function testStringConstant(): void
     {
-        $lines = $this->runTest("constants", "string.php");
+        $lines = $this->runTest("constant", "string.php");
         $this->assertSame("string = Hello world", $lines[0]);
     }
 
     public function testArrayConstant(): void
     {
-        $lines = $this->runTest("constants", "array.php");
+        $lines = $this->runTest("constant", "array.php");
         $this->assertSame(<<<OUTPUT
         Array
         (
@@ -39,7 +39,7 @@ final class ConstantTest extends ExtensionTestCase
 
     public function testFindConstant(): void
     {
-        $lines = $this->runTest("constants", "show.php");
+        $lines = $this->runTest("constant", "show.php");
         $this->assertSame("Hello world", $lines[0]);
         $this->assertSame("1234", $lines[1]);
         $this->assertSame("3.1415926535898", $lines[2]);
@@ -47,7 +47,7 @@ final class ConstantTest extends ExtensionTestCase
 
     public function testEnumConstant(): void
     {
-        $lines = $this->runTest("constants", "enum.php");
+        $lines = $this->runTest("constant", "enum.php");
         $this->assertSame(<<<OUTPUT
         exists
         hello = 0
@@ -70,7 +70,7 @@ final class ConstantTest extends ExtensionTestCase
 
     public function testPackedStructConstant(): void
     {
-        $lines = $this->runTest("constants", "packed.php");
+        $lines = $this->runTest("constant", "packed.php");
         $this->assertSame(<<<OUTPUT
         option_a = 1
         option_b = 2
