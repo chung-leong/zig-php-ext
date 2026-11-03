@@ -13,4 +13,4 @@ echo "cat = ", WithStatic::Enum::cat->value, "\n";
 echo "dog = ", WithStatic::Enum::dog->value, "\n";
 echo "dog = ", Enum::dog->value, "\n";
 echo "Flag = ", WithStatic::Flag, "\n";
-echo "pork = ", Flag::pork->value, "\n";
+echo "pork = ", Flag::pork, "\n";
