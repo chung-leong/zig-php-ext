@@ -13,12 +13,12 @@ pub fn value(self: *const @This()) Value {
     return .fromZval(self.impl.value);
 }
 
-pub fn create(cls: *Class, v: Value) *@This() {
+pub fn create(cls: *const Class, const_value: Value) *@This() {
     const self = php_al.create(@This()) catch unreachable;
     self.* = .{
         .impl = .{
-            .value = v.toZval(),
-            .ce = @ptrCast(cls),
+            .value = const_value.toZval(),
+            .ce = @ptrCast(@constCast(cls)),
         },
     };
     self.impl.value.u2.constant_flags = c.CONST_PERSISTENT;

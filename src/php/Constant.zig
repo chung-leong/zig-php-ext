@@ -1,3 +1,4 @@
+pub const AstRef = @import("Constant/AstRef.zig");
 const php = @import("root.zig");
 const c = php.c;
 const php_al = php.allocator;
@@ -21,17 +22,16 @@ pub fn find(n: *String) ?*@This() {
     return v.getPointerOf(@This()) catch return null;
 }
 
-pub fn create(const_name: []const u8, arg: anytype) *@This() {
+pub fn create(const_name: []const u8, const_value: Value) *@This() {
     const self = php_al.create(@This()) catch unreachable;
     const name_str: *String = .create(const_name);
-    var v: Value = .fromAny(arg, .{});
-    v.impl.u2.constant_flags = c.CONST_PERSISTENT;
     self.* = .{
         .impl = .{
             .name = @ptrCast(name_str),
-            .value = v.toZval(),
+            .value = const_value.toZval(),
         },
     };
+    self.impl.value.u2.constant_flags = c.CONST_PERSISTENT;
     return self;
 }
 

@@ -55,6 +55,16 @@ final class ConstantTest extends ExtensionTestCase
         alpha = 123
         beta = 456
         gamma = 789
+        a = ConstType Enum:int
+        (
+            [name] => alpha
+            [value] => 123
+        )
+        b = ConstType Enum:int
+        (
+            [name] => beta
+            [value] => 456
+        )
         OUTPUT, implode(PHP_EOL, $lines));
     }
 

@@ -4,6 +4,7 @@ const php = @import("root.zig");
 const c = php.c;
 const Array = php.Array;
 const Class = php.Class;
+const Constant = php.Constant;
 const Object = php.Object;
 const pi = php.imports;
 const String = php.String;
@@ -64,14 +65,18 @@ fn addEnumFields(self: *@This(), comptime T: type) void {
         for (en.decl_names) |decl_name| {
             if (@TypeOf(@field(T, decl_name)) == T) alias_count += 1;
         }
-        var aliases: [alias_count]CaseInfo = undefined;
+        var aliases: [alias_count]AliasInfo = undefined;
         var index: usize = 0;
         for (en.decl_names) |decl_name| {
             if (@TypeOf(@field(T, decl_name)) == T) {
                 const decl_value = @field(T, decl_name);
+                const field_index = for (en.field_values, 0..) |field_value, i| {
+                    if (@backingInt(decl_value) == field_value) break i;
+                };
+                const field_name = en.field_names[field_index];
                 aliases[index] = .{
                     .name = String.static(decl_name),
-                    .value = .fromAny(decl_value, .{}),
+                    .case_name = String.static(field_name),
                 };
                 index += 1;
             }
@@ -80,13 +85,19 @@ fn addEnumFields(self: *@This(), comptime T: type) void {
     };
     for (cases) |case| self.addCase(case.name, case.value);
     // add aliases as constants
-    _ = aliases;
-    // const arr = self.class().constants();
-    // for (aliases) |alias| {
-    //     const case_obj = self.findCaseByValue(alias.value) orelse continue;
-    //     const constant: *Class.Constant = .create(self.class(), .fromObject(case_obj.retain()));
-    //     arr.set(alias.name, .fromPointer(constant));
-    // }
+    const cls = self.class();
+    const constants = cls.constants();
+    for (aliases) |alias| {
+        const ast_ref: *Constant.AstRef = .createClassConstFetch(cls.name(), alias.case_name);
+        const ast_value: Value = .{
+            .impl = .{
+                .u1 = .{ .type_info = c.IS_CONSTANT_AST },
+                .value = .{ .ast = @ptrCast(ast_ref) },
+            },
+        };
+        const constant: *Class.Constant = .create(cls, ast_value);
+        constants.set(alias.name, .fromPointer(constant));
+    }
 }
 
 fn addPackedStructFields(self: *@This(), comptime T: type) void {
@@ -109,17 +120,22 @@ fn addPackedStructFields(self: *@This(), comptime T: type) void {
         }
         break :init cases;
     };
-    const arr = self.class().constants();
+    const cls = self.class();
+    const constants = self.class().constants();
     for (cases) |case| {
         // packed struct fields get added as constants
-        const constant: *Class.Constant = .create(self.class(), case.value);
-        arr.set(case.name, .fromPointer(constant));
+        const constant: *Class.Constant = .create(cls, case.value);
+        constants.set(case.name, .fromPointer(constant));
     }
 }
 
 const CaseInfo = struct {
     name: *String,
     value: Value,
+};
+const AliasInfo = struct {
+    name: *String,
+    case_name: *String,
 };
 
 class_entry: Class,

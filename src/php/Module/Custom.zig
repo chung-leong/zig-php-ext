@@ -301,7 +301,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                 };
                 if (persistent == is_literal) {
                     const value = @field(constants, field_name);
-                    const constant: *Constant = .create(field_name, value);
+                    const constant: *Constant = .create(field_name, .fromAny(value, .{}));
                     try constant.register(arr);
                 }
             }

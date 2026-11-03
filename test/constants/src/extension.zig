@@ -1,4 +1,5 @@
 const std = @import("std");
+pub const @"export CONST_FLOAT" = std.math.pi;
 
 const php = @import("php/root.zig");
 const Constant = php.Constant;
@@ -7,7 +8,6 @@ const String = php.String;
 
 pub const @"export CONST_BOOL" = true;
 pub const @"export CONST_INT" = 1234;
-pub const @"export CONST_FLOAT" = std.math.pi;
 pub const @"export CONST_STRING" = "Hello world";
 pub const @"export CONST_ARRAY" = [4]i32{ 1, 2, 3, 4 };
 pub const @"export CONST_STRING_ARRAY" = [2][]const u8{ "Hello", "world" };
@@ -17,6 +17,9 @@ pub const @"export ConstType" = enum(i32) {
     alpha = 123,
     beta = 456,
     gamma = 789,
+
+    pub const a: @This() = .alpha;
+    pub const b: @This() = .beta;
 };
 pub const @"export ConstFlag" = packed struct {
     option_a: bool,
