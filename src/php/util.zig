@@ -15,6 +15,7 @@ const Stream = php.Stream;
 const String = php.String;
 const Value = php.Value;
 pub const api = @import("util/api.zig");
+pub const macgyver = @import("util/macgyver.zig");
 pub const symbol = @import("util/symbol.zig");
 
 pub fn argCount(comptime F: type) usize {

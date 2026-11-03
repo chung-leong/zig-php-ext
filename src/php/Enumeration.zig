@@ -24,17 +24,6 @@ pub fn register(comptime full_name: []const u8, kind: Value.Kind) !*@This() {
     return @ptrCast(zce);
 }
 
-pub fn addFields(self: *@This(), comptime T: type) !void {
-    switch (@typeInfo(T)) {
-        .@"enum" => try self.addEnumFields(T),
-        .@"struct" => |st| switch (st.layout) {
-            .@"packed" => try self.addPackedStructFields(T),
-            else => @compileError("Packed struct expected, received: " ++ @typeName(T)),
-        },
-        else => @compileError("Enum or packed struct expected, received: " ++ @typeName(T)),
-    }
-}
-
 pub fn getCase(self: *@This(), name: *String) *Object {
     const zobj = pi.zend_enum_get_case(@ptrCast(self.class()), @ptrCast(name));
     return @ptrCast(zobj);
@@ -52,19 +41,33 @@ pub fn addCase(self: *@This(), name: *String, value: Value) void {
     pi.zend_enum_add_case(@ptrCast(self.class()), @ptrCast(name), &zval);
 }
 
+pub fn addFields(self: *@This(), comptime T: type) !void {
+    switch (@typeInfo(T)) {
+        .@"enum" => try self.addEnumFields(T),
+        .@"struct" => |st| switch (st.layout) {
+            .@"packed" => try self.addPackedStructFields(T),
+            else => @compileError("Packed struct expected, received: " ++ @typeName(T)),
+        },
+        else => @compileError("Enum or packed struct expected, received: " ++ @typeName(T)),
+    }
+}
+
 fn addEnumFields(self: *@This(), comptime T: type) !void {
-    const cases, const aliases = comptime init: {
-        const en = @typeInfo(T).@"enum";
+    const en = @typeInfo(T).@"enum";
+    const cases = comptime init: {
         const count = en.field_names.len;
-        var cases: [count]CaseInfo = undefined;
+        var list: [count]CaseInfo = undefined;
         for (en.field_names, en.field_values, 0..) |field_name, field_value, i| {
-            cases[i] = .{ .name = field_name, .value = field_value };
+            list[i] = .{ .name = field_name, .value = field_value };
         }
-        var alias_count: usize = 0;
+        break :init list;
+    };
+    const aliases = comptime init: {
+        var count: usize = 0;
         for (en.decl_names) |decl_name| {
-            if (@TypeOf(@field(T, decl_name)) == T) alias_count += 1;
+            if (@TypeOf(@field(T, decl_name)) == T) count += 1;
         }
-        var aliases: [alias_count]AliasInfo = undefined;
+        var list: [count]AliasInfo = undefined;
         var index: usize = 0;
         for (en.decl_names) |decl_name| {
             if (@TypeOf(@field(T, decl_name)) == T) {
@@ -73,11 +76,11 @@ fn addEnumFields(self: *@This(), comptime T: type) !void {
                     if (@backingInt(decl_value) == field_value) break i;
                 };
                 const field_name = en.field_names[field_index];
-                aliases[index] = .{ .name = decl_name, .case_name = field_name };
+                list[index] = .{ .name = decl_name, .case_name = field_name };
                 index += 1;
             }
         }
-        break :init .{ cases, aliases };
+        break :init list;
     };
     inline for (cases) |case| {
         self.addCase(.static(case.name), .fromInteger(case.value));
@@ -97,6 +100,15 @@ fn addEnumFields(self: *@This(), comptime T: type) !void {
         _ = constant;
     }
 }
+
+const CaseInfo = struct {
+    name: []const u8,
+    value: comptime_int,
+};
+const AliasInfo = struct {
+    name: []const u8,
+    case_name: []const u8,
+};
 
 fn addPackedStructFields(self: *@This(), comptime T: type) !void {
     const cases = comptime init: {
@@ -123,14 +135,5 @@ fn addPackedStructFields(self: *@This(), comptime T: type) !void {
         _ = constant;
     }
 }
-
-const CaseInfo = struct {
-    name: []const u8,
-    value: comptime_int,
-};
-const AliasInfo = struct {
-    name: []const u8,
-    case_name: []const u8,
-};
 
 class_entry: Class,

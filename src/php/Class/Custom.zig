@@ -52,6 +52,10 @@ pub fn @"fn"(comptime T: type) type {
             return self.class_entry.flags();
         }
 
+        pub fn isRegistered() bool {
+            return registered != null;
+        }
+
         pub fn register(comptime full_name: []const u8, parent_class: ?*Class) !*@This() {
             return registered orelse create: {
                 const class_name: *String = .static(full_name);

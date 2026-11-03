@@ -23,12 +23,12 @@ pub fn find(n: *String) ?*@This() {
 }
 
 pub fn register(comptime full_name: []const u8, const_value: Value) !*@This() {
-    const const_name: *String = .static(full_name);
+    // we can't use a static string here, since PHP insists on freeing it
+    const const_name: *String = .create(full_name);
     const self = create(const_name, const_value);
     const constants = php.constants();
     if (constants.has(self.name())) return error.NameConflict;
-    const constant_name: *String = .create(full_name);
-    constants.set(constant_name, .fromPointer(self));
+    constants.set(const_name, .fromPointer(self));
     return self;
 }
 

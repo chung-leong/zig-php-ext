@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const php = @import("../root.zig");
 const c = php.c;
@@ -106,6 +107,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             Allocator.mode = .persistent;
             defer {
                 Singleton(T).deinit();
+                // adjust class constants prior to shutdown to avoid assertion when ZEND_DEBUG=1 (issue #34)
+                if (php.debug) php.util.macgyver.fixProblematicConstants();
                 unregisterIniEntries(module_no);
             }
             if (!@hasDecl(T, "moduleShutdown")) return;

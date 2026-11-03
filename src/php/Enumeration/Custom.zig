@@ -26,6 +26,10 @@ pub fn @"fn"(comptime T: type) type {
             };
         }
 
+        pub fn isRegistered() bool {
+            return registered != null;
+        }
+
         pub fn register(comptime full_name: []const u8) !*@This() {
             return registered orelse create: {
                 const en: *Enumeration = try .register(full_name, .integer);
