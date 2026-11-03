@@ -28,10 +28,14 @@ pub fn @"call returnNewString"(_: *@This(), allocator: std.mem.Allocator, args: 
 }
 
 pub const @"export Animal" = Animal;
-const Animal = enum { cat, dog, turkey, monkey };
+const Animal = enum(u8) { cat, dog, turkey, monkey, _ };
 
 pub fn @"call returnEnum"(_: *@This()) Animal {
     return .dog;
+}
+
+pub fn @"call returnUnknownEnum"(_: *@This()) Animal {
+    return @fromBackingInt(@intCast(123));
 }
 
 pub fn @"call returnFlags"(_: *@This()) packed struct(u8) {

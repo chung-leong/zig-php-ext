@@ -205,6 +205,11 @@ pub fn getDynamicProperties(self: *const @This()) ?*Array {
     return @ptrCast(self.impl.properties);
 }
 
+pub fn getStaticPropertyByIndex(self: *const @This(), index: usize) Value {
+    const zobj = @constCast(&self.impl);
+    return .fromZval(zobj.properties_table[index]);
+}
+
 pub fn isCustom(self: *const @This(), comptime T: type) bool {
     return @intFromPtr(self.impl.handlers) == @intFromPtr(&Custom(T).handlers);
 }

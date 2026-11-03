@@ -23,7 +23,14 @@ final class ReturnValueTest extends ExtensionTestCase
     public function testEnumReturnValue(): void
     {
         $lines = $this->runTest("return-value", "enum.php");
-        $this->assertSame("enum = 1", $lines[0]);
+        $this->assertSame(<<<OUTPUT
+        enum = Animal Enum:int
+        (
+            [name] => dog
+            [value] => 1
+        )
+        123
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
     public function testFlagsReturnValue(): void

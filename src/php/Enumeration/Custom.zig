@@ -7,7 +7,7 @@ const String = php.String;
 pub fn @"fn"(comptime T: type) type {
     return struct {
         pub fn enumeration(self: *const @This()) *Enumeration {
-            return @constCast(self.enum_entry);
+            return @constCast(&self.enum_entry);
         }
 
         pub fn name(_: *const @This()) *String {

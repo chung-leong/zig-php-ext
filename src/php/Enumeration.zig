@@ -118,7 +118,8 @@ fn addPackedStructFields(self: *@This(), comptime T: type) !void {
     const cls = self.class();
     inline for (cases) |case| {
         // packed struct fields get added as constants
-        const constant: *Class.Constant = try .register(case.name, .fromInteger(case.value), cls);
+        const constant_value: Value = .fromAny(case.value, .{});
+        const constant: *Class.Constant = try .register(case.name, constant_value, cls);
         _ = constant;
     }
 }

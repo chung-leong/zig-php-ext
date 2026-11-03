@@ -4,86 +4,110 @@ require_once __DIR__ . '/ExtensionTestCase.php';
 
 final class ArgumentTest extends ExtensionTestCase
 {   
-    public function testSimpleArgs(): void
+    public function testSimpleArguments(): void
     {
         $lines = $this->runTest("argument", "simple.php");
-        $this->assertSame("boolean = true", $lines[0]);
-        $this->assertSame("boolean = false", $lines[1]);
-        $this->assertSame("int = 1234", $lines[2]);
-        $this->assertSame("uint = 4567", $lines[3]);
-        $this->assertSame("int = 100, float1 = 42.5, float2 = 3.14", $lines[4]);
+        $this->assertSame(<<<OUTPUT
+        boolean = true
+        boolean = false
+        int = 1234
+        uint = 4567
+        int = 100, float1 = 42.5, float2 = 3.14
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testStringArgs(): void
+    public function testStringArguments(): void
     {
         $lines = $this->runTest("argument", "string.php");
-        $this->assertSame("string = Hello world", $lines[0]);
-        $this->assertSame("string1 = foo, string2 = bar", $lines[1]);
+        $this->assertSame(<<<OUTPUT
+        string = Hello world
+        string1 = foo, string2 = bar
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testEnumArgs(): void
+    public function testEnumArguments(): void
     {
         $lines = $this->runTest("argument", "enum.php");
-        $this->assertSame("enum = .cat", $lines[0]);
-        $this->assertSame("enum = .dog", $lines[1]);
-        $this->assertSame("enum = .monkey", $lines[2]);
+        $this->assertSame(<<<OUTPUT
+        enum = .cat
+        enum = .dog
+        enum = .monkey
+        enum = .monkey
+        enum = .monkey
+        enum = .dog
+        enum = .turkey
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testFlagsArgs(): void
+    public function testFlagsArguments(): void
     {
         $lines = $this->runTest("argument", "flags.php");
-        $this->assertSame("flags = .{ .option1 = true, .option2 = false, .option3 = true, .option4 = false, ._ = 0 }", $lines[0]);
-        $this->assertSame("flags = .{ .option1 = false, .option2 = false, .option3 = false, .option4 = true, ._ = 0 }", $lines[1]);
-        $this->assertSame("flags = .{ .option1 = false, .option2 = false, .option3 = false, .option4 = false, ._ = 0 }", $lines[2]);
+        $this->assertSame(<<<OUTPUT
+        flags = .{ .option1 = true, .option2 = false, .option3 = true, .option4 = false, ._ = 0 }
+        flags = .{ .option1 = false, .option2 = false, .option3 = false, .option4 = true, ._ = 0 }
+        flags = .{ .option1 = false, .option2 = false, .option3 = false, .option4 = false, ._ = 0 }
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testListArgs(): void
+    public function testListArguments(): void
     {
         $lines = $this->runTest("argument", "list.php");
-        $this->assertSame("0: hello", $lines[0]);
-        $this->assertSame("1: world", $lines[1]);
-        $this->assertSame("2: chicken", $lines[2]);
+        $this->assertSame(<<<OUTPUT
+        0: hello
+        1: world
+        2: chicken
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testStructArgs(): void
+    public function testStructArguments(): void
     {
         $lines = $this->runTest("argument", "struct.php");
-        $this->assertSame("number = 1234", $lines[0]); 
-        $this->assertSame("0: hello", $lines[1]);
-        $this->assertSame("1: world", $lines[2]);
-        $this->assertSame("2: chicken", $lines[3]);
-        $this->assertSame("number = 4567", $lines[4]);
-        $this->assertSame("0: hello", $lines[5]);
-        $this->assertSame("1: world", $lines[6]);
+        $this->assertSame(<<<OUTPUT
+        number = 1234
+        0: hello
+        1: world
+        2: chicken
+        number = 4567
+        0: hello
+        1: world
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testUnionArgs(): void
+    public function testUnionArguments(): void
     {
         $lines = $this->runTest("argument", "union.php");
-        $this->assertSame("number = 1234", $lines[0]); 
-        $this->assertSame("string = Hello world", $lines[1]);
+        $this->assertSame(<<<OUTPUT
+        number = 1234
+        string = Hello world
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testArrayArgs(): void
+    public function testArrayArguments(): void
     {
         $lines = $this->runTest("argument", "array.php");
-        $this->assertSame("array = { 1.5, 2.3, 789 }", $lines[0]); 
+        $this->assertSame(<<<OUTPUT
+        array = { 1.5, 2.3, 789 }
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testVectorArgs(): void
+    public function testVectorArguments(): void
     {
         $lines = $this->runTest("argument", "vector.php");
-        $this->assertSame("vector = { 1.5, 2.3, 789 }", $lines[0]); 
+        $this->assertSame(<<<OUTPUT
+        vector = { 1.5, 2.3, 789 }
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testOptionalArgs(): void
+    public function testOptionalArguments(): void
     {
         $lines = $this->runTest("argument", "optional.php");
-        $this->assertSame("int = 100, float1 = 42.5, float2 = 8.88", $lines[0]);
-        $this->assertSame("string = Dingo ate my baby!", $lines[1]);
+        $this->assertSame(<<<OUTPUT
+        int = 100, float1 = 42.5, float2 = 8.88
+        string = Dingo ate my baby!
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testByRefArgs(): void
+    public function testByRefArguments(): void
     {
         $lines = $this->runTest("argument", "ref.php");
         $this->assertSame(<<<OUTPUT

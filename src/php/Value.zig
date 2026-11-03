@@ -6,6 +6,7 @@ const Class = php.Class;
 const failure = php.failure;
 const Callable = php.Callable;
 const Dictionary = php.Dictionary;
+const Enumeration = php.Enumeration;
 const List = php.List;
 const Object = php.Object;
 const php_al = php.allocator;
@@ -258,10 +259,14 @@ pub fn getEnum(self: *const @This(), comptime T: type) !T {
     if (@typeInfo(T) != .@"enum") {
         @compileError("Enum type expected, received: " ++ @typeName(T));
     }
-    if (self.getInteger()) |int| {
+    if (self.getObject()) |obj| {
+        const en = Enumeration.Custom(T).get().enumeration();
+        if (!obj.isInstanceOf(en.class())) return error.EnumTypeMismatch;
+        const int = obj.getStaticPropertyByIndex(1).integer();
         return std.enums.fromInt(T, int) orelse error.InvalidEnumValue;
-    } else |_| {
-        const str = self.getString() catch return error.NotIntegerOrString;
+    } else |_| if (self.getInteger()) |int| {
+        return std.enums.fromInt(T, int) orelse error.InvalidEnumValue;
+    } else |_| if (self.getString()) |str| {
         const field_names = @typeInfo(T).@"enum".field_names;
         inline for (field_names) |field_name| {
             if (str.matchStatic(field_name)) return @field(T, field_name);
@@ -271,6 +276,8 @@ pub fn getEnum(self: *const @This(), comptime T: type) !T {
                 .{ str.slice(), php.util.getFieldList(T, "or") },
             );
         }
+    } else |_| {
+        return error.NotEnumValue;
     }
 }
 
@@ -503,8 +510,11 @@ pub fn fromPointer(ptr: *const anyopaque) @This() {
 pub fn fromEnum(arg: anytype) @This() {
     const T = @TypeOf(arg);
     if (@typeInfo(T) != .@"enum") @compileError("Enum expected, received: " ++ @typeName(T));
-    const int: c.zend_long = @backingInt(arg);
-    return fromInteger(int);
+    const en = Enumeration.Custom(T).get().enumeration();
+    const int = @backingInt(arg);
+    const value = fromAny(int, .{});
+    // just return the number if enum is non-exhaustive
+    return if (en.findCaseByValue(value)) |obj| fromObject(obj.retain()) else value;
 }
 
 pub fn fromStruct(arg: anytype, options: ConversionOptions) @This() {

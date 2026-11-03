@@ -45,8 +45,11 @@ pub fn @"call printStrings"(_: *@This(), args: struct {
     php.print("string1 = {s}, string2 = {s}\n", .{ args.string1, args.string2 });
 }
 
+pub const @"export Animal" = Animal;
+const Animal = enum { cat, dog, monkey, turkey };
+
 pub fn @"call printEnum"(_: *@This(), args: struct {
-    animal: enum { cat, dog, monkey },
+    animal: Animal,
 }) void {
     php.print("enum = {}\n", .{args.animal});
 }
