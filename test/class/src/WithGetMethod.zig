@@ -22,4 +22,6 @@ pub fn getMethod(_: *@This(), name: *String) !*const Function {
     return error.Undefined;
 }
 
-const function_bar: Function = .init(bar, .{ .self_source = .{ .this_object = @This() } });
+const function_bar: Function = .init(.static("bar"), bar, .{
+    .self_source = .{ .this_object = @This() },
+});

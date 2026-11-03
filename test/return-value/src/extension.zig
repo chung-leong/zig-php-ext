@@ -27,7 +27,10 @@ pub fn @"call returnNewString"(_: *@This(), allocator: std.mem.Allocator, args: 
     return try allocator.print("Hello, {s}\n", .{args.name});
 }
 
-pub fn @"call returnEnum"(_: *@This()) enum { cat, dog, turkey } {
+pub const @"export Animal" = Animal;
+const Animal = enum { cat, dog, turkey, monkey };
+
+pub fn @"call returnEnum"(_: *@This()) Animal {
     return .dog;
 }
 

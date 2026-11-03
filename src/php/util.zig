@@ -386,6 +386,22 @@ pub fn getFieldList(comptime T: type, comptime conjunction: []const u8) [:0]cons
     };
 }
 
+pub fn extractFunctionName(comptime func: anytype) []const u8 {
+    // stupid hack making use of the fact that the function names show up in the
+    // names of parametric types
+    const ns = struct {
+        pub fn Dummy(comptime arg: anytype) type {
+            return struct {
+                comptime x: @TypeOf(arg) = arg,
+            };
+        }
+    };
+    const type_name = @typeName(ns.Dummy(func));
+    const si = std.mem.indexOfScalar(u8, type_name, '\'').?;
+    const ei = std.mem.lastIndexOfScalar(u8, type_name, '\'').?;
+    return type_name[si + 1 .. ei];
+}
+
 pub inline fn camelize(comptime name: []const u8) [:0]const u8 {
     var buffer: [name.len + 1]u8 = undefined;
     var len: usize = 0;

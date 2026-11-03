@@ -22,22 +22,26 @@ pub fn find(n: *String) ?*@This() {
     return v.getPointerOf(@This()) catch return null;
 }
 
-pub fn create(const_name: []const u8, const_value: Value) *@This() {
+pub fn register(comptime full_name: []const u8, const_value: Value) !*@This() {
+    const const_name: *String = .static(full_name);
+    const self = create(const_name, const_value);
+    const constants = php.constants();
+    if (constants.has(self.name())) return error.NameConflict;
+    const constant_name: *String = .create(full_name);
+    constants.set(constant_name, .fromPointer(self));
+    return self;
+}
+
+pub fn create(const_name: *String, const_value: Value) *@This() {
     const self = php_al.create(@This()) catch unreachable;
-    const name_str: *String = .create(const_name);
     self.* = .{
         .impl = .{
-            .name = @ptrCast(name_str),
             .value = const_value.toZval(),
+            .name = @ptrCast(const_name),
         },
     };
     self.impl.value.u2.constant_flags = c.CONST_PERSISTENT;
     return self;
-}
-
-pub fn register(self: *const @This(), arr: *Array) !void {
-    if (arr.has(self.name())) return error.NameConflict;
-    arr.set(self.name(), .fromPointer(self));
 }
 
 impl: c.zend_constant,

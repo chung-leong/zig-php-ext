@@ -1,5 +1,6 @@
 const std = @import("std");
 
+pub const Custom = @import("Enumeration/Custom.zig").@"fn";
 const php = @import("root.zig");
 const c = php.c;
 const Array = php.Array;
@@ -14,23 +15,24 @@ pub fn class(self: *const @This()) *Class {
     return @ptrCast(@constCast(self));
 }
 
-pub fn create(name: *String, kind: Value.Kind) *@This() {
+pub fn register(comptime full_name: []const u8, kind: Value.Kind) !*@This() {
     var fn_entries = std.mem.zeroes([1]c.zend_function_entry);
-    const zce = pi.zend_register_internal_enum(name.slice().ptr, @backingInt(kind), &fn_entries);
+    const cg = php.globals("compiler");
+    const classes: *Array = @ptrCast(cg.class_table);
+    if (classes.has(full_name)) return error.NameConflict;
+    const zce = pi.zend_register_internal_enum(full_name.ptr, @backingInt(kind), &fn_entries);
     return @ptrCast(zce);
 }
 
-pub fn createFromType(name: *String, comptime T: type) *@This() {
-    const self = create(name, .integer);
+pub fn addFields(self: *@This(), comptime T: type) !void {
     switch (@typeInfo(T)) {
-        .@"enum" => self.addEnumFields(T),
+        .@"enum" => try self.addEnumFields(T),
         .@"struct" => |st| switch (st.layout) {
-            .@"packed" => self.addPackedStructFields(T),
+            .@"packed" => try self.addPackedStructFields(T),
             else => @compileError("Packed struct expected, received: " ++ @typeName(T)),
         },
         else => @compileError("Enum or packed struct expected, received: " ++ @typeName(T)),
     }
-    return self;
 }
 
 pub fn getCase(self: *@This(), name: *String) *Object {
@@ -50,16 +52,13 @@ pub fn addCase(self: *@This(), name: *String, value: Value) void {
     pi.zend_enum_add_case(@ptrCast(self.class()), @ptrCast(name), &zval);
 }
 
-fn addEnumFields(self: *@This(), comptime T: type) void {
+fn addEnumFields(self: *@This(), comptime T: type) !void {
     const cases, const aliases = comptime init: {
         const en = @typeInfo(T).@"enum";
         const count = en.field_names.len;
         var cases: [count]CaseInfo = undefined;
         for (en.field_names, en.field_values, 0..) |field_name, field_value, i| {
-            cases[i] = .{
-                .name = String.static(field_name),
-                .value = .fromAny(field_value, .{}),
-            };
+            cases[i] = .{ .name = field_name, .value = field_value };
         }
         var alias_count: usize = 0;
         for (en.decl_names) |decl_name| {
@@ -74,33 +73,32 @@ fn addEnumFields(self: *@This(), comptime T: type) void {
                     if (@backingInt(decl_value) == field_value) break i;
                 };
                 const field_name = en.field_names[field_index];
-                aliases[index] = .{
-                    .name = String.static(decl_name),
-                    .case_name = String.static(field_name),
-                };
+                aliases[index] = .{ .name = decl_name, .case_name = field_name };
                 index += 1;
             }
         }
         break :init .{ cases, aliases };
     };
-    for (cases) |case| self.addCase(case.name, case.value);
+    inline for (cases) |case| {
+        self.addCase(.static(case.name), .fromInteger(case.value));
+    }
     // add aliases as constants
     const cls = self.class();
-    const constants = cls.constants();
-    for (aliases) |alias| {
-        const ast_ref: *Constant.AstRef = .createClassConstFetch(cls.name(), alias.case_name);
+    inline for (aliases) |alias| {
+        const ast_ref: *Constant.AstRef = .createClassConstFetch(cls.name(), .static(alias.case_name));
         const ast_value: Value = .{
             .impl = .{
                 .u1 = .{ .type_info = c.IS_CONSTANT_AST },
                 .value = .{ .ast = @ptrCast(ast_ref) },
             },
         };
-        const constant: *Class.Constant = .create(cls, ast_value);
-        constants.set(alias.name, .fromPointer(constant));
+        // class constant registration never fails actually--returning error union only for consistency
+        const constant: *Class.Constant = try .register(alias.name, ast_value, cls);
+        _ = constant;
     }
 }
 
-fn addPackedStructFields(self: *@This(), comptime T: type) void {
+fn addPackedStructFields(self: *@This(), comptime T: type) !void {
     const cases = comptime init: {
         const st = @typeInfo(T).@"struct";
         var count: usize = 0;
@@ -111,31 +109,27 @@ fn addPackedStructFields(self: *@This(), comptime T: type) void {
         var index: usize = 0;
         for (st.field_names, st.field_types) |field_name, FT| {
             if (FT == bool) {
-                cases[index] = .{
-                    .name = String.static(field_name),
-                    .value = .fromInteger(@as(c.zend_long, 1) << @bitOffsetOf(T, field_name)),
-                };
+                cases[index] = .{ .name = field_name, .value = 1 << @bitOffsetOf(T, field_name) };
                 index += 1;
             }
         }
         break :init cases;
     };
     const cls = self.class();
-    const constants = self.class().constants();
-    for (cases) |case| {
+    inline for (cases) |case| {
         // packed struct fields get added as constants
-        const constant: *Class.Constant = .create(cls, case.value);
-        constants.set(case.name, .fromPointer(constant));
+        const constant: *Class.Constant = try .register(case.name, .fromInteger(case.value), cls);
+        _ = constant;
     }
 }
 
 const CaseInfo = struct {
-    name: *String,
-    value: Value,
+    name: []const u8,
+    value: comptime_int,
 };
 const AliasInfo = struct {
-    name: *String,
-    case_name: *String,
+    name: []const u8,
+    case_name: []const u8,
 };
 
 class_entry: Class,

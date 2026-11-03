@@ -703,7 +703,7 @@ pub fn @"fn"(comptime T: type) type {
             var result: Object.MethodSet(method_names) = undefined;
             for (method_names) |method_name| {
                 const method = @field(methods, method_name);
-                @field(result.entries, method_name) = .init(method, .{
+                @field(result.entries, method_name) = .init(.static(method_name), method, .{
                     .self_source = .{ .this_object = T },
                 });
             }
@@ -752,7 +752,7 @@ pub fn @"fn"(comptime T: type) type {
         const deinit_fn = .{ .exists = @hasDecl(T, "deinit") };
         const constructor = switch (@hasDecl(T, "getConstructor")) {
             true => {},
-            false => Function.init(construct, .{
+            false => Function.init(.static("construct"), construct, .{
                 .self_source = .{ .this_object = Object },
             }),
         };

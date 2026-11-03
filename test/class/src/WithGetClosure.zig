@@ -23,4 +23,6 @@ pub fn getClosure(_: *@This(), check_only: bool) !Object.ClosureResult {
     return .{ .function = &closure };
 }
 
-const closure: Function = .init(call, .{ .self_source = .{ .none = {} } });
+const closure: Function = .init(.static("call"), call, .{
+    .self_source = .{ .none = {} },
+});

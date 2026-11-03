@@ -4,7 +4,7 @@ require_once __DIR__ . '/ExtensionTestCase.php';
 
 final class ReturnValueTest extends ExtensionTestCase
 {   
-    public function testSimpleRetval(): void
+    public function testSimpleReturnValue(): void
     {
         $lines = $this->runTest("return-value", "simple.php");
         $this->assertSame("bool = 1", $lines[0]);
@@ -12,7 +12,7 @@ final class ReturnValueTest extends ExtensionTestCase
         $this->assertSame("float = 12.5", $lines[2]);
     }
 
-    public function testStringRetval(): void
+    public function testStringReturnValue(): void
     {
         $lines = $this->runTest("return-value", "string.php");
         $this->assertSame("This is a test", $lines[0]);
@@ -20,19 +20,19 @@ final class ReturnValueTest extends ExtensionTestCase
         $this->assertSame("Hello, Alice", $lines[2]);
     }   
 
-    public function testEnumRetval(): void
+    public function testEnumReturnValue(): void
     {
         $lines = $this->runTest("return-value", "enum.php");
         $this->assertSame("enum = 1", $lines[0]);
     }
 
-    public function testFlagsRetval(): void
+    public function testFlagsReturnValue(): void
     {
         $lines = $this->runTest("return-value", "flags.php");
         $this->assertSame("flags = 5", $lines[0]);
     }
 
-    public function testArrayRetval(): void
+    public function testArrayReturnValue(): void
     {
         $lines = $this->runTest("return-value", "array.php");
         $this->assertSame(<<<OUTPUT
@@ -46,7 +46,7 @@ final class ReturnValueTest extends ExtensionTestCase
         OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testVectorRetval(): void
+    public function testVectorReturnValue(): void
     {
         $lines = $this->runTest("return-value", "vector.php");
         $this->assertSame(<<<OUTPUT
@@ -59,14 +59,14 @@ final class ReturnValueTest extends ExtensionTestCase
         OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testOptionalRetval(): void
+    public function testOptionalReturnValue(): void
     {
         $lines = $this->runTest("return-value", "optional.php");
         $this->assertSame("Hello world", $lines[0]);
         $this->assertSame("", $lines[1]);
     }
 
-    public function testStructRetval(): void
+    public function testStructReturnValue(): void
     {
         $lines = $this->runTest("return-value", "struct.php");
         $this->assertSame(<<<OUTPUT
@@ -78,7 +78,7 @@ final class ReturnValueTest extends ExtensionTestCase
         OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testStructArrayRetval(): void
+    public function testStructArrayReturnValue(): void
     {
         $lines = $this->runTest("return-value", "struct-array.php");
         $this->assertSame(<<<OUTPUT

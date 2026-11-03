@@ -1,4 +1,5 @@
 <?php
 
 $enum = returnEnum();
-echo "enum = $enum\n";
+echo "enum = ";
+print_r($enum);

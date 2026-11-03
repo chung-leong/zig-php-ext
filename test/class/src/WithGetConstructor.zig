@@ -23,7 +23,7 @@ pub fn getConstructor(_: *@This()) ?*const Function {
     return &constructor;
 }
 
-const constructor: Function = .init(construct, .{
+const constructor: Function = .init(.static("construct"), construct, .{
     .self_source = .{ .this_object = @This() },
 });
 

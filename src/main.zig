@@ -10,7 +10,7 @@ var module: php.Module.Custom(@import("extension.zig"), .{
     .version = config.ext_version,
 }) = .init();
 comptime {
-    module.register();
+    module.@"export"();
 }
 
 pub fn DllMain(

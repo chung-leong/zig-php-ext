@@ -46,6 +46,46 @@ pub fn @"fn"(comptime T: type) type {
             return self.class_entry.flags();
         }
 
+        pub fn register(comptime full_name: []const u8, parent_class: ?*Class) !*@This() {
+            return registered orelse create: {
+                const class_name: *String = .static(full_name);
+                const self: *@This() = .create(class_name, parent_class);
+                const cg = php.globals("compiler");
+                const list: *Array = @ptrCast(cg.class_table);
+                const lc_name = self.name().duplicateLowerCase();
+                defer lc_name.release();
+                if (list.has(lc_name)) return error.NameConflict;
+                list.set(lc_name, .fromPointer(&self.class_entry.impl));
+                self.addRef();
+                registered = self;
+                break :create self;
+            };
+        }
+
+        pub fn addRef(self: *@This()) void {
+            self.class_entry.impl.refcount += 1;
+        }
+
+        pub fn release(self: *@This()) void {
+            self.class_entry.impl.refcount -= 1;
+            if (self.class_entry.impl.refcount == 0) {
+                php_al.destroy(self);
+            }
+        }
+
+        pub fn registerChildren(self: *@This(), comptime parent_class_name: []const u8) !void {
+            try self.registerClasses(parent_class_name);
+            try self.registerEnumerations(parent_class_name);
+        }
+
+        pub fn initStatic() !void {
+            if (Static != NoStatic) try Singleton(Static).init();
+        }
+
+        pub fn deinitStatic() void {
+            if (Static != NoStatic) Singleton(Static).deinit();
+        }
+
         pub fn create(class_name: *String, parent_class: ?*Class) *@This() {
             const self = php_al.create(@This()) catch unreachable;
             errdefer php_al.destroy(self);
@@ -108,49 +148,13 @@ pub fn @"fn"(comptime T: type) type {
             return self;
         }
 
-        pub fn addRef(self: *@This()) void {
-            self.class_entry.impl.refcount += 1;
-        }
-
-        pub fn release(self: *@This()) void {
-            self.class_entry.impl.refcount -= 1;
-            if (self.class_entry.impl.refcount == 0) {
-                php_al.destroy(self);
-            }
-        }
-
-        pub fn register(self: *@This()) !void {
-            const cg = php.globals("compiler");
-            const list: *Array = @ptrCast(cg.class_table);
-            const lc_name = self.name().duplicateLowerCase();
-            defer lc_name.release();
-            if (list.has(lc_name)) return error.NameConflict;
-            list.set(lc_name, .fromPointer(&self.class_entry.impl));
-            self.addRef();
-            registered = self;
-        }
-
-        pub fn registerChildren(self: *@This(), comptime parent_class_name: []const u8) !void {
-            try self.registerClasses(parent_class_name);
-            try self.registerEnumerations(parent_class_name);
-        }
-
-        pub fn initStatic() !void {
-            if (Static != NoStatic) try Singleton(Static).init();
-        }
-
-        pub fn deinitStatic() void {
-            if (Static != NoStatic) Singleton(Static).deinit();
-        }
-
         fn registerClasses(self: *@This(), comptime parent_class_name: []const u8) !void {
             const st = @typeInfo(@TypeOf(classes)).@"struct";
             const arr = self.class().constants();
             inline for (st.field_names) |class_name| {
                 const CustomClass = @field(classes, class_name);
                 const full_class_name = parent_class_name ++ "\\" ++ class_name;
-                const cls: *CustomClass = .create(.static(full_class_name), null);
-                try cls.register();
+                const cls: *CustomClass = try .register(full_class_name, null);
                 try cls.registerChildren(full_class_name);
                 // add the full class path as a constant
                 const constant: *Class.Constant = .create(self.class(), .fromString(.static(full_class_name)));
@@ -160,15 +164,15 @@ pub fn @"fn"(comptime T: type) type {
 
         fn registerEnumerations(self: *@This(), comptime parent_class_name: []const u8) !void {
             const st = @typeInfo(@TypeOf(enums)).@"struct";
-            const arr = self.class().constants();
-            inline for (st.field_names) |enum_name| {
-                const ET = @field(enums, enum_name);
-                const full_enum_name = parent_class_name ++ "\\" ++ enum_name;
-                const enumeration: *Enumeration = .createFromType(.static(full_enum_name), ET);
-                _ = enumeration;
-                // add the full enum path as a constant
-                const constant: *Class.Constant = .create(self.class(), .fromString(.static(full_enum_name)));
-                arr.set(String.static(enum_name), .fromPointer(constant));
+            inline for (st.field_names) |field_name| {
+                const ET = @field(enums, field_name);
+                const full_enum_name = parent_class_name ++ "\\" ++ field_name;
+                const enumeration: *Enumeration.Custom(ET) = try .register(full_enum_name);
+
+                // add the enumeration's canonical name as a class constant
+                const constant_value: Value = .fromString(enumeration.name());
+                const constant: *Class.Constant = try .register(field_name, constant_value, self.class());
+                _ = constant;
             }
         }
 
@@ -261,7 +265,7 @@ pub fn @"fn"(comptime T: type) type {
             var result: Object.MethodSet(method_names) = undefined;
             for (method_names) |method_name| {
                 const method = @field(methods, method_name);
-                @field(result.entries, method_name) = .init(method, .{
+                @field(result.entries, method_name) = .init(.static(method_name), method, .{
                     .self_source = .{ .singleton = Static },
                     .is_static = true,
                 });

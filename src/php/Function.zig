@@ -24,21 +24,21 @@ pub fn name(self: *const @This()) *String {
     return @ptrCast(zstr);
 }
 
-pub fn create(comptime func: anytype, comptime options: Options) *@This() {
-    const self = php_al.create(@This());
-    self.* = .init(func, options);
-}
-
-pub fn register(self: *@This()) !void {
+pub fn register(comptime full_name: []const u8, comptime func: anytype, comptime options: Options) !*@This() {
+    // TODO: test function to see if it works
+    const func_name: *String = .static(full_name);
+    const self: *@This() = .create(func_name, func, options);
     const cg = php.globals("compiler");
     const list: *Array = @ptrCast(cg.function_table);
-    const lc_name = self.name().createLowerCase();
+    const lc_name = func_name.createLowerCase();
     defer lc_name.release();
     if (list.has(lc_name)) return error.NameConflict;
     list.set(lc_name, .fromPointer(&self));
+    return self;
 }
 
 pub fn unregister(self: *@This()) !void {
+    // TODO: test function to see if it works
     const cg = php.globals("compiler");
     const list: *Array = @ptrCast(cg.function_table);
     const lc_name = self.name().createLowerCase();
@@ -46,17 +46,17 @@ pub fn unregister(self: *@This()) !void {
     list.delete(lc_name);
 }
 
-pub fn createClosure(self: *const @This(), scope: ?*Class, called_scope: ?*Class, this: ?Value) Closure {
-    return .create(self, scope, called_scope, this);
+pub fn create(func_name: *String, comptime func: anytype, comptime options: Options) *@This() {
+    const self = php_al.create(@This());
+    self.* = .init(func_name, func, options);
 }
 
-pub fn init(comptime func: anytype, comptime options: Options) @This() {
+pub fn init(func_name: *String, comptime func: anytype, comptime options: Options) @This() {
     const handler_info = comptime handlerInfo(func, options.self_source);
     const arg_info = argInfo(handler_info);
     var flags = c.ZEND_ACC_PUBLIC;
     if (options.is_static) flags |= c.ZEND_ACC_NEVER_CACHE | c.ZEND_ACC_STATIC;
     if (handler_info.is_variadic) flags |= c.ZEND_ACC_VARIADIC;
-    const func_name = String.static(extractName(func));
     return .{
         .impl = .{
             .internal_function = .{
@@ -167,16 +167,6 @@ pub fn handlerInfo(comptime func: anytype, comptime self_src: SelfSource) Handle
         .arguments = arguments,
         .required_count = required_count,
         .is_variadic = is_variadic,
-    };
-}
-
-fn acceptsNamedParameters(comptime AT: type) bool {
-    return switch (@typeInfo(AT)) {
-        .optional => |op| acceptsNamedParameters(op.child),
-        .error_union => |eu| acceptsNamedParameters(eu.payload),
-        .@"union" => AT == Dictionary,
-        .@"struct" => true,
-        else => false,
     };
 }
 
@@ -299,20 +289,6 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
     return @field(ns, @tagName(handler_type));
 }
 
-pub fn extractName(comptime func: anytype) []const u8 {
-    const ns = struct {
-        pub fn Dummy(comptime arg: anytype) type {
-            return struct {
-                comptime x: @TypeOf(arg) = arg,
-            };
-        }
-    };
-    const type_name = @typeName(ns.Dummy(func));
-    const si = std.mem.indexOfScalar(u8, type_name, '\'').?;
-    const ei = std.mem.lastIndexOfScalar(u8, type_name, '\'').?;
-    return type_name[si + 1 .. ei];
-}
-
 pub const Handler = switch (builtin.target.os.tag) {
     .windows => init: {
         // handler uses fastcall
@@ -375,8 +351,6 @@ pub const Options = struct {
     is_static: bool = false,
 };
 
-const ArgInfoEntry = @typeInfo(@FieldType(c.zend_internal_function, "arg_info")).pointer.child;
-
 fn argInfo(comptime info: HandlerInfo) []const ArgInfoEntry {
     const len = info.arguments.len + if (info.is_variadic) 1 else 0;
     const array = init: {
@@ -397,6 +371,17 @@ fn argInfo(comptime info: HandlerInfo) []const ArgInfoEntry {
     return &array;
 }
 
+fn acceptsNamedParameters(comptime AT: type) bool {
+    return switch (@typeInfo(AT)) {
+        .optional => |op| acceptsNamedParameters(op.child),
+        .error_union => |eu| acceptsNamedParameters(eu.payload),
+        .@"union" => AT == Dictionary,
+        .@"struct" => true,
+        else => false,
+    };
+}
+
+const ArgInfoEntry = @typeInfo(@FieldType(c.zend_internal_function, "arg_info")).pointer.child;
 const StdHandler = fn ([*c]c.zend_execute_data, [*c]c.zval) callconv(.c) void;
 const Function = @This();
 

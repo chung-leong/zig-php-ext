@@ -63,7 +63,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             };
         }
 
-        pub fn register(comptime self: *@This()) void {
+        pub fn @"export"(comptime self: *@This()) void {
             const export_ns = struct {
                 pub fn getModule() callconv(.c) *c.zend_module_entry {
                     return @ptrCast(&self.entry);
@@ -256,8 +256,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             const st = @typeInfo(@TypeOf(classes)).@"struct";
             inline for (st.field_names) |class_name| {
                 const CustomClass = @field(classes, class_name);
-                const cls: *CustomClass = .create(.static(class_name), null);
-                try cls.register();
+                const cls: *CustomClass = try .register(class_name, null);
                 try cls.registerChildren(class_name);
             }
         }
@@ -266,7 +265,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             const st = @typeInfo(@TypeOf(enums)).@"struct";
             inline for (st.field_names) |enum_name| {
                 const ET = @field(enums, enum_name);
-                const enumeration: *Enumeration = .createFromType(.static(enum_name), ET);
+                const enumeration: *Enumeration.Custom(ET) = try .register(enum_name);
                 _ = enumeration;
             }
         }
@@ -285,7 +284,6 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
 
         fn registerConstants(persistent: bool) !void {
             const st = @typeInfo(@TypeOf(constants)).@"struct";
-            const arr = php.constants();
             inline for (st.field_names, st.field_types) |field_name, FT| {
                 const is_literal = switch (@typeInfo(FT)) {
                     .bool, .comptime_int, .int, .comptime_float, .float => true,
@@ -301,8 +299,9 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                 };
                 if (persistent == is_literal) {
                     const value = @field(constants, field_name);
-                    const constant: *Constant = .create(field_name, .fromAny(value, .{}));
-                    try constant.register(arr);
+                    const constant_value: Value = .fromAny(value, .{});
+                    const constant: *Constant = try .register(field_name, constant_value);
+                    _ = constant;
                 }
             }
         }
