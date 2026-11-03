@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const php = @import("../root.zig");
 const c = php.c;
@@ -31,7 +32,12 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         pub fn get() *@This() {
-            return registered orelse @panic("Not registered as custom class: " ++ @typeName(T));
+            return registered orelse {
+                if (builtin.mode == .debug) {
+                    std.debug.print("Class is not registered: {}\n", .{T});
+                }
+                unreachable;
+            };
         }
 
         pub fn custom(_: *@This()) *T {

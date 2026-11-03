@@ -1,3 +1,6 @@
+const std = @import("std");
+const builtin = @import("builtin");
+
 const php = @import("../root.zig");
 const Array = php.Array;
 const Class = php.Class;
@@ -15,7 +18,12 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         pub fn get() *@This() {
-            return registered.?;
+            return registered orelse {
+                if (builtin.mode == .debug) {
+                    std.debug.print("Enum is not registered: {}\n", .{T});
+                }
+                unreachable;
+            };
         }
 
         pub fn register(comptime full_name: []const u8) !*@This() {

@@ -228,7 +228,10 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
                     else => unsupported(Arg),
                 },
                 else => get: {
-                    const value: Value = .fromAny(arg, .{});
+                    const value: Value = .fromAny(arg, .{
+                        .convert_enum_to_string = true,
+                        .convert_enum_to_integer = true,
+                    });
                     const str = value.cast(.string).string();
                     break :get str.slice();
                 },

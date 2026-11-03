@@ -507,14 +507,25 @@ pub fn fromPointer(ptr: *const anyopaque) @This() {
     };
 }
 
-pub fn fromEnum(arg: anytype) @This() {
+pub fn fromEnum(arg: anytype, options: ConversionOptions) @This() {
     const T = @TypeOf(arg);
     if (@typeInfo(T) != .@"enum") @compileError("Enum expected, received: " ++ @typeName(T));
-    const en = Enumeration.Custom(T).get().enumeration();
     const int = @backingInt(arg);
-    const value = fromAny(int, .{});
+    if (options.convert_enum_to_string) {
+        const info = @typeInfo(T).@"enum";
+        inline for (info.field_names, info.field_values) |field_name, field_value| {
+            if (int == field_value) return .fromString(.static(field_name));
+        }
+        // fall through and return an int if convert_enum_to_integer is true
+    }
+    const int_value = fromAny(int, .{});
+    if (options.convert_enum_to_integer) return int_value;
+    const en = Enumeration.Custom(T).get().enumeration();
     // just return the number if enum is non-exhaustive
-    return if (en.findCaseByValue(value)) |obj| fromObject(obj.retain()) else value;
+    return if (en.findCaseByValue(int_value)) |obj|
+        fromObject(obj.retain())
+    else
+        int_value;
 }
 
 pub fn fromStruct(arg: anytype, options: ConversionOptions) @This() {
@@ -546,7 +557,7 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
         },
         .comptime_int => .fromInteger(arg),
         .float, .comptime_float => .fromFloat(arg),
-        .@"enum" => .fromEnum(arg),
+        .@"enum" => .fromEnum(arg, options),
         .error_union => if (arg) |payload| .fromAny(payload, options) else |err| err,
         .array, .vector => .fromArray(.createFromAny(arg, options)),
         .optional => if (arg) |p| fromAny(p, options) else .fromNull(),
@@ -657,6 +668,8 @@ pub const ConversionOptions = packed struct {
     free_pointer: bool = false,
     get_string_from_slice: bool = false,
     get_object_from_custom: bool = false,
+    convert_enum_to_string: bool = false,
+    convert_enum_to_integer: bool = false,
 
     pub fn freeReturnedPointers(comptime RT: type) @This() {
         const has_obj = php.util.hasCustomObject(RT);
