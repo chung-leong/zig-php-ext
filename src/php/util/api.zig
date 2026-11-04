@@ -138,7 +138,7 @@ pub fn ClassValidator(comptime T: type) type {
 }
 
 pub const custom = opaque {
-    pub const Type = enum { class, object, iterator };
+    pub const Type = enum { module, class, @"enum", object, iterator };
 };
 
 pub fn isCustomType(comptime T: type) bool {

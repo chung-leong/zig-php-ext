@@ -5,12 +5,12 @@ const php = @import("../root.zig");
 const Array = php.Array;
 const Class = php.Class;
 const Constant = php.Constant;
-const Enumeration = php.Enumeration;
+const Enum = php.Enum;
 const String = php.String;
 
 pub fn @"fn"(comptime T: type) type {
     return struct {
-        pub fn enumeration(self: *const @This()) *Enumeration {
+        pub fn @"enum"(self: *const @This()) *Enum {
             return @constCast(&self.enum_entry);
         }
 
@@ -33,7 +33,7 @@ pub fn @"fn"(comptime T: type) type {
 
         pub fn register(comptime full_name: []const u8) !*@This() {
             return registered orelse create: {
-                const enum_entry: *Enumeration = try .register(full_name, .integer);
+                const enum_entry: *Enum = try .register(full_name, .integer);
                 const en = @typeInfo(T).@"enum";
                 inline for (en.field_names, en.field_values) |field_name, field_value| {
                     enum_entry.addCase(.static(field_name), .fromAny(field_value, .{}));
@@ -61,9 +61,11 @@ pub fn @"fn"(comptime T: type) type {
             };
         }
 
+        pub const custom_type: php.util.api.custom.Type = .@"enum";
+
         var registered: ?*@This() = null;
         var canonical_name: ?*String = null;
 
-        enum_entry: Enumeration,
+        enum_entry: Enum,
     };
 }

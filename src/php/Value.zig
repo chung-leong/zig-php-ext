@@ -6,7 +6,7 @@ const Class = php.Class;
 const failure = php.failure;
 const Callable = php.Callable;
 const Dictionary = php.Dictionary;
-const Enumeration = php.Enumeration;
+const Enum = php.Enum;
 const List = php.List;
 const Object = php.Object;
 const php_al = php.allocator;
@@ -260,9 +260,9 @@ pub fn getEnum(self: *const @This(), comptime T: type) !T {
         @compileError("Enum type expected, received: " ++ @typeName(T));
     }
     if (self.getObject()) |obj| {
-        const CE = Enumeration.Custom(T);
+        const CE = Enum.Custom(T);
         if (CE.isRegistered()) {
-            const en = CE.get().enumeration();
+            const en = CE.get().@"enum"();
             if (obj.isInstanceOf(en.class())) {
                 const int = obj.getStaticPropertyByIndex(1).integer();
                 return std.enums.fromInt(T, int) orelse error.InvalidEnumValue;
@@ -525,7 +525,7 @@ pub fn fromEnum(arg: anytype, options: ConversionOptions) @This() {
     }
     const int_value = fromAny(int, .{});
     if (options.convert_enum_to_integer) return int_value;
-    const en = Enumeration.Custom(T).get().enumeration();
+    const en = Enum.Custom(T).get().@"enum"();
     // just return the number if enum is non-exhaustive
     return if (en.findCaseByValue(int_value)) |obj|
         fromObject(obj.retain())

@@ -1,11 +1,12 @@
 const std = @import("std");
 
 const php = @import("php/root.zig");
+const Enum = php.Enum;
 const getter = php.IniEntry.getter;
 const setter = php.IniEntry.setter;
 
 pub const @"export CONSTANT" = "Hello world";
-pub const @"export Enum" = enum { hello, world };
+pub const @"export Enum" = Enum.Custom(enum { hello, world });
 
 pub fn @"call greet"(self: *@This(), args: struct {
     recipient: union(enum) {

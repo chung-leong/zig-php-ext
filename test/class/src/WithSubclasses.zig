@@ -1,11 +1,12 @@
 const php = @import("php/root.zig");
 const Class = php.Class;
+const Enum = php.Enum;
 const Object = php.Object;
 const getter = Object.getter;
 
 pub const @"export SubclassA" = Class.Custom(struct {
     pub const @"export hello" = "Hello";
-    pub const @"export Animal" = enum { cat, dog, cow };
+    pub const @"export Animal" = Enum.Custom(enum { cat, dog, cow });
 });
 
 pub const @"export SubclassB" = Class.Custom(struct {

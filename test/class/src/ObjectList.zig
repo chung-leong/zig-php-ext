@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const php = @import("php/root.zig");
+const Enum = php.Enum;
 
 pub fn @"call print"(self: *@This()) !void {
     for (self.list) |animal| {

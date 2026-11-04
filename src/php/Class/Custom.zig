@@ -10,7 +10,7 @@ const Array = php.Array;
 const Allocator = php.Allocator;
 const Class = php.Class;
 const Constant = php.Constant;
-const Enumeration = php.Enumeration;
+const Enum = php.Enum;
 const errable = php.errable;
 const failure = php.failure;
 const Function = php.Function;
@@ -86,7 +86,7 @@ pub fn @"fn"(comptime T: type) type {
 
         pub fn registerChildren(self: *@This(), comptime parent_class_name: []const u8) !void {
             try self.registerClasses(parent_class_name);
-            try self.registerEnumerations(parent_class_name);
+            try self.registerEnums(parent_class_name);
         }
 
         pub fn initStatic() !void {
@@ -173,15 +173,15 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        fn registerEnumerations(self: *@This(), comptime parent_class_name: []const u8) !void {
+        fn registerEnums(self: *@This(), comptime parent_class_name: []const u8) !void {
             const st = @typeInfo(@TypeOf(enums)).@"struct";
             inline for (st.field_names) |field_name| {
-                const ET = @field(enums, field_name);
+                const CustomEnum = @field(enums, field_name);
                 const full_enum_name = parent_class_name ++ "\\" ++ field_name;
-                const enumeration: *Enumeration.Custom(ET) = try .register(full_enum_name);
+                const custom_enum: *CustomEnum = try .register(full_enum_name);
 
                 // add the enumeration's canonical name as a class constant
-                const constant_value: Value = .fromString(enumeration.name());
+                const constant_value: Value = .fromString(custom_enum.name());
                 const constant: *Class.Constant = try .register(field_name, constant_value, self.class());
                 _ = constant;
             }
@@ -242,6 +242,7 @@ pub fn @"fn"(comptime T: type) type {
             constant.value().release();
         }
 
+        pub const custom_type: php.util.api.custom.Type = .class;
         pub const Instance = Object.Custom(T);
         pub const Static = init: {
             var S: ?type = null;
@@ -277,7 +278,6 @@ pub fn @"fn"(comptime T: type) type {
             }
             break :init S orelse NoStatic;
         };
-        pub const custom_type: php.util.api.custom.Type = .class;
         const NoStatic = struct {};
 
         const methods = php.util.symbol.MethodExporter(T, .static).get();

@@ -4,6 +4,7 @@ pub const @"export CONST_FLOAT" = std.math.pi;
 const php = @import("php/root.zig");
 const Class = php.Class;
 const Constant = php.Constant;
+const Enum = php.Enum;
 const Module = php.Module;
 const String = php.String;
 
@@ -14,15 +15,15 @@ pub const @"export CONST_ARRAY" = [4]i32{ 1, 2, 3, 4 };
 pub const @"export CONST_STRING_ARRAY" = [2][]const u8{ "Hello", "world" };
 pub const @"export CONST_OBJECT" = .{ .cow = 123, .pig = 456 };
 
-pub const @"export ConstEnum" = enum { hello, world };
-pub const @"export ConstType" = enum(i32) {
+pub const @"export ConstEnum" = Enum.Custom(enum { hello, world });
+pub const @"export ConstType" = Enum.Custom(enum(i32) {
     alpha = 123,
     beta = 456,
     gamma = 789,
 
     pub const a: @This() = .alpha;
     pub const b: @This() = .beta;
-};
+});
 pub const @"export ConstFlag" = Class.Custom(packed struct {
     option_a: bool = false,
     option_b: bool = false,

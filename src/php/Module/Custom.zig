@@ -7,7 +7,7 @@ const pi = php.imports;
 const Allocator = php.Allocator;
 const Class = php.Class;
 const Constant = php.Constant;
-const Enumeration = php.Enumeration;
+const Enum = php.Enum;
 const errable = php.util.errable;
 const failure = php.failure;
 const unsupported = failure.unsupported;
@@ -73,6 +73,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             @export(&export_ns.getModule, .{ .name = "get_module" });
         }
 
+        pub const custom_type: php.util.api.custom.Type = .module;
+
         fn moduleStartup(module_type: Module.Type, module_no: c_int) callconv(.c) c.zend_result {
             tryModuleStartup(module_type, module_no) catch |err| {
                 failure.show(err);
@@ -88,7 +90,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             ini_default_value = self.*;
             try registerIniEntries(self, module_no);
             try registerClasses();
-            try registerEnumerations();
+            try registerEnums();
             try registerConstants(true);
             if (!@hasDecl(T, "moduleStartup")) return;
             return T.moduleStartup(self, module_type, module_no);
@@ -267,12 +269,12 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             }
         }
 
-        fn registerEnumerations() !void {
+        fn registerEnums() !void {
             const st = @typeInfo(@TypeOf(enums)).@"struct";
             inline for (st.field_names) |enum_name| {
-                const ET = @field(enums, enum_name);
-                const enumeration: *Enumeration.Custom(ET) = try .register(enum_name);
-                _ = enumeration;
+                const CustomEnum = @field(enums, enum_name);
+                const custom_enum: *CustomEnum = try .register(enum_name);
+                _ = custom_enum;
             }
         }
 

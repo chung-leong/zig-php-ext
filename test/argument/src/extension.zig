@@ -3,6 +3,7 @@ const std = @import("std");
 const php = @import("php/root.zig");
 const Array = php.Array;
 const Class = php.Class;
+const Enum = php.Enum;
 const Module = php.Module;
 const Value = php.Value;
 
@@ -45,7 +46,7 @@ pub fn @"call printStrings"(_: *@This(), args: struct {
     php.print("string1 = {s}, string2 = {s}\n", .{ args.string1, args.string2 });
 }
 
-pub const @"export Animal" = Animal;
+pub const @"export Animal" = Enum.Custom(Animal);
 const Animal = enum { cat, dog, monkey, turkey };
 
 pub fn @"call printEnum"(_: *@This(), args: struct {

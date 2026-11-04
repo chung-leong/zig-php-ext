@@ -52,15 +52,11 @@ pub fn MethodExporter(comptime T: type, comptime scope: Scope) type {
 pub fn ClassExporter(comptime T: type) type {
     return DeclarationExtractor(T, struct {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
-            const name = removePrefix(decl_name, "export", .instance) orelse return null;
-            return switch (@typeInfo(@TypeOf(decl))) {
-                .type => switch (@typeInfo(decl)) {
-                    .@"enum" => null,
-                    .@"struct" => name,
-                    else => @compileError("Struct or enum expected, received: " ++ @typeName(decl)),
-                },
+            if (@typeInfo(@TypeOf(decl)) != .type) return null;
+            return if (comptime php.util.api.isCustomType(decl)) switch (decl.custom_type) {
+                .class => removePrefix(decl_name, "export", .instance),
                 else => null,
-            };
+            } else null;
         }
     });
 }
@@ -69,10 +65,11 @@ pub fn ConstantExporter(comptime T: type) type {
     return DeclarationExtractor(T, struct {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "export", .instance) orelse return null;
-            return switch (@typeInfo(@TypeOf(decl))) {
-                .type => null,
-                else => name,
-            };
+            if (@typeInfo(@TypeOf(decl)) != .type) return name;
+            if (comptime php.util.api.isCustomType(decl)) switch (decl.custom_type) {
+                .class, .@"enum" => return null,
+                else => |tag| @compileError("Expected custom class or enum type, received: " ++ @tagName(tag)),
+            } else @compileError("Expected custom type or constant value, received: " ++ @typeName(decl));
         }
     });
 }
@@ -80,15 +77,11 @@ pub fn ConstantExporter(comptime T: type) type {
 pub fn EnumExporter(comptime T: type) type {
     return DeclarationExtractor(T, struct {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
-            const name = removePrefix(decl_name, "export", .instance) orelse return null;
-            return switch (@typeInfo(@TypeOf(decl))) {
-                .type => switch (@typeInfo(decl)) {
-                    .@"enum" => name,
-                    .@"struct" => null,
-                    else => @compileError("Struct or enum expected, received: " ++ @typeName(decl)),
-                },
+            if (@typeInfo(@TypeOf(decl)) != .type) return null;
+            return if (comptime php.util.api.isCustomType(decl)) switch (decl.custom_type) {
+                .@"enum" => removePrefix(decl_name, "export", .instance),
                 else => null,
-            };
+            } else null;
         }
     });
 }

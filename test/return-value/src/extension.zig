@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const php = @import("php/root.zig");
+const Enum = php.Enum;
 const Module = php.Module;
 
 pub fn @"call returnBool"(_: *@This()) !bool {
@@ -27,7 +28,7 @@ pub fn @"call returnNewString"(_: *@This(), allocator: std.mem.Allocator, args: 
     return try allocator.print("Hello, {s}\n", .{args.name});
 }
 
-pub const @"export Animal" = Animal;
+pub const @"export Animal" = Enum.Custom(Animal);
 const Animal = enum(u8) { cat, dog, turkey, monkey, _ };
 
 pub fn @"call returnEnum"(_: *@This()) Animal {

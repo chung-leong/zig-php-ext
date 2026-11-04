@@ -1,4 +1,6 @@
 const php = @import("php/root.zig");
+const Class = php.Class;
+const Enum = php.Enum;
 const getter = php.IniEntry.getter;
 const setter = php.IniEntry.setter;
 
@@ -37,8 +39,8 @@ const Flags = packed struct {
 };
 const Pet = enum { cat, dog, monkey, hippopotamus };
 
-pub const @"export module_x\\Flags" = Flags;
-pub const @"export module_x\\Pet" = Pet;
+pub const @"export module_x\\Flags" = Class.Custom(Flags);
+pub const @"export module_x\\Pet" = Enum.Custom(Pet);
 
 pub const @"get string" = getter(@This(), .string);
 pub const @"set string" = setter(@This(), .string);
