@@ -34,6 +34,11 @@ final class ConstantTest extends ExtensionTestCase
             [0] => Hello
             [1] => world
         )
+        stdClass Object
+        (
+            [cow] => 123
+            [pig] => 456
+        )
         OUTPUT, implode(PHP_EOL, $lines));
     }
 

@@ -2,6 +2,9 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 pub const c = @import("c");
+pub const major_version = c.PHP_MAJOR_VERSION;
+pub const minor_version = c.PHP_MINOR_VERSION;
+pub const api_no = c.ZEND_MODULE_API_NO;
 
 pub const Allocator = @import("Allocator.zig");
 pub const Array = @import("Array.zig");
@@ -25,7 +28,6 @@ pub const String = @import("String.zig");
 pub const util = @import("util.zig");
 pub const Value = @import("Value.zig");
 
-pub const api_no = c.ZEND_MODULE_API_NO + 0;
 pub const build_id = std.fmt.comptimePrint("API{d}{s}{s}{s}{s}", .{
     c.ZEND_MODULE_API_NO,
     c.ZEND_BUILD_TS,

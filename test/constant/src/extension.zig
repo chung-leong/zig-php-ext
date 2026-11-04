@@ -11,6 +11,7 @@ pub const @"export CONST_INT" = 1234;
 pub const @"export CONST_STRING" = "Hello world";
 pub const @"export CONST_ARRAY" = [4]i32{ 1, 2, 3, 4 };
 pub const @"export CONST_STRING_ARRAY" = [2][]const u8{ "Hello", "world" };
+pub const @"export CONST_OBJECT" = .{ .cow = 123, .pig = 456 };
 
 pub const @"export ConstEnum" = enum { hello, world };
 pub const @"export ConstType" = enum(i32) {

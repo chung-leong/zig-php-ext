@@ -291,19 +291,10 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         fn registerConstants(persistent: bool) !void {
             const st = @typeInfo(@TypeOf(constants)).@"struct";
             inline for (st.field_names, st.field_types) |field_name, FT| {
-                const is_literal = switch (@typeInfo(FT)) {
-                    .bool, .comptime_int, .int, .comptime_float, .float => true,
-                    .pointer => |pt| switch (pt.size) {
-                        .one => switch (@typeInfo(pt.child)) {
-                            .array => |ar| ar.child == u8,
-                            else => false,
-                        },
-                        .slice => pt.child == u8,
-                        else => false,
-                    },
-                    else => false,
-                };
-                if (persistent == is_literal) {
+                if (comptime !php.util.isLiteralType(FT) and !php.util.canBeConstant(T)) {
+                    @compileError("Unsupported type for constants: " ++ @typeName(T));
+                }
+                if (persistent == php.util.isLiteralType(FT)) {
                     const value = @field(constants, field_name);
                     const constant_value: Value = .fromAny(value, .{});
                     const constant: *Constant = try .register(field_name, constant_value);

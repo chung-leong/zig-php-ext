@@ -9,6 +9,7 @@ const php_al = php.allocator;
 const Array = php.Array;
 const Allocator = php.Allocator;
 const Class = php.Class;
+const Constant = php.Constant;
 const Enumeration = php.Enumeration;
 const errable = php.errable;
 const failure = php.failure;
@@ -189,9 +190,13 @@ pub fn @"fn"(comptime T: type) type {
         fn registerConstants(self: *@This()) void {
             const st = @typeInfo(@TypeOf(constants)).@"struct";
             const arr = self.class().constants();
-            inline for (st.field_names) |field_name| {
+            inline for (st.field_names, st.field_types) |field_name, FT| {
                 const value = @field(constants, field_name);
-                const constant: *Class.Constant = .create(self.class(), .fromAny(value, .{}));
+                const constant_value: Value = switch (comptime php.util.isLiteralType(FT)) {
+                    true => .fromAny(value, .{}),
+                    false => Constant.AstRef.createLiteral(FT, value).toValue(),
+                };
+                const constant: *Class.Constant = .create(self.class(), constant_value);
                 arr.set(field_name, .fromPointer(constant));
             }
         }

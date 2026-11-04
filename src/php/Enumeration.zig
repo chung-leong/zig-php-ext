@@ -89,14 +89,8 @@ fn addEnumFields(self: *@This(), comptime T: type) !void {
     const cls = self.class();
     inline for (aliases) |alias| {
         const ast_ref: *Constant.AstRef = .createClassConstFetch(cls.name(), .static(alias.case_name));
-        const ast_value: Value = .{
-            .impl = .{
-                .u1 = .{ .type_info = c.IS_CONSTANT_AST },
-                .value = .{ .ast = @ptrCast(ast_ref) },
-            },
-        };
         // class constant registration never fails actually--returning error union only for consistency
-        const constant: *Class.Constant = try .register(alias.name, ast_value, cls);
+        const constant: *Class.Constant = try .register(alias.name, ast_ref.toValue(), cls);
         _ = constant;
     }
 }

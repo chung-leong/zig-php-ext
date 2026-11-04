@@ -577,4 +577,54 @@ final class ClassTest extends ExtensionTestCase
         )
         OUTPUT, implode(PHP_EOL, $lines));
     }
+
+    public function testClassConstant(): void
+    {
+        $lines = $this->runTest("class", "constant.php");
+        if (PHP_MINOR_VERSION >= 5 || PHP_MAJOR_VERSION > 8) {
+            $this->assertSame(<<<OUTPUT
+            1234
+            Array
+            (
+                [0] => 1
+                [1] => 2
+                [2] => 3
+                [3] => 4
+            )
+            Array
+            (
+                [0] => 1
+                [1] => 2
+                [2] => Hello world
+            )
+            stdClass Object
+            (
+                [cow] => 123
+                [pig] => 456
+            )
+            OUTPUT, implode(PHP_EOL, $lines));
+        } else {
+            $this->assertSame(<<<OUTPUT
+            1234
+            Array
+            (
+                [0] => 1
+                [1] => 2
+                [2] => 3
+                [3] => 4
+            )
+            Array
+            (
+                [0] => 1
+                [1] => 2
+                [2] => Hello world
+            )
+            Array
+            (
+                [cow] => 123
+                [pig] => 456
+            )
+            OUTPUT, implode(PHP_EOL, $lines));
+        }
+    }
 }

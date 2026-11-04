@@ -53,6 +53,35 @@ pub fn WithoutError(comptime T: type) type {
     };
 }
 
+pub fn isLiteralType(comptime T: type) bool {
+    return switch (@typeInfo(T)) {
+        .bool, .comptime_int, .int, .comptime_float, .float => true,
+        .pointer => |pt| switch (pt.size) {
+            .one => switch (@typeInfo(pt.child)) {
+                .array => |ar| ar.child == u8,
+                else => false,
+            },
+            .slice => pt.child == u8,
+            else => false,
+        },
+        else => false,
+    };
+}
+
+pub fn canBeConstant(comptime T: type) bool {
+    return comptime switch (@typeInfo(T)) {
+        .array => |ar| isLiteralType(ar.child),
+        .@"struct" => |st| for (st.field_types) |FT| {
+            if (!isLiteralType(FT)) break false;
+        } else true,
+        .pointer => |pt| switch (pt.size) {
+            .slice => isLiteralType(pt.child),
+            else => false,
+        },
+        else => false,
+    };
+}
+
 pub fn errable(arg: anytype) !WithoutError(@TypeOf(arg)) {
     return switch (@typeInfo(@TypeOf(arg))) {
         .error_union => try arg,

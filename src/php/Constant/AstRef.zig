@@ -7,16 +7,7 @@ const php_al = php.allocator;
 const pi = php.imports;
 const String = php.String;
 const Value = php.Value;
-
-pub fn createZval(value: Value, attr: Attribute) *@This() {
-    const bytes = php_al.alloc(u8, @sizeOf(c.zend_ast_zval)) catch unreachable;
-    const z_ast_val: *c.zend_ast_zval = @ptrCast(@alignCast(bytes));
-    z_ast_val.kind = @backingInt(Kind.zval);
-    z_ast_val.attr = @backingInt(attr);
-    z_ast_val.val = value.toZval();
-    z_ast_val.val.u2.lineno = 0;
-    return @ptrCast(z_ast_val);
-}
+const isLiteralType = php.util.isLiteralType;
 
 pub fn createClassConstFetch(class_name: *String, const_name: *String) *@This() {
     var na: NodeAllocator(.{
@@ -31,10 +22,89 @@ pub fn createClassConstFetch(class_name: *String, const_name: *String) *@This() 
     const class_node = na.alloc(.class_name);
     const const_node = na.alloc(.const_name);
     writeRef(ref);
-    writeZval(class_node, .fromString(class_name), .fq);
-    writeZval(const_node, .fromString(const_name), .fq);
+    writeZval(class_node, .fromString(class_name), 0);
+    writeZval(const_node, .fromString(const_name), 0);
     writeNode(class_const_node, .class_const, .{ class_node, const_node });
     return @ptrCast(ref);
+}
+
+pub fn createLiteral(comptime T: type, arg: T) *@This() {
+    if (comptime !php.util.canBeConstant(T)) {
+        @compileError("Unsupported type for constants: " ++ @typeName(T));
+    }
+    const constant_type: enum { array, tuple, object } = switch (@typeInfo(T)) {
+        .array => .array,
+        .@"struct" => |st| if (st.is_tuple) .tuple else .object,
+        .pointer => .array,
+        else => unreachable,
+    };
+    const child_count = switch (constant_type) {
+        .array => arg.len,
+        .tuple, .object => @typeInfo(T).@"struct".field_names.len,
+    };
+    const cast_to_obj = switch (constant_type) {
+        .array, .tuple => false,
+        // cast-to-object is only supported in 8.5 and up
+        .object => php.minor_version >= 5 or php.major_version > 8,
+    };
+    var na: NodeAllocator(.{
+        .ref = .{ .type = c.zend_ast_ref },
+        .cast = .{ .type = c.zend_ast },
+        .array = .{ .type = c.zend_ast_list, .child_count = child_count },
+        .array_elem = .{ .type = c.zend_ast, .child_count = 2, .count = child_count },
+        .value = .{ .type = c.zend_ast_zval, .count = child_count },
+        .key = .{ .type = c.zend_ast_zval, .count = child_count },
+    }) = .init(switch (constant_type) {
+        .array, .tuple => .{ .omitting = &.{ .cast, .key } },
+        .object => if (cast_to_obj) .{} else .{ .omitting = &.{.cast} },
+    });
+    const ref = na.alloc(.ref);
+    // the element that immediately follows the ref is the root expression
+    const cast_node = if (cast_to_obj) na.alloc(.cast) else null;
+    const array_node = na.alloc(.array);
+    var array_elems: [child_count]*c.zend_ast = undefined;
+    var values: [child_count]*c.zend_ast_zval = undefined;
+    var keys: [child_count]?*c.zend_ast_zval = undefined;
+    for (&array_elems, &values, &keys) |*array_elem_ptr, *value_ptr, *key_ptr| {
+        array_elem_ptr.* = na.alloc(.array_elem);
+        value_ptr.* = na.alloc(.value);
+        key_ptr.* = if (constant_type == .object) na.alloc(.value) else null;
+    }
+    writeRef(ref);
+    // write the elements
+    switch (constant_type) {
+        .array => {
+            for (array_elems, values, keys, 0..) |array_elem, value, key, i| {
+                const arg_elem = arg[i];
+                writeZval(value, .fromAny(arg_elem, .{}), 0);
+                writeNode(array_elem, .array_elem, .{ value, key });
+            }
+        },
+        inline .tuple, .object => {
+            const field_names = @typeInfo(T).@"struct".field_names;
+            inline for (array_elems, values, keys, field_names) |array_elem, value, key, field_name| {
+                const arg_elem = @field(arg, field_name);
+                writeZval(value, .fromAny(arg_elem, .{}), 0);
+                if (key) |k| writeZval(k, .fromString(.static(field_name)), 0);
+                writeNode(array_elem, .array_elem, .{ value, key });
+            }
+        },
+    }
+    writeNode(array_node, .array, array_elems);
+    if (cast_to_obj) {
+        writeNode(cast_node, .cast, .{array_node});
+        cast_node.attr = c.IS_OBJECT;
+    }
+    return @ptrCast(ref);
+}
+
+pub fn toValue(self: *@This()) Value {
+    return .{
+        .impl = .{
+            .u1 = .{ .type_info = c.IS_CONSTANT_AST },
+            .value = .{ .ast = @ptrCast(self) },
+        },
+    };
 }
 
 pub const Kind = enum(u16) {
@@ -143,7 +213,6 @@ pub const Kind = enum(u16) {
     declare = c.ZEND_AST_DECLARE,
     use_trait = c.ZEND_AST_USE_TRAIT,
     trait_precedence = c.ZEND_AST_TRAIT_PRECEDENCE,
-    method_reference = c.ZEND_AST_METHOD_REFERENCE,
     namespace = c.ZEND_AST_NAMESPACE,
     use_elem = c.ZEND_AST_USE_ELEM,
     trait_alias = c.ZEND_AST_TRAIT_ALIAS,
@@ -177,13 +246,6 @@ pub const Kind = enum(u16) {
     // 5 child nodes
     param = c.ZEND_AST_PARAM,
 };
-pub const Attribute = enum(u16) {
-    fq = c.ZEND_NAME_FQ,
-    not_fq = c.ZEND_NAME_NOT_FQ,
-    relative = c.ZEND_NAME_RELATIVE,
-
-    pub const none: @This() = .fq;
-};
 
 fn NodeAllocator(descriptor: anytype) type {
     const Descriptor = @TypeOf(descriptor);
@@ -194,16 +256,18 @@ fn NodeAllocator(descriptor: anytype) type {
             const field_names = @typeInfo(Descriptor).@"struct".field_names;
             for (field_names) |field_name| {
                 const node_info = @field(descriptor, field_name);
-                total_required += nodeSize(node_info);
+                const count = if (@hasField(@TypeOf(node_info), "count")) node_info.count else 1;
+                total_required += nodeSize(node_info) * count;
             }
             break :init total_required;
         };
 
-        pub fn init(omitting: anytype) @This() {
+        pub fn init(comptime options: struct { omitting: []const Tag = &.{} }) @This() {
             var len = total_byte_count;
-            for (omitting) |tag| {
+            inline for (options.omitting) |tag| {
                 const node_info = @field(descriptor, @tagName(tag));
-                len -= nodeSize(node_info);
+                const count = if (@hasField(@TypeOf(node_info), "count")) node_info.count else 1;
+                len -= nodeSize(node_info) * count;
             }
             return .{ .bytes = php_al.alloc(u8, len) catch unreachable };
         }
@@ -225,10 +289,11 @@ fn NodeAllocator(descriptor: anytype) type {
 
         fn nodeSize(node_info: anytype) usize {
             const T = node_info.type;
-            return switch (T) {
-                c.zend_ast => @sizeOf(T) + @sizeOf(*T) * (node_info.child_count - 1),
-                else => @sizeOf(T),
+            const size = switch (@hasField(@TypeOf(node_info), "child_count")) {
+                true => @sizeOf(T) + @sizeOf(*T) * (node_info.child_count - 1),
+                false => @sizeOf(T),
             };
+            return size;
         }
 
         bytes: []u8,
@@ -250,18 +315,19 @@ fn writeRef(ref: *c.zend_ast_ref) void {
     };
 }
 
-fn writeNode(node: *c.zend_ast, kind: Kind, children: anytype) void {
+fn writeNode(node: anytype, kind: Kind, children: anytype) void {
     node.* = .{
         .kind = @backingInt(kind),
     };
-    const child_ptr: [*]*c.zend_ast = @ptrCast(&node.child[0]);
+    const child_ptr: [*]?*c.zend_ast = @ptrCast(&node.child[0]);
     inline for (children, 0..) |child, i| child_ptr[i] = @ptrCast(child);
+    if (@hasField(@TypeOf(node.*), "children")) node.children = children.len;
 }
 
-fn writeZval(node: *c.zend_ast_zval, value: Value, attr: Attribute) void {
+fn writeZval(node: *c.zend_ast_zval, value: Value, attr: u16) void {
     node.* = .{
         .kind = @backingInt(Kind.zval),
-        .attr = @backingInt(attr),
+        .attr = attr,
         .val = value.toZval(),
     };
 }
