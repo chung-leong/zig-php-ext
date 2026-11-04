@@ -2,6 +2,7 @@ const std = @import("std");
 pub const @"export CONST_FLOAT" = std.math.pi;
 
 const php = @import("php/root.zig");
+const Class = php.Class;
 const Constant = php.Constant;
 const Module = php.Module;
 const String = php.String;
@@ -22,16 +23,16 @@ pub const @"export ConstType" = enum(i32) {
     pub const a: @This() = .alpha;
     pub const b: @This() = .beta;
 };
-pub const @"export ConstFlag" = packed struct {
-    option_a: bool,
-    option_b: bool,
-    option_c: bool,
-};
-pub const @"export ConstMore" = packed struct(u8) {
-    option_a: bool,
-    option_b: bool,
+pub const @"export ConstFlag" = Class.Custom(packed struct {
+    option_a: bool = false,
+    option_b: bool = false,
+    option_c: bool = false,
+});
+pub const @"export ConstMore" = Class.Custom(packed struct(u8) {
+    option_a: bool = false,
+    option_b: bool = false,
     _: u6 = 0,
-};
+});
 
 pub fn @"call show_constant"(_: *@This(), args: struct {
     name: *String,

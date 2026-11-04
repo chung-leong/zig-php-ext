@@ -54,13 +54,11 @@ pub fn ClassExporter(comptime T: type) type {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "export", .instance) orelse return null;
             return switch (@typeInfo(@TypeOf(decl))) {
-                .type => if (php.util.api.isCustomType(decl)) check: {
-                    if (decl.custom_type == .object) {
-                        const tag = @tagName(decl.custom_type);
-                        @compileError("@\"" ++ decl_name ++ "\" is not a valid export: received custom " ++ tag ++ " type instead of custom class type");
-                    }
-                    break :check name;
-                } else null,
+                .type => switch (@typeInfo(decl)) {
+                    .@"enum" => null,
+                    .@"struct" => name,
+                    else => @compileError("Struct or enum expected, received: " ++ @typeName(decl)),
+                },
                 else => null,
             };
         }
@@ -84,13 +82,10 @@ pub fn EnumExporter(comptime T: type) type {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "export", .instance) orelse return null;
             return switch (@typeInfo(@TypeOf(decl))) {
-                .type => if (php.util.api.isCustomType(decl)) null else check: {
-                    if (switch (@typeInfo(decl)) {
-                        .@"struct" => |st| st.layout != .@"packed",
-                        .@"enum" => false,
-                        else => true,
-                    }) @compileError("Custom class, packed struct, or enum expected, received: " ++ @typeName(decl));
-                    break :check name;
+                .type => switch (@typeInfo(decl)) {
+                    .@"enum" => name,
+                    .@"struct" => null,
+                    else => @compileError("Struct or enum expected, received: " ++ @typeName(decl)),
                 },
                 else => null,
             };

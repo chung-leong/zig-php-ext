@@ -1,4 +1,5 @@
 const php = @import("php/root.zig");
+const Class = php.Class;
 const getter = php.Object.getter;
 const setter = php.Object.setter;
 
@@ -17,8 +18,8 @@ pub const @"export TEXT" = "Hello world";
 pub const @"export ARRAY" = [3]f64{ 1.23, 0.234, 3.45 };
 
 pub const @"export Enum" = enum { cat, dog, monkey };
-pub const @"export Flag" = packed struct {
-    chicken: bool,
-    beef: bool,
-    pork: bool,
-};
+pub const @"export Flag" = Class.Custom(packed struct {
+    chicken: bool = false,
+    beef: bool = false,
+    pork: bool = false,
+});

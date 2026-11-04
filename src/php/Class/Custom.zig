@@ -188,16 +188,26 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         fn registerConstants(self: *@This()) void {
-            const st = @typeInfo(@TypeOf(constants)).@"struct";
-            const arr = self.class().constants();
-            inline for (st.field_names, st.field_types) |field_name, FT| {
+            const cst = @typeInfo(@TypeOf(constants)).@"struct";
+            inline for (cst.field_names, cst.field_types) |field_name, FT| {
                 const value = @field(constants, field_name);
                 const constant_value: Value = switch (comptime php.util.isLiteralType(FT)) {
                     true => .fromAny(value, .{}),
                     false => Constant.AstRef.createLiteral(FT, value).toValue(),
                 };
-                const constant: *Class.Constant = .create(self.class(), constant_value);
-                arr.set(field_name, .fromPointer(constant));
+                const constant: *Class.Constant = try .register(field_name, constant_value, self.class());
+                _ = constant;
+            }
+            const st = @typeInfo(T).@"struct";
+            if (st.layout == .@"packed") {
+                // make it possible to use class constants to toggle bit-flag
+                inline for (st.field_names, st.field_types) |field_name, FT| {
+                    if (FT == bool) {
+                        const constant_value: Value = .fromAny(1 << @bitOffsetOf(T, field_name), .{});
+                        const constant: *Class.Constant = try .register(field_name, constant_value, self.class());
+                        _ = constant;
+                    }
+                }
             }
         }
 

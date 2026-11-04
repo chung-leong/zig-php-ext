@@ -4,6 +4,7 @@ const builtin = @import("builtin");
 const php = @import("../root.zig");
 const Array = php.Array;
 const Class = php.Class;
+const Constant = php.Constant;
 const Enumeration = php.Enumeration;
 const String = php.String;
 
@@ -32,9 +33,26 @@ pub fn @"fn"(comptime T: type) type {
 
         pub fn register(comptime full_name: []const u8) !*@This() {
             return registered orelse create: {
-                const en: *Enumeration = try .register(full_name, .integer);
-                try en.addFields(T);
-                const self: *@This() = @ptrCast(en);
+                const enum_entry: *Enumeration = try .register(full_name, .integer);
+                const en = @typeInfo(T).@"enum";
+                inline for (en.field_names, en.field_values) |field_name, field_value| {
+                    enum_entry.addCase(.static(field_name), .fromAny(field_value, .{}));
+                }
+                const cls = enum_entry.class();
+                inline for (en.decl_names) |decl_name| {
+                    if (@TypeOf(@field(T, decl_name)) == T) {
+                        const decl_value = @field(T, decl_name);
+                        const field_index = inline for (en.field_values, 0..) |field_value, i| {
+                            if (@backingInt(decl_value) == field_value) break i;
+                        };
+                        const field_name = en.field_names[field_index];
+                        const ast_ref: *Constant.AstRef = .createClassConstFetch(cls.name(), .static(field_name));
+                        // class constant registration never fails actually--returning error union only for consistency
+                        const constant: *Class.Constant = try .register(decl_name, ast_ref.toValue(), cls);
+                        _ = constant;
+                    }
+                }
+                const self: *@This() = @ptrCast(enum_entry);
                 registered = self;
                 // when an enum is registered in multiple places, the first name encountered is
                 // considered its canonical name
