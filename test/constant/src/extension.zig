@@ -35,6 +35,18 @@ pub const @"export ConstMore" = Class.Custom(packed struct(u8) {
     _: u6 = 0,
 });
 
+pub const @"export EnumWithConst" = Enum.Custom(enum {
+    cat,
+    dog,
+    monkey,
+
+    pub const kitten: @This() = .cat;
+    pub const puppy: @This() = .dog;
+
+    pub const @"export cow" = "Mooo";
+    pub const @"export puppy" = "Sad";
+});
+
 pub fn @"call show_constant"(_: *@This(), args: struct {
     name: *String,
 }) !void {

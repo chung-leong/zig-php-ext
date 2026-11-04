@@ -6,7 +6,9 @@ const Array = php.Array;
 const Class = php.Class;
 const Constant = php.Constant;
 const Enum = php.Enum;
+const Object = php.Object;
 const String = php.String;
+const Value = php.Value;
 
 pub fn @"fn"(comptime T: type) type {
     return struct {
@@ -16,6 +18,10 @@ pub fn @"fn"(comptime T: type) type {
 
         pub fn name(_: *const @This()) *String {
             return canonical_name.?;
+        }
+
+        pub fn class(self: *const @This()) *Class {
+            return self.enum_entry.class();
         }
 
         pub fn get() *@This() {
@@ -61,7 +67,62 @@ pub fn @"fn"(comptime T: type) type {
             };
         }
 
+        pub fn registerExports(self: *@This(), comptime parent_name: []const u8) !void {
+            const class_names = comptime std.meta.fieldNames(@TypeOf(classes));
+            var class_instances: php.util.symbol.InstanceTuple(classes) = undefined;
+            inline for (class_names, 0..) |class_name, i| {
+                const full_class_name = parent_name ++ "\\" ++ class_name;
+                class_instances[i] = try .register(full_class_name, null);
+                // add the full class path as a constant
+                _ = try Class.Constant.register(class_name, .fromString(.static(full_class_name)), self.class());
+            }
+            const enum_names = comptime std.meta.fieldNames(@TypeOf(enums));
+            var enum_instances: php.util.symbol.InstanceTuple(enums) = undefined;
+            inline for (enum_names, 0..) |enum_name, i| {
+                const full_enum_name = parent_name ++ "\\" ++ enum_name;
+                enum_instances[i] = try .register(full_enum_name);
+                _ = try Class.Constant.register(enum_name, .fromString(.static(full_enum_name)), self.class());
+            }
+            inline for (class_instances, class_names) |custom_cls, class_name| {
+                try custom_cls.registerExports(parent_name ++ "\\" ++ class_name);
+            }
+            inline for (enum_instances, enum_names) |custom_enum, enum_name| {
+                try custom_enum.registerExports(parent_name ++ "\\" ++ enum_name);
+            }
+            const const_names = comptime std.meta.fieldNames(@TypeOf(constants));
+            const const_types = comptime std.meta.fieldTypes(@TypeOf(constants));
+            inline for (const_names, const_types) |const_name, CT| {
+                // unlike global constants, it's possible to create persistent non-scalar class
+                // constants using AST literals
+                const value = @field(constants, const_name);
+                const constant_value: Value = switch (comptime php.util.isScalarType(CT)) {
+                    true => .fromAny(value, .{}),
+                    false => Constant.AstRef.createLiteral(CT, value).toValue(),
+                };
+                _ = try Class.Constant.register(const_name, constant_value, self.class());
+            }
+        }
+
         pub const custom_type: php.util.api.custom.Type = .@"enum";
+        pub const Static = php.util.api.FindStatic(T);
+
+        const methods = php.util.symbol.MethodExporter(T, .static).get();
+        const constants = php.util.symbol.ConstantExporter(T).get();
+        const enums = php.util.symbol.EnumExporter(T).get();
+        const classes = php.util.symbol.ClassExporter(T).get();
+
+        const method_set = init: {
+            const method_names = std.meta.fieldNames(@TypeOf(methods));
+            var result: Object.MethodSet(method_names) = undefined;
+            for (method_names) |method_name| {
+                const method = @field(methods, method_name);
+                @field(result.entries, method_name) = .init(.static(method_name), method, .{
+                    .self_source = .{ .singleton = Static },
+                    .is_static = true,
+                });
+            }
+            break :init result;
+        };
 
         var registered: ?*@This() = null;
         var canonical_name: ?*String = null;

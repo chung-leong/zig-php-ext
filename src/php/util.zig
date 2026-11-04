@@ -53,7 +53,7 @@ pub fn WithoutError(comptime T: type) type {
     };
 }
 
-pub fn isLiteralType(comptime T: type) bool {
+pub fn isScalarType(comptime T: type) bool {
     return switch (@typeInfo(T)) {
         .bool, .comptime_int, .int, .comptime_float, .float => true,
         .pointer => |pt| switch (pt.size) {
@@ -70,12 +70,12 @@ pub fn isLiteralType(comptime T: type) bool {
 
 pub fn canBeConstant(comptime T: type) bool {
     return comptime switch (@typeInfo(T)) {
-        .array => |ar| isLiteralType(ar.child),
+        .array => |ar| isScalarType(ar.child),
         .@"struct" => |st| for (st.field_types) |FT| {
-            if (!isLiteralType(FT)) break false;
+            if (!isScalarType(FT)) break false;
         } else true,
         .pointer => |pt| switch (pt.size) {
-            .slice => isLiteralType(pt.child),
+            .slice => isScalarType(pt.child),
             else => false,
         },
         else => false,

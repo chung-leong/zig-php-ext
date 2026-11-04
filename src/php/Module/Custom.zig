@@ -89,9 +89,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             // save the default values used by the extension
             ini_default_value = self.*;
             try registerIniEntries(self, module_no);
-            try registerClasses();
-            try registerEnums();
-            try registerConstants(true);
+            try registerExports();
             if (!@hasDecl(T, "moduleStartup")) return;
             return T.moduleStartup(self, module_type, module_no);
         }
@@ -128,7 +126,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
 
         fn tryRequestStartup(module_type: Module.Type, module_no: c_int) !void {
             Allocator.mode = .per_request;
-            try registerConstants(false);
+            try registerNonscalarConstants();
             try initializeClassStatic();
             if (!@hasDecl(T, "requestStartup")) return;
             const self = Singleton(T).get();
@@ -260,21 +258,51 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             };
         }
 
-        fn registerClasses() !void {
-            const st = @typeInfo(@TypeOf(classes)).@"struct";
-            inline for (st.field_names) |class_name| {
-                const CustomClass = @field(classes, class_name);
-                const cls: *CustomClass = try .register(class_name, null);
-                try cls.registerChildren(class_name);
+        fn registerExports() !void {
+            const class_names = comptime std.meta.fieldNames(@TypeOf(classes));
+            var class_instances: php.util.symbol.InstanceTuple(classes) = undefined;
+            inline for (class_names, 0..) |class_name, i| {
+                class_instances[i] = try .register(class_name, null);
+            }
+            const enum_names = comptime std.meta.fieldNames(@TypeOf(enums));
+            var enum_instances: php.util.symbol.InstanceTuple(enums) = undefined;
+            inline for (enum_names, 0..) |enum_name, i| {
+                enum_instances[i] = try .register(enum_name);
+            }
+            // now that we've registered all the top-level classes and enums, we can register
+            // the ones exported at a lower-level; the arrangement ensures that the top-level
+            // name is canonical when the same type get exported twice
+            inline for (class_instances, class_names) |custom_cls, class_name| {
+                try custom_cls.registerExports(class_name);
+            }
+            inline for (enum_instances, enum_names) |custom_enum, enum_name| {
+                try custom_enum.registerExports(enum_name);
+            }
+            // export constants--only scalar ones can be persistent
+            const const_names = comptime std.meta.fieldNames(@TypeOf(constants));
+            const const_types = comptime std.meta.fieldTypes(@TypeOf(constants));
+            inline for (const_names, const_types) |const_name, CT| {
+                if (comptime php.util.isScalarType(CT)) {
+                    const value = @field(constants, const_name);
+                    const constant_value: Value = .fromAny(value, .{});
+                    const constant: *Constant = try .register(const_name, constant_value);
+                    _ = constant;
+                } else if (comptime !php.util.canBeConstant(CT)) {
+                    @compileError("Unsupported type for constants: " ++ @typeName(CT));
+                }
             }
         }
 
-        fn registerEnums() !void {
-            const st = @typeInfo(@TypeOf(enums)).@"struct";
-            inline for (st.field_names) |enum_name| {
-                const CustomEnum = @field(enums, enum_name);
-                const custom_enum: *CustomEnum = try .register(enum_name);
-                _ = custom_enum;
+        fn registerNonscalarConstants() !void {
+            const const_names = comptime std.meta.fieldNames(@TypeOf(constants));
+            const const_types = comptime std.meta.fieldTypes(@TypeOf(constants));
+            inline for (const_names, const_types) |const_name, CT| {
+                if (!php.util.isScalarType(CT)) {
+                    const value = @field(constants, const_name);
+                    const constant_value: Value = .fromAny(value, .{});
+                    const constant: *Constant = try .register(const_name, constant_value);
+                    _ = constant;
+                }
             }
         }
 
@@ -287,21 +315,6 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         fn deinitializeClassStatic() void {
             inline for (comptime std.meta.fieldNames(@TypeOf(classes))) |class_name| {
                 @field(classes, class_name).deinitStatic();
-            }
-        }
-
-        fn registerConstants(persistent: bool) !void {
-            const st = @typeInfo(@TypeOf(constants)).@"struct";
-            inline for (st.field_names, st.field_types) |field_name, FT| {
-                if (comptime !php.util.isLiteralType(FT) and !php.util.canBeConstant(T)) {
-                    @compileError("Unsupported type for constants: " ++ @typeName(T));
-                }
-                if (persistent == php.util.isLiteralType(FT)) {
-                    const value = @field(constants, field_name);
-                    const constant_value: Value = .fromAny(value, .{});
-                    const constant: *Constant = try .register(field_name, constant_value);
-                    _ = constant;
-                }
             }
         }
 

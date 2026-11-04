@@ -137,6 +137,40 @@ pub fn ClassValidator(comptime T: type) type {
     };
 }
 
+pub fn FindStatic(comptime T: type) type {
+    var S: ?type = null;
+    inline for (comptime std.meta.declarations(T)) |decl_name| {
+        if (std.mem.startsWith(u8, decl_name, "static ") or std.mem.eql(u8, decl_name, "getStaticMethod")) {
+            const Decl = @TypeOf(@field(T, decl_name));
+            if (@typeInfo(Decl) == .@"fn") {
+                const f = @typeInfo(Decl).@"fn";
+                const arg0_type: ?type = find: {
+                    if (f.param_types.len > 0) {
+                        if (f.param_types[0]) |PT| break :find PT;
+                    }
+                    break :find null;
+                };
+                const arg0_target_type: ?type = find: {
+                    const Arg0 = arg0_type orelse break :find null;
+                    switch (@typeInfo(Arg0)) {
+                        .pointer => |pt| if (pt.size == .one) break :find pt.child,
+                        else => {},
+                    }
+                    break :find null;
+                };
+                if (arg0_target_type) |New| {
+                    if (S) |Current| {
+                        if (New != Current) @compileError("Multiple static type detected: " ++ @typeName(Current) ++ ", " ++ @typeName(New));
+                    } else {
+                        S = New;
+                    }
+                }
+            }
+        }
+    }
+    return S orelse void;
+}
+
 pub const custom = opaque {
     pub const Type = enum { module, class, @"enum", object, iterator };
 };
@@ -155,8 +189,7 @@ fn checkStruct(comptime T: type) void {
 }
 
 fn checkGetters(comptime T: type) void {
-    const st = @typeInfo(T).@"struct";
-    inline for (st.decl_names) |decl_name| {
+    inline for (comptime std.meta.declarations(T)) |decl_name| {
         if (std.mem.startsWith(u8, decl_name, "get ")) {
             const Handler = @TypeOf(@field(T, decl_name));
             checkGetter(T, Handler) catch |err| {
@@ -174,8 +207,7 @@ fn checkGetter(comptime Self: type, comptime FT: type) !void {
 }
 
 fn checkSetters(comptime T: type) void {
-    const st = @typeInfo(T).@"struct";
-    inline for (st.decl_names) |decl_name| {
+    inline for (comptime std.meta.declarations(T)) |decl_name| {
         if (std.mem.startsWith(u8, decl_name, "set ")) {
             const Handler = @TypeOf(@field(T, decl_name));
             checkSetter(T, Handler) catch |err| {
@@ -195,8 +227,7 @@ fn checkSetter(comptime Self: type, comptime FT: type) !void {
 }
 
 fn checkMethods(comptime T: type) void {
-    const st = @typeInfo(T).@"struct";
-    inline for (st.decl_names) |decl_name| {
+    inline for (comptime std.meta.declarations(T)) |decl_name| {
         if (std.mem.startsWith(u8, decl_name, "call ")) {
             const Handler = @TypeOf(@field(T, decl_name));
             checkMethod(T, Handler) catch |err| {
@@ -228,8 +259,7 @@ fn checkMethod(comptime Self: type, comptime FT: type) !void {
 }
 
 fn checkHandlers(comptime T: type, comptime prototypes: anytype) void {
-    const st = @typeInfo(T).@"struct";
-    inline for (st.decl_names) |decl_name| {
+    inline for (comptime std.meta.declarations(T)) |decl_name| {
         const MP = @TypeOf(prototypes);
         if (@hasField(MP, decl_name)) {
             const prototype = @field(prototypes, decl_name);
@@ -279,8 +309,7 @@ fn checkHandler(comptime Self: type, comptime FT: type, comptime prototype: anyt
 }
 
 fn checkStaticGetters(comptime T: type, comptime _: type) void {
-    const st = @typeInfo(T).@"struct";
-    inline for (st.decl_names) |decl_name| {
+    inline for (comptime std.meta.declarations(T)) |decl_name| {
         if (std.mem.startsWith(u8, decl_name, "static get ")) {
             @compileError("PHP currently does not support dynamic static setters/getters");
         }
@@ -288,8 +317,7 @@ fn checkStaticGetters(comptime T: type, comptime _: type) void {
 }
 
 fn checkStaticSetters(comptime T: type, comptime _: type) void {
-    const st = @typeInfo(T).@"struct";
-    inline for (st.decl_names) |decl_name| {
+    inline for (comptime std.meta.declarations(T)) |decl_name| {
         if (std.mem.startsWith(u8, decl_name, "static set ")) {
             @compileError("PHP currently does not support dynamic static setters/getters");
         }
@@ -297,8 +325,7 @@ fn checkStaticSetters(comptime T: type, comptime _: type) void {
 }
 
 fn checkStaticMethods(comptime T: type, comptime S: type) void {
-    const st = @typeInfo(T).@"struct";
-    inline for (st.decl_names) |decl_name| {
+    inline for (comptime std.meta.declarations(T)) |decl_name| {
         if (std.mem.startsWith(u8, decl_name, "static call ")) {
             const Handler = @TypeOf(@field(T, decl_name));
             checkMethod(S, Handler) catch |err| {
@@ -310,8 +337,7 @@ fn checkStaticMethods(comptime T: type, comptime S: type) void {
 }
 
 fn checkStaticHandlers(comptime T: type, comptime S: type, comptime prototypes: anytype) void {
-    const st = @typeInfo(T).@"struct";
-    inline for (st.decl_names) |decl_name| {
+    inline for (comptime std.meta.declarations(T)) |decl_name| {
         const MP = @TypeOf(prototypes);
         if (@hasField(MP, decl_name)) {
             const prototype = @field(prototypes, decl_name);
@@ -375,27 +401,4 @@ fn prototypeName(comptime prototype: anytype) []const u8 {
         },
         else => unreachable,
     };
-}
-
-fn FindStatic(comptime T: type) type {
-    const st = @typeInfo(T).@"struct";
-    inline for (st.decl_names) |decl_name| {
-        if (std.mem.startsWith(u8, decl_name, "static ") or std.mem.eql(u8, decl_name, "getStaticMethod")) {
-            const Decl = @TypeOf(@field(T, decl_name));
-            switch (@typeInfo(Decl)) {
-                .@"fn" => |f| {
-                    if (f.param_types.len > 0) {
-                        if (f.param_types[0]) |PT| {
-                            switch (@typeInfo(PT)) {
-                                .pointer => |pt| return pt.child,
-                                else => {},
-                            }
-                        }
-                    }
-                },
-                else => {},
-            }
-        }
-    }
-    return void;
 }

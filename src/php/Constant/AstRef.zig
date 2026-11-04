@@ -7,7 +7,7 @@ const php_al = php.allocator;
 const pi = php.imports;
 const String = php.String;
 const Value = php.Value;
-const isLiteralType = php.util.isLiteralType;
+const isScalarType = php.util.isScalarType;
 
 pub fn createClassConstFetch(class_name: *String, const_name: *String) *@This() {
     var na: NodeAllocator(.{

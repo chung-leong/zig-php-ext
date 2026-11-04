@@ -86,6 +86,15 @@ pub fn EnumExporter(comptime T: type) type {
     });
 }
 
+pub fn InstanceTuple(types: anytype) type {
+    const names = comptime std.meta.fieldNames(@TypeOf(types));
+    var by_index: [names.len]type = undefined;
+    for (names, 0..) |name, i| {
+        by_index[i] = *@field(types, name);
+    }
+    return @Tuple(&by_index);
+}
+
 fn DeclarationExtractor(comptime T: type, criteria: type) type {
     const decl_names = comptime std.meta.declarations(T);
     var count: usize = 0;

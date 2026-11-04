@@ -84,4 +84,9 @@ final class ConstantTest extends ExtensionTestCase
         option_b = 2
         OUTPUT, implode(PHP_EOL, $lines));
     }
+
+    public function testEnumWithConstant(): void {
+        $lines = $this->runTest("constant", "enum-with-const.php");
+        echo implode(PHP_EOL, $lines);
+    }
 }

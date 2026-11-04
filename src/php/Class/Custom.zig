@@ -69,8 +69,54 @@ pub fn @"fn"(comptime T: type) type {
                 list.set(lc_name, .fromPointer(&self.class_entry.impl));
                 self.addRef();
                 registered = self;
+                const st = @typeInfo(T).@"struct";
+                if (st.layout == .@"packed") {
+                    // add bits of bool fields as constants so the user can use the to toggle flags
+                    inline for (st.field_names, st.field_types) |field_name, FT| {
+                        if (FT == bool) {
+                            const constant_value: Value = .fromAny(1 << @bitOffsetOf(T, field_name), .{});
+                            _ = try Class.Constant.register(field_name, constant_value, self.class());
+                        }
+                    }
+                }
                 break :create self;
             };
+        }
+
+        pub fn registerExports(self: *@This(), comptime parent_name: []const u8) !void {
+            const class_names = comptime std.meta.fieldNames(@TypeOf(classes));
+            var class_instances: php.util.symbol.InstanceTuple(classes) = undefined;
+            inline for (class_names, 0..) |class_name, i| {
+                const full_class_name = parent_name ++ "\\" ++ class_name;
+                class_instances[i] = try .register(full_class_name, null);
+                // add the full class path as a constant
+                _ = try Class.Constant.register(class_name, .fromString(.static(full_class_name)), self.class());
+            }
+            const enum_names = comptime std.meta.fieldNames(@TypeOf(enums));
+            var enum_instances: php.util.symbol.InstanceTuple(enums) = undefined;
+            inline for (enum_names, 0..) |enum_name, i| {
+                const full_enum_name = parent_name ++ "\\" ++ enum_name;
+                enum_instances[i] = try .register(full_enum_name);
+                _ = try Class.Constant.register(enum_name, .fromString(.static(full_enum_name)), self.class());
+            }
+            inline for (class_instances, class_names) |custom_cls, class_name| {
+                try custom_cls.registerExports(parent_name ++ "\\" ++ class_name);
+            }
+            inline for (enum_instances, enum_names) |custom_enum, enum_name| {
+                try custom_enum.registerExports(parent_name ++ "\\" ++ enum_name);
+            }
+            const const_names = comptime std.meta.fieldNames(@TypeOf(constants));
+            const const_types = comptime std.meta.fieldTypes(@TypeOf(constants));
+            inline for (const_names, const_types) |const_name, CT| {
+                // unlike global constants, it's possible to create persistent non-scalar class
+                // constants using AST literals
+                const value = @field(constants, const_name);
+                const constant_value: Value = switch (comptime php.util.isScalarType(CT)) {
+                    true => .fromAny(value, .{}),
+                    false => Constant.AstRef.createLiteral(CT, value).toValue(),
+                };
+                _ = try Class.Constant.register(const_name, constant_value, self.class());
+            }
         }
 
         pub fn addRef(self: *@This()) void {
@@ -84,17 +130,12 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        pub fn registerChildren(self: *@This(), comptime parent_class_name: []const u8) !void {
-            try self.registerClasses(parent_class_name);
-            try self.registerEnums(parent_class_name);
-        }
-
         pub fn initStatic() !void {
-            if (Static != NoStatic) try Singleton(Static).init();
+            if (Static != void) try Singleton(Static).init();
         }
 
         pub fn deinitStatic() void {
-            if (Static != NoStatic) Singleton(Static).deinit();
+            if (Static != void) Singleton(Static).deinit();
         }
 
         pub fn create(class_name: *String, parent_class: ?*Class) *@This() {
@@ -155,60 +196,7 @@ pub fn @"fn"(comptime T: type) type {
             pi._zend_hash_init(&zce.properties_info, c.HT_MIN_SIZE, null, true);
             pi._zend_hash_init(&zce.constants_table, c.HT_MIN_SIZE, @ptrCast(&freeConstant), true);
             pi._zend_hash_init(&zce.function_table, c.HT_MIN_SIZE, deref(&pi.zend_function_dtor), true);
-            self.registerConstants();
             return self;
-        }
-
-        fn registerClasses(self: *@This(), comptime parent_class_name: []const u8) !void {
-            const st = @typeInfo(@TypeOf(classes)).@"struct";
-            const arr = self.class().constants();
-            inline for (st.field_names) |class_name| {
-                const CustomClass = @field(classes, class_name);
-                const full_class_name = parent_class_name ++ "\\" ++ class_name;
-                const cls: *CustomClass = try .register(full_class_name, null);
-                try cls.registerChildren(full_class_name);
-                // add the full class path as a constant
-                const constant: *Class.Constant = .create(self.class(), .fromString(.static(full_class_name)));
-                arr.set(class_name, .fromPointer(constant));
-            }
-        }
-
-        fn registerEnums(self: *@This(), comptime parent_class_name: []const u8) !void {
-            const st = @typeInfo(@TypeOf(enums)).@"struct";
-            inline for (st.field_names) |field_name| {
-                const CustomEnum = @field(enums, field_name);
-                const full_enum_name = parent_class_name ++ "\\" ++ field_name;
-                const custom_enum: *CustomEnum = try .register(full_enum_name);
-
-                // add the enumeration's canonical name as a class constant
-                const constant_value: Value = .fromString(custom_enum.name());
-                const constant: *Class.Constant = try .register(field_name, constant_value, self.class());
-                _ = constant;
-            }
-        }
-
-        fn registerConstants(self: *@This()) void {
-            const cst = @typeInfo(@TypeOf(constants)).@"struct";
-            inline for (cst.field_names, cst.field_types) |field_name, FT| {
-                const value = @field(constants, field_name);
-                const constant_value: Value = switch (comptime php.util.isLiteralType(FT)) {
-                    true => .fromAny(value, .{}),
-                    false => Constant.AstRef.createLiteral(FT, value).toValue(),
-                };
-                const constant: *Class.Constant = try .register(field_name, constant_value, self.class());
-                _ = constant;
-            }
-            const st = @typeInfo(T).@"struct";
-            if (st.layout == .@"packed") {
-                // make it possible to use class constants to toggle bit-flag
-                inline for (st.field_names, st.field_types) |field_name, FT| {
-                    if (FT == bool) {
-                        const constant_value: Value = .fromAny(1 << @bitOffsetOf(T, field_name), .{});
-                        const constant: *Class.Constant = try .register(field_name, constant_value, self.class());
-                        _ = constant;
-                    }
-                }
-            }
         }
 
         fn createObject(_: *@This()) callconv(.c) ?*Object {
@@ -243,42 +231,8 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         pub const custom_type: php.util.api.custom.Type = .class;
+        pub const Static = php.util.api.FindStatic(T);
         pub const Instance = Object.Custom(T);
-        pub const Static = init: {
-            var S: ?type = null;
-            const decl_names = std.meta.declarations(T);
-            for (decl_names) |decl_name| {
-                if (std.mem.startsWith(u8, decl_name, "static ")) {
-                    const Decl = @TypeOf(@field(T, decl_name));
-                    if (@typeInfo(Decl) == .@"fn") {
-                        const f = @typeInfo(Decl).@"fn";
-                        const arg0_type: ?type = find: {
-                            if (f.param_types.len > 0) {
-                                if (f.param_types[0]) |PT| break :find PT;
-                            }
-                            break :find null;
-                        };
-                        const arg0_target_type: ?type = find: {
-                            const Arg0 = arg0_type orelse break :find null;
-                            switch (@typeInfo(Arg0)) {
-                                .pointer => |pt| if (pt.size == .one) break :find pt.child,
-                                else => {},
-                            }
-                            break :find null;
-                        };
-                        if (arg0_target_type) |New| {
-                            if (S) |Current| {
-                                if (New != Current) @compileError("Multiple static type detected: " ++ @typeName(Current) ++ ", " ++ @typeName(New));
-                            } else {
-                                S = New;
-                            }
-                        }
-                    }
-                }
-            }
-            break :init S orelse NoStatic;
-        };
-        const NoStatic = struct {};
 
         const methods = php.util.symbol.MethodExporter(T, .static).get();
         const constants = php.util.symbol.ConstantExporter(T).get();
@@ -300,12 +254,6 @@ pub fn @"fn"(comptime T: type) type {
 
         var registered: ?*@This() = null;
 
-        class_entry: Class align(@max(@alignOf(Class), @alignOf(Static))),
-
-        comptime {
-            if (@offsetOf(@This(), "class_entry") != 0) {
-                @compileError("class_entry is in the wrong position");
-            }
-        }
+        class_entry: Class,
     };
 }
