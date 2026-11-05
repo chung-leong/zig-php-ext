@@ -1,5 +1,14 @@
 #include "include/root.h"
 
+/* AST constants require the separation of the class's constant table */
+void enable_ast_constants(zend_class_entry* ce) {
+    ce->ce_flags &= ~ZEND_ACC_CONSTANTS_UPDATED;
+    ce->ce_flags |= ZEND_ACC_HAS_AST_CONSTANTS;
+    if (ce->type == ZEND_INTERNAL_CLASS && !ZEND_MAP_PTR(ce->mutable_data)) {
+        ZEND_MAP_PTR_NEW(ce->mutable_data);
+    }
+}
+
 /* php_stream_to_zval() cannot be imported into Zig due to the presence of bit fields in php_stream */
 void set_zval_stream(zval* zv, const php_stream* strm) {
     php_stream_to_zval((php_stream*) strm, zv);

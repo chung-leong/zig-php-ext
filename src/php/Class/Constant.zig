@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const php = @import("../root.zig");
 const c = php.c;
 const Class = php.Class;
@@ -18,11 +20,14 @@ pub fn value(self: *@This()) Value {
     return value_ptr.*;
 }
 
-pub fn register(comptime full_name: []const u8, const_value: Value, cls: *const Class) !*@This() {
+pub fn register(comptime full_name: []const u8, const_value: Value, cls: *Class) !*@This() {
     const self = create(cls, const_value);
     const constants = cls.constants();
     const constant_name: *String = .static(full_name);
     constants.set(constant_name, .fromPointer(self));
+    if (const_value.kind() == .constant_ast) {
+        enable_ast_constants(cls);
+    }
     return self;
 }
 
@@ -37,5 +42,7 @@ pub fn create(cls: *const Class, const_value: Value) *@This() {
     self.impl.value.u2.constant_flags = c.CONST_PERSISTENT;
     return self;
 }
+
+extern fn enable_ast_constants(*Class) void;
 
 impl: c.zend_class_constant,
