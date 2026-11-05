@@ -177,7 +177,6 @@ pub fn @"fn"(comptime T: type) type {
                 .resolved_interfaces = true,
                 .resolved_parent = true,
                 .not_serializable = !@hasDecl(T, "serialize"),
-                .abstract = std.meta.declarations(T).len == 0,
             };
             const class_pce = parent_class orelse Class.builtin(.standard);
             const zce = &self.class_instance.impl;

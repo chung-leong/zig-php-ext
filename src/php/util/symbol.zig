@@ -5,13 +5,15 @@ const Array = php.Array;
 const Class = php.Class;
 const Constant = php.Constant;
 const Enum = php.Enum;
+const Object = php.Object;
+const fieldCount = php.util.fieldCount;
 const ReturnType = php.util.ReturnType;
 const WithoutError = php.util.WithoutError;
 
 pub const Scope = enum { instance, static };
 
 pub fn GetterExporter(comptime T: type, comptime scope: Scope) type {
-    return DeclarationExtractor(T, struct {
+    const DefinedGetterExtractor = DeclarationExtractor(T, struct {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "get", scope) orelse return null;
             if (!checkMethod(decl, T, scope, 1)) {
@@ -20,10 +22,18 @@ pub fn GetterExporter(comptime T: type, comptime scope: Scope) type {
             return name;
         }
     });
+    const defined = DefinedGetterExtractor.get();
+    const use_auto_getter: bool = switch (@hasDecl(T, "use auto getter")) {
+        true => T.@"use auto getter",
+        false => fieldCount(@TypeOf(defined)) == 0,
+    };
+    if (!use_auto_getter) return DefinedGetterExtractor;
+    // return struct type that adds auto-getters
+    return GetterSetterGenerator(T, scope, defined, Object.getter);
 }
 
 pub fn SetterExporter(comptime T: type, comptime scope: Scope) type {
-    return DeclarationExtractor(T, struct {
+    const DefinedSetterExtractor = DeclarationExtractor(T, struct {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "set", scope) orelse return null;
             if (!checkMethod(decl, T, scope, 2)) {
@@ -36,6 +46,14 @@ pub fn SetterExporter(comptime T: type, comptime scope: Scope) type {
             return name;
         }
     });
+    const defined = DefinedSetterExtractor.get();
+    const use_auto_setter: bool = switch (@hasDecl(T, "use auto setter")) {
+        true => T.@"use auto setter",
+        false => fieldCount(@TypeOf(defined)) == 0,
+    };
+    if (!use_auto_setter) return DefinedSetterExtractor;
+    // return struct type that adds auto-getters
+    return GetterSetterGenerator(T, scope, defined, Object.setter);
 }
 
 pub fn MethodExporter(comptime T: type, comptime scope: Scope) type {
@@ -97,6 +115,7 @@ pub fn InstanceTuple(types: anytype) type {
 }
 
 fn DeclarationExtractor(comptime T: type, criteria: type) type {
+    @setEvalBranchQuota(2000000);
     const decl_names = comptime std.meta.declarations(T);
     var count: usize = 0;
     for (decl_names) |decl_name| {
@@ -131,6 +150,59 @@ fn DeclarationExtractor(comptime T: type, criteria: type) type {
             @field(res, name) = @field(T, decl_name);
         }
         break :init res;
+    };
+    return struct {
+        pub fn get() Struct {
+            return result;
+        }
+    };
+}
+
+fn GetterSetterGenerator(comptime T: type, comptime scope: Scope, defined: anytype, create_fn: anytype) type {
+    @setEvalBranchQuota(2000000);
+    const Self = switch (scope) {
+        .instance => T,
+        .static => switch (@typeInfo(T)) {
+            .@"enum" => Enum.Custom(T).Static,
+            else => Class.Custom(T).Static,
+        },
+    };
+    const Defined = @TypeOf(defined);
+    const max_len = fieldCount(T) + fieldCount(Defined);
+    var field_types: [max_len]type = undefined;
+    var field_names: [max_len][]const u8 = undefined;
+    var field_attrs: [max_len]std.lang.Type.Struct.FieldAttributes = undefined;
+    var index: usize = 0;
+    const FieldEnum = std.meta.FieldEnum(T);
+    const st = @typeInfo(Defined).@"struct";
+    // copy user-defined getters first
+    inline for (st.field_names, st.field_types) |field_name, FT| {
+        field_names[index] = field_name;
+        field_types[index] = FT;
+        field_attrs[index] = .{};
+        index += usize;
+    }
+    // then generate getters for remaining fields
+    inline for (comptime std.meta.fieldNames(T)) |field_name| {
+        if (!@hasField(Defined, field_name)) {
+            field_types[index] = @TypeOf(create_fn(Self, @field(FieldEnum, field_name)));
+            field_names[index] = field_name;
+            field_attrs[index] = .{};
+            index += 1;
+        }
+    }
+    const Struct = @Struct(.auto, null, field_names[0..index], field_types[0..index], field_attrs[0..index]);
+    const result = comptime init: {
+        var result: Struct = undefined;
+        for (st.field_names) |field_name| {
+            @field(result, field_name) = @field(defined, field_name);
+        }
+        for (std.meta.fieldNames(T)) |field_name| {
+            if (!@hasField(Defined, field_name)) {
+                @field(result, field_name) = create_fn(Self, @field(FieldEnum, field_name));
+            }
+        }
+        break :init result;
     };
     return struct {
         pub fn get() Struct {

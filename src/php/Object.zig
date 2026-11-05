@@ -222,7 +222,7 @@ pub fn standardHandlers() *const Handlers {
     return deref(&pi.std_object_handlers);
 }
 
-pub fn getter(comptime T: type, field: std.meta.FieldEnum(T)) RT: {
+pub fn getter(comptime T: type, comptime field: std.meta.FieldEnum(T)) RT: {
     const field_name = @tagName(field);
     const FT = @FieldType(T, field_name);
     break :RT fn (*const T) FT;
@@ -237,7 +237,7 @@ pub fn getter(comptime T: type, field: std.meta.FieldEnum(T)) RT: {
     return ns.@"fn";
 }
 
-pub fn setter(comptime T: type, field: std.meta.FieldEnum(T)) RT: {
+pub fn setter(comptime T: type, comptime field: std.meta.FieldEnum(T)) RT: {
     const field_name = @tagName(field);
     const FT = @FieldType(T, field_name);
     break :RT fn (*T, FT) void;

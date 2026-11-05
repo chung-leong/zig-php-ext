@@ -18,6 +18,10 @@ pub const api = @import("util/api.zig");
 pub const macgyver = @import("util/macgyver.zig");
 pub const symbol = @import("util/symbol.zig");
 
+pub fn fieldCount(comptime T: anytype) usize {
+    return std.meta.fieldNames(T).len;
+}
+
 pub fn argCount(comptime F: type) usize {
     return switch (@typeInfo(F)) {
         .pointer => |pt| argCount(pt.child),
