@@ -1,8 +1,11 @@
 const std = @import("std");
 
 const php = @import("php/root.zig");
+const Array = php.Array;
+const Class = php.Class;
 const Enum = php.Enum;
 const Module = php.Module;
+const Object = php.Object;
 
 pub fn @"call returnBool"(_: *@This()) !bool {
     return true;
@@ -77,4 +80,23 @@ pub fn @"call returnStructArray"(_: *@This()) [3]struct {
         .{ .name = "Doctor Doom", .age = 100 },
         .{ .name = "Doctor Zhivago", .age = 45 },
     };
+}
+
+pub const Doctor = struct {
+    name: []const u8,
+    age: u32,
+
+    pub const @"get name" = Object.getter(@This(), .name);
+    pub const @"set name" = Object.setter(@This(), .name);
+    pub const @"get age" = Object.getter(@This(), .age);
+    pub const @"set age" = Object.setter(@This(), .age);
+};
+pub const @"export Doctor" = Class.Custom(Doctor);
+
+pub fn @"call returnAssociativeArray"(_: *@This()) *Array {
+    return .createFromAny(Doctor{ .name = "Doctor Evil", .age = 32 }, .{});
+}
+
+pub fn @"call returnStdClass"(_: *@This()) *Object.StdClass {
+    return .createFromAny(Doctor{ .name = "Doctor Evil", .age = 32 }, .{});
 }

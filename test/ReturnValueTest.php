@@ -110,7 +110,31 @@ final class ReturnValueTest extends ExtensionTestCase
                 )
 
         )
-        OUTPUT
-        , implode(PHP_EOL, $lines));
+        OUTPUT, implode(PHP_EOL, $lines));
     }
+
+    public function testAssociativeArrayReturnValue(): void
+    {
+        $lines = $this->runTest("return-value", "assoc-array.php");
+        $this->assertSame(<<<OUTPUT
+        Array
+        (
+            [name] => Doctor Evil
+            [age] => 32
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testStdClass(): void
+    {
+        $lines = $this->runTest("return-value", "stdclass.php");
+        $this->assertSame(<<<OUTPUT
+        stdClass Object
+        (
+            [name] => Doctor Evil
+            [age] => 32
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
 }

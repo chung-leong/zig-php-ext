@@ -6,6 +6,7 @@ pub const Custom = @import("Object/Custom.zig").@"fn";
 pub const Iterator = @import("Object/Iterator.zig");
 pub const MethodSet = @import("Object/MethodSet.zig").@"fn";
 pub const Opcode = @import("Object/Opcode.zig").@"enum";
+pub const StdClass = @import("Object/StdClass.zig");
 const php = @import("root.zig");
 const Array = php.Array;
 const c = php.c;
@@ -65,22 +66,6 @@ pub fn createCustom(comptime T: type, initializers: T) *@This() {
 pub fn createFromName(name: anytype, params: []const Value) !*@This() {
     const ce = Class.find(name) orelse return error.ClassNotFound;
     return .create(ce, params);
-}
-
-pub fn createFromStruct(arg: anytype, options: Value.ConversionOptions) *@This() {
-    const T = @TypeOf(arg);
-    if (@typeInfo(T) != .@"struct") @compileError("Struct expected, received: " ++ @typeName(T));
-    const st = @typeInfo(T).@"struct";
-    const obj = createStandard();
-    const arr: *Array = .create();
-    inline for (st.field_names) |field_name| {
-        const field_value = @field(arg, field_name);
-        const value: Value = .fromAny(field_value, options);
-        defer value.release();
-        arr.set(String.static(field_name), value);
-    }
-    obj.impl.properties = @ptrCast(arr);
-    return obj;
 }
 
 pub fn createFromArray(arr: *Array) *@This() {

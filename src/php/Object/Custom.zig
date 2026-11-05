@@ -130,7 +130,13 @@ pub fn @"fn"(comptime T: type) type {
                     try errable(if (init_fn.uses_args) T.initSelf(ptr, args) else T.initSelf(ptr));
                 }
             } else {
-                self.custom_struct = .{};
+                self.custom_struct = undefined;
+                const st = @typeInfo(T).@"struct";
+                inline for (st.field_names, st.field_attrs, st.field_types) |field_name, field_attrs, FT| {
+                    if (field_attrs.defaultValue(FT)) |def_value| {
+                        @field(self.custom_struct, field_name) = def_value;
+                    }
+                }
                 inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
                     const set = @field(setters, setter_name);
                     const arg = @field(args, setter_name);
@@ -149,7 +155,7 @@ pub fn @"fn"(comptime T: type) type {
                     if (comptime php.util.hasPointer(T)) {
                         // free memory allocated by setters
                         if (!comptime php.util.autoFreeable(T)) {
-                            @compileError("Unable to free custom struct automatically");
+                            @compileError("Unable to free custom struct automatically: " ++ @typeName(T));
                         }
                         php.util.freeAny(self.custom_struct);
                     }

@@ -57,35 +57,37 @@ pub fn createNonDestructive() *@This() {
     return @ptrCast(arr);
 }
 
-pub fn createFromAny(list: anytype, options: Value.ConversionOptions) *@This() {
-    const T = @TypeOf(list);
+pub fn createFromAny(arg: anytype, options: Value.ConversionOptions) *@This() {
+    const T = @TypeOf(arg);
     const supported = switch (@typeInfo(T)) {
-        .array, .vector => true,
+        .array, .vector, .@"struct" => true,
         .pointer => |pt| pt.size == .slice,
-        .@"struct" => |st| st.is_tuple,
         else => false,
     };
     if (!supported) @compileError("Array, slice, vector, or tuple expected, received: " ++ @typeName(T));
-    const len = switch (@typeInfo(T)) {
-        .vector => |ve| ve.len,
-        else => list.len,
-    };
-    const arr = createWithLength(len);
+    const arr = create();
     switch (@typeInfo(T)) {
-        .vector => {
+        .vector => |ve| {
             // vectors require an unrolled loop
-            inline for (0..len) |i| arr.append(.fromAny(list[i], options));
+            inline for (0..ve.len) |i| arr.append(.fromAny(arg[i], options));
         },
-        .@"struct" => {
-            // tuple also
-            inline for (list) |item| {
+        .@"struct" => |st| if (st.is_tuple) {
+            inline for (arg) |item| {
                 const value: Value = .fromAny(item, options);
                 defer value.release();
                 arr.append(value);
             }
+        } else {
+            inline for (st.field_names) |field_name| {
+                const item = @field(arg, field_name);
+                const key = String.static(field_name);
+                const value: Value = .fromAny(item, options);
+                defer value.release();
+                arr.set(key, value);
+            }
         },
         else => {
-            for (list) |item| {
+            for (arg) |item| {
                 const value: Value = .fromAny(item, options);
                 defer value.release();
                 arr.append(value);
@@ -94,6 +96,14 @@ pub fn createFromAny(list: anytype, options: Value.ConversionOptions) *@This() {
     }
     return arr;
 }
+
+// pub fn of(comptime T: type) type {
+//     return struct {
+//         pub const Child = T;
+
+//         pub fn createFromAny(list: anytype, options: Value.ConversionOptions) *Array {}
+//     };
+// }
 
 pub fn retain(self: *@This()) *@This() {
     self.addRef();
@@ -212,5 +222,6 @@ const Key = union(enum) {
     string: *String,
     slice: []const u8,
 };
+const Array = @This();
 
 impl: c.zend_array,

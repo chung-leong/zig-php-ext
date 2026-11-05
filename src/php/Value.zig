@@ -529,14 +529,12 @@ pub fn fromStruct(arg: anytype, options: ConversionOptions) @This() {
     const T = @TypeOf(arg);
     if (@typeInfo(T) != .@"struct") @compileError("Struct expected, received: " ++ @typeName(T));
     const st = @typeInfo(T).@"struct";
-    if (st.backing_integer) |Int| {
-        const int: Int = @bitCast(arg);
-        const long: c.zend_long = @intCast(int);
-        return .fromInteger(long);
-    } else {
-        const obj: *Object = .createFromStruct(arg, options);
-        return .fromObject(obj);
-    }
+    return if (st.backing_integer) |Int|
+        .fromAny(@as(Int, @bitCast(arg)), .{})
+    else if (st.is_tuple)
+        .fromArray(.createFromAny(arg, options))
+    else
+        .fromObject(.createCustom(T, arg));
 }
 
 pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@TypeOf(arg))) {
@@ -562,6 +560,7 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
             .one => switch (pt.child) {
                 Array => .fromArray(arg),
                 Object => .fromObject(arg),
+                Object.StdClass => .fromObject(arg.object()),
                 Reference => .fromReference(arg),
                 Resource => .fromResource(arg),
                 Stream => .fromStream(arg),
@@ -594,12 +593,9 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
             },
             else => unsupported(T),
         },
-        .@"struct" => |st| switch (T) {
+        .@"struct" => switch (T) {
             Callable => arg.value,
-            else => if (st.is_tuple)
-                .fromArray(.createFromAny(arg, options))
-            else
-                .fromStruct(arg, options),
+            else => .fromStruct(arg, options),
         },
         .@"union" => |un| if (un.tag_type) |Tag|
             inline for (un.field_names) |name| {

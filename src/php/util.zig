@@ -247,7 +247,7 @@ pub fn freeAny(arg: anytype) void {
         .error_union => if (arg) |payload| freeAny(payload) else |_| {},
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
-                Array, Object, Reference, Resource, Stream, String => arg.release(),
+                Array, Object, Object.StdClass, Reference, Resource, Stream, String => arg.release(),
                 else => if (@typeInfo(pt.child) == .@"struct") {
                     Object.fromCustom(arg).release();
                 },
@@ -291,7 +291,7 @@ pub fn autoFreeable(comptime T: type) bool {
         .error_union => |eu| autoFreeable(eu.payload),
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
-                Array, Object, Reference, Resource, Stream, String => true,
+                Array, Object, Object.StdClass, Reference, Resource, Stream, String => true,
                 else => autoFreeable(pt.child),
             },
             .slice => autoFreeable(pt.child),
