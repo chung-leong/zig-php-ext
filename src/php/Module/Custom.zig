@@ -127,6 +127,7 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
         fn tryRequestStartup(module_type: Module.Type, module_no: c_int) !void {
             Allocator.mode = .per_request;
             try registerNonscalarConstants();
+            try injectCustomEnumHandlers();
             try initializeClassStatic();
             if (!@hasDecl(T, "requestStartup")) return;
             const self = Singleton(T).get();
@@ -306,6 +307,21 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             }
         }
 
+        fn injectCustomEnumHandlers() !void {
+            if (status.handlers_injected) return;
+            status.handlers_injected = true;
+            const class_names = comptime std.meta.fieldNames(@TypeOf(classes));
+            inline for (class_names) |class_name| {
+                const CustomClass = @field(classes, class_name);
+                try CustomClass.get().injectCustomEnumHandlers();
+            }
+            const enum_names = comptime std.meta.fieldNames(@TypeOf(enums));
+            inline for (enum_names) |enum_name| {
+                const CustomEnum = @field(enums, enum_name);
+                try CustomEnum.get().injectCustomEnumHandlers();
+            }
+        }
+
         fn initializeClassStatic() !void {
             inline for (comptime std.meta.fieldNames(@TypeOf(classes))) |class_name| {
                 try @field(classes, class_name).initStatic();
@@ -346,6 +362,10 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             break :VT [count]IniEntryDef;
         } = undefined;
         var ini_default_value: T = undefined;
+
+        var status: packed struct {
+            handlers_injected: bool = false,
+        } = .{};
 
         entry: Module align(@max(@alignOf(Module), @alignOf(T))),
     };

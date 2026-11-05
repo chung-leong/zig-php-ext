@@ -4,6 +4,7 @@ const php = @import("../root.zig");
 const Array = php.Array;
 const Class = php.Class;
 const Constant = php.Constant;
+const Enum = php.Enum;
 const ReturnType = php.util.ReturnType;
 const WithoutError = php.util.WithoutError;
 
@@ -141,7 +142,10 @@ fn DeclarationExtractor(comptime T: type, criteria: type) type {
 fn checkMethod(comptime arg: anytype, comptime T: type, comptime scope: Scope, comptime arg_count: ?usize) bool {
     const Self = switch (scope) {
         .instance => T,
-        .static => Class.Custom(T).Static,
+        .static => switch (@typeInfo(T)) {
+            .@"enum" => Enum.Custom(T).Static,
+            else => Class.Custom(T).Static,
+        },
     };
     const FT = @TypeOf(arg);
     switch (@typeInfo(FT)) {
@@ -151,11 +155,11 @@ fn checkMethod(comptime arg: anytype, comptime T: type, comptime scope: Scope, c
                 if (f.param_types.len != count) return false;
             }
             const PT = f.param_types[0] orelse return false;
-            switch (@typeInfo(PT)) {
-                .pointer => |pt| if (pt.child != Self) return false,
-                else => return false,
-            }
-            return true;
+            return switch (@typeInfo(PT)) {
+                .pointer => |pt| pt.child == Self,
+                .@"enum" => PT == Self,
+                else => false,
+            };
         },
         else => return false,
     }

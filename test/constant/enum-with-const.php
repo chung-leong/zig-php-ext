@@ -6,3 +6,4 @@ print_r(EnumWithConst::puppy);
 echo "\n";
 print_r(EnumWithConst::cow);
 echo "\n";
+print_r(EnumWithConst::birds);

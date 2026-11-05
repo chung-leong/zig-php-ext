@@ -45,6 +45,25 @@ pub const @"export EnumWithConst" = Enum.Custom(enum {
 
     pub const @"export cow" = "Mooo";
     pub const @"export puppy" = "Sad";
+    pub const @"export birds" = .{ "Fat", "Angry", "Depressed" };
+});
+pub const @"export EnumWithMethod" = Enum.Custom(enum {
+    cat,
+    dog,
+    bear,
+
+    pub fn @"call hello"(self: @This()) void {
+        php.print("Hello {}\n", .{self});
+    }
+
+    pub fn @"static call hello"(static: *Static) void {
+        static.count += 1;
+        php.print("Hello world!!! ({d})\n", .{static.count});
+    }
+
+    const Static = struct {
+        count: usize = 0,
+    };
 });
 
 pub fn @"call show_constant"(_: *@This(), args: struct {

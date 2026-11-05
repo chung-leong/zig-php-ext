@@ -2,6 +2,7 @@ const php = @import("../root.zig");
 const c = php.c;
 const Class = php.Class;
 const php_al = php.allocator;
+const pi = php.imports;
 const String = php.String;
 const Value = php.Value;
 
@@ -9,8 +10,12 @@ pub fn class(self: *const @This()) *Class {
     return @ptrCast(self.impl.ce);
 }
 
-pub fn value(self: *const @This()) Value {
-    return .fromZval(self.impl.value);
+pub fn value(self: *@This()) Value {
+    const value_ptr: *Value = @ptrCast(&self.impl.value);
+    if (value_ptr.kind() == .constant_ast) {
+        _ = pi.zval_update_constant_ex(&self.impl.value, self.impl.ce);
+    }
+    return value_ptr.*;
 }
 
 pub fn register(comptime full_name: []const u8, const_value: Value, cls: *const Class) !*@This() {

@@ -4,7 +4,7 @@ const php = @import("../root.zig");
 const c = php.c;
 const Array = php.Array;
 const Class = php.Class;
-const String = php.String;
+const Value = php.Value;
 
 pub fn fixProblematicConstants() void {
     const cg = php.globals("compiler");
@@ -17,7 +17,7 @@ pub fn fixProblematicConstants() void {
             var const_iter = constants.iterate(.{});
             while (const_iter.next()) |const_value| {
                 const constant: *Class.Constant = @ptrCast(@alignCast(const_value.pointer()));
-                const constant_value = constant.value();
+                const constant_value: *Value = @ptrCast(&constant.impl.value);
                 if (constant_value.kind() == .constant_ast) {
                     // the first instruction is right after the zend_ast_ref struct
                     const ast_ptr: [*]u8 = @ptrCast(constant_value.impl.value.ast);

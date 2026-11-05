@@ -12,6 +12,7 @@ const pi = php.imports;
 const Callable = php.Callable;
 const Class = php.Class;
 const Dictionary = php.Dictionary;
+const Enum = php.Enum;
 const failure = php.failure;
 const Object = php.Object;
 const Resource = php.Resource;
@@ -264,18 +265,21 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
             } else |err| failure.throw(err);
         }
 
-        fn getSelf(this: Value) !*switch (self_src) {
-            inline else => |T| T,
-        } {
+        fn getSelf(this: Value) !Self {
             // the self variable is either a singleton or held in PHP's $this variable
             return switch (self_src) {
                 .singleton => |T| Singleton(T).get(),
                 .this_object => |T| get: {
                     const obj = try this.getObject();
-                    break :get switch (T) {
-                        Object => obj, // self is a standard object
-                        else => obj.custom(T), // self is a custom object
-                    };
+                    if (@typeInfo(T) == .@"enum") {
+                        // obtain the integer value from the object and convert to enum
+                        break :get try Enum.Custom(T).getValueOf(obj);
+                    } else {
+                        break :get switch (T) {
+                            Object => obj, // self is a standard object
+                            else => obj.custom(T), // self is a custom object
+                        };
+                    }
                 },
                 .this_pointer => |T| get: {
                     // self is some data structure that we reference by a pointer
@@ -285,6 +289,13 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
                 .none => unreachable,
             };
         }
+
+        const Self = switch (self_src) {
+            inline else => |T| switch (@typeInfo(T)) {
+                .@"enum" => T,
+                else => *T,
+            },
+        };
     };
     return @field(ns, @tagName(handler_type));
 }
@@ -336,6 +347,7 @@ pub const SelfSource = union(enum) {
                 if (@typeInfo(T) == .pointer) @compileError("Unexpected pointer");
                 switch (@typeInfo(Arg0)) {
                     .pointer => |pt| break :match pt.child == T,
+                    .@"enum" => break :match Arg0 == T, // we pass enum by-value
                     else => {
                         if (Arg0 == T) @compileError("self should be a pointer");
                         break :match false;

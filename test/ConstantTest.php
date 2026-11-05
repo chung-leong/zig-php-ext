@@ -87,6 +87,62 @@ final class ConstantTest extends ExtensionTestCase
 
     public function testEnumWithConstant(): void {
         $lines = $this->runTest("constant", "enum-with-const.php");
-        echo implode(PHP_EOL, $lines);
+        $this->assertSame(<<<OUTPUT
+        EnumWithConst Enum:int
+        (
+            [name] => cat
+            [value] => 0
+        )
+        EnumWithConst Enum:int
+        (
+            [name] => cat
+            [value] => 0
+        )
+        Sad
+        Mooo
+        Array
+        (
+            [0] => Fat
+            [1] => Angry
+            [2] => Depressed
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testEnumWithMethod(): void {
+        $lines = $this->runTest("constant", "enum-with-method.php");
+        $this->assertSame(<<<OUTPUT
+        Hello .cat
+        Hello .bear
+        Hello world!!! (1)
+        Hello world!!! (2)
+        Hello world!!! (3)
+        Array
+        (
+            [0] => EnumWithMethod Enum:int
+                (
+                    [name] => cat
+                    [value] => 0
+                )
+
+            [1] => EnumWithMethod Enum:int
+                (
+                    [name] => dog
+                    [value] => 1
+                )
+
+            [2] => EnumWithMethod Enum:int
+                (
+                    [name] => bear
+                    [value] => 2
+                )
+
+        )
+        EnumWithMethod Enum:int
+        (
+            [name] => dog
+            [value] => 1
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 }

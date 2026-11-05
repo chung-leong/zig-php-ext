@@ -260,15 +260,7 @@ pub fn getEnum(self: *const @This(), comptime T: type) !T {
         @compileError("Enum type expected, received: " ++ @typeName(T));
     }
     if (self.getObject()) |obj| {
-        const CE = Enum.Custom(T);
-        if (CE.isRegistered()) {
-            const en = CE.get().@"enum"();
-            if (obj.isInstanceOf(en.class())) {
-                const int = obj.getStaticPropertyByIndex(1).integer();
-                return std.enums.fromInt(T, int) orelse error.InvalidEnumValue;
-            }
-        }
-        return error.EnumTypeMismatch;
+        return Enum.Custom(T).getValueOf(obj);
     } else |_| if (self.getInteger()) |int| {
         return std.enums.fromInt(T, int) orelse error.InvalidEnumValue;
     } else |_| if (self.getString()) |str| {

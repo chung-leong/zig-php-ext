@@ -33,12 +33,11 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         pub fn get() *@This() {
-            return registered orelse {
-                if (builtin.mode == .debug) {
-                    std.debug.print("Class is not registered: {}\n", .{T});
-                }
+            if (status.registered) {
+                if (builtin.mode == .debug) std.debug.print("Class is not registered: {}\n", .{T});
                 unreachable;
-            };
+            }
+            return instance;
         }
 
         pub fn custom(_: *@This()) *T {
@@ -54,36 +53,37 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         pub fn isRegistered() bool {
-            return registered != null;
+            return status.registered;
         }
 
         pub fn register(comptime full_name: []const u8, parent_class: ?*Class) !*@This() {
-            return registered orelse create: {
-                const class_name: *String = .static(full_name);
-                const self: *@This() = .create(class_name, parent_class);
-                const cg = php.globals("compiler");
-                const list: *Array = @ptrCast(cg.class_table);
-                const lc_name = self.name().duplicateLowerCase();
-                defer lc_name.release();
-                if (list.has(lc_name)) return error.NameConflict;
-                list.set(lc_name, .fromPointer(&self.class_entry.impl));
-                self.addRef();
-                registered = self;
-                const st = @typeInfo(T).@"struct";
-                if (st.layout == .@"packed") {
-                    // add bits of bool fields as constants so the user can use the to toggle flags
-                    inline for (st.field_names, st.field_types) |field_name, FT| {
-                        if (FT == bool) {
-                            const constant_value: Value = .fromAny(1 << @bitOffsetOf(T, field_name), .{});
-                            _ = try Class.Constant.register(field_name, constant_value, self.class());
-                        }
+            if (status.registered) return instance;
+            const class_name: *String = .static(full_name);
+            const self: *@This() = .create(class_name, parent_class);
+            const cg = php.globals("compiler");
+            const list: *Array = @ptrCast(cg.class_table);
+            const lc_name = self.name().duplicateLowerCase();
+            defer lc_name.release();
+            if (list.has(lc_name)) return error.NameConflict;
+            list.set(lc_name, .fromPointer(&self.class_entry.impl));
+            self.addRef();
+            const st = @typeInfo(T).@"struct";
+            if (st.layout == .@"packed") {
+                // add bits of bool fields as constants so the user can use the to toggle flags
+                inline for (st.field_names, st.field_types) |field_name, FT| {
+                    if (FT == bool) {
+                        const constant_value: Value = .fromAny(1 << @bitOffsetOf(T, field_name), .{});
+                        _ = try Class.Constant.register(field_name, constant_value, self.class());
                     }
                 }
-                break :create self;
-            };
+            }
+            instance = self;
+            return self;
         }
 
         pub fn registerExports(self: *@This(), comptime parent_name: []const u8) !void {
+            if (status.exports_registered) return;
+            status.exports_registered = true;
             const class_names = comptime std.meta.fieldNames(@TypeOf(classes));
             var class_instances: php.util.symbol.InstanceTuple(classes) = undefined;
             inline for (class_names, 0..) |class_name, i| {
@@ -116,6 +116,21 @@ pub fn @"fn"(comptime T: type) type {
                     false => Constant.AstRef.createLiteral(CT, value).toValue(),
                 };
                 _ = try Class.Constant.register(const_name, constant_value, self.class());
+            }
+        }
+
+        pub fn injectCustomEnumHandlers(_: *@This()) !void {
+            if (status.handlers_injected) return;
+            status.handlers_injected = true;
+            const class_names = comptime std.meta.fieldNames(@TypeOf(classes));
+            inline for (class_names) |class_name| {
+                const CustomClass = @field(classes, class_name);
+                try CustomClass.get().injectCustomEnumHandlers();
+            }
+            const enum_names = comptime std.meta.fieldNames(@TypeOf(enums));
+            inline for (enum_names) |enum_name| {
+                const CustomEnum = @field(enums, enum_name);
+                try CustomEnum.get().injectCustomEnumHandlers();
             }
         }
 
@@ -252,7 +267,12 @@ pub fn @"fn"(comptime T: type) type {
             break :init result;
         };
 
-        var registered: ?*@This() = null;
+        var status: packed struct {
+            registered: bool = false,
+            exports_registered: bool = false,
+            handlers_injected: bool = false,
+        } = .{};
+        var instance: *@This() = undefined;
 
         class_entry: Class,
     };
