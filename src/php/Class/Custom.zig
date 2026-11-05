@@ -25,7 +25,7 @@ pub fn @"fn"(comptime T: type) type {
     comptime ClassValidator(T).check();
     return struct {
         pub fn name(self: *const @This()) *String {
-            return self.class_entry.name();
+            return self.class_instance.name();
         }
 
         pub fn class(self: *const @This()) *Class {
@@ -33,7 +33,7 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         pub fn get() *@This() {
-            if (status.registered) {
+            if (!status.registered) {
                 if (builtin.mode == .debug) std.debug.print("Class is not registered: {}\n", .{T});
                 unreachable;
             }
@@ -45,11 +45,11 @@ pub fn @"fn"(comptime T: type) type {
         }
 
         pub fn parent(self: *const @This()) *Class {
-            return self.class_entry.parent();
+            return self.class_instance.parent();
         }
 
         pub fn flags(self: *const @This()) Class.Flags {
-            return self.class_entry.flags();
+            return self.class_instance.flags();
         }
 
         pub fn isRegistered() bool {
@@ -58,6 +58,7 @@ pub fn @"fn"(comptime T: type) type {
 
         pub fn register(comptime full_name: []const u8, parent_class: ?*Class) !*@This() {
             if (status.registered) return instance;
+            status.registered = true;
             const class_name: *String = .static(full_name);
             const self: *@This() = .create(class_name, parent_class);
             const cg = php.globals("compiler");
@@ -65,8 +66,8 @@ pub fn @"fn"(comptime T: type) type {
             const lc_name = self.name().duplicateLowerCase();
             defer lc_name.release();
             if (list.has(lc_name)) return error.NameConflict;
-            list.set(lc_name, .fromPointer(&self.class_entry.impl));
-            self.addRef();
+            list.set(lc_name, .fromPointer(&self.class_instance.impl));
+            self.class_instance.impl.refcount += 1;
             const st = @typeInfo(T).@"struct";
             if (st.layout == .@"packed") {
                 // add bits of bool fields as constants so the user can use the to toggle flags
@@ -134,17 +135,6 @@ pub fn @"fn"(comptime T: type) type {
             }
         }
 
-        pub fn addRef(self: *@This()) void {
-            self.class_entry.impl.refcount += 1;
-        }
-
-        pub fn release(self: *@This()) void {
-            self.class_entry.impl.refcount -= 1;
-            if (self.class_entry.impl.refcount == 0) {
-                php_al.destroy(self);
-            }
-        }
-
         pub fn initStatic() !void {
             if (Static != void) try Singleton(Static).init();
         }
@@ -190,7 +180,7 @@ pub fn @"fn"(comptime T: type) type {
                 .abstract = std.meta.declarations(T).len == 0,
             };
             const class_pce = parent_class orelse Class.builtin(.standard);
-            const zce = &self.class_entry.impl;
+            const zce = &self.class_instance.impl;
             zce.* = .{};
             zce.type = c.ZEND_INTERNAL_CLASS;
             zce.refcount = 1;
@@ -274,6 +264,6 @@ pub fn @"fn"(comptime T: type) type {
         } = .{};
         var instance: *@This() = undefined;
 
-        class_entry: Class,
+        class_instance: Class,
     };
 }

@@ -265,9 +265,9 @@ pub fn freeAny(arg: anytype) void {
         .@"struct" => |st| switch (T) {
             Value => arg.release(),
             else => if (st.backing_integer == null) {
-                inline for (st.field_names) |field_name| {
+                inline for (st.field_names, st.field_attrs) |field_name, field_attrs| {
                     // attempt to free value only if it's does not match the field's default value
-                    if (!fieldHasDefaultValue(arg, field_name)) {
+                    if (!field_attrs.@"comptime" and !fieldHasDefaultValue(arg, field_name)) {
                         const value = @field(arg, field_name);
                         freeAny(value);
                     }

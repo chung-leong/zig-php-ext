@@ -145,4 +145,15 @@ final class ConstantTest extends ExtensionTestCase
         )
         OUTPUT, implode(PHP_EOL, $lines));
     }
+
+    public function testUnregisteredEnum(): void {
+        $lines = $this->runTest("constant", "unregistered-enum.php");
+        $this->assertSame(<<<OUTPUT
+        stdClass Object
+        (
+            [name] => cow
+            [value] => 2
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
 }

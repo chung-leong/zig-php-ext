@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub const Iterator = @import("./Array/Iterator.zig");
 const php = @import("root.zig");
+const Allocator = php.Allocator;
 const c = php.c;
 const php_al = php.allocator;
 const pi = php.imports;
@@ -44,6 +45,14 @@ pub fn create() *@This() {
     return @ptrCast(arr);
 }
 
+pub fn createWithDestructor(dtor: c.dtor_func_t) *@This() {
+    const alignment: std.mem.Alignment = .fromByteUnits(@alignOf(c.zend_array));
+    const byte_ptr = php_al.rawAlloc(@sizeOf(c.zend_array), alignment, @returnAddress());
+    const arr: *c.zend_array = @ptrCast(@alignCast(byte_ptr));
+    pi._zend_hash_init(arr, c.HT_MIN_SIZE, dtor, Allocator.mode == .persistent);
+    return @ptrCast(arr);
+}
+
 pub fn createWithLength(len: usize) *@This() {
     const arr = pi._zend_new_array(@intCast(len));
     return @ptrCast(arr);
@@ -53,7 +62,7 @@ pub fn createNonDestructive() *@This() {
     const alignment: std.mem.Alignment = .fromByteUnits(@alignOf(c.zend_array));
     const byte_ptr = php_al.rawAlloc(@sizeOf(c.zend_array), alignment, @returnAddress());
     const arr: *c.zend_array = @ptrCast(@alignCast(byte_ptr));
-    pi._zend_hash_init(arr, c.HT_MIN_SIZE, null, false);
+    pi._zend_hash_init(arr, c.HT_MIN_SIZE, null, Allocator.mode == .persistent);
     return @ptrCast(arr);
 }
 

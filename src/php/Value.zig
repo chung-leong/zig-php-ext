@@ -334,6 +334,7 @@ pub fn cast(self: *const @This(), comptime desired_kind: Kind) @This() {
 
 pub fn extract(self: *const @This(), allocator: std.mem.Allocator, comptime T: type) !T {
     return switch (@typeInfo(T)) {
+        .void, .null, .undefined => try self.getNull(),
         .bool => try self.getBoolean(),
         .int => |int| get: {
             const int_value = switch (int.signedness) {
@@ -517,12 +518,25 @@ pub fn fromEnum(arg: anytype, options: ConversionOptions) @This() {
     }
     const int_value = fromAny(int, .{});
     if (options.convert_enum_to_integer) return int_value;
-    const en = Enum.Custom(T).get().@"enum"();
-    // just return the number if enum is non-exhaustive
-    return if (en.findCaseByValue(int_value)) |obj|
-        fromObject(obj.retain())
-    else
-        int_value;
+    const obj = init: {
+        if (Enum.Custom(T).isRegistered()) {
+            const en = Enum.Custom(T).get().@"enum"();
+            // just return the number
+            if (en.findCaseByValue(int_value)) |obj| {
+                break :init obj.retain();
+            } else {
+                // if enum is non-exhaustive, create a stdclass that has the same properties as a
+                // real enum object when there isn't a matching entry
+                const fake = .{ .name = null, .value = int_value };
+                break :init Object.StdClass.createFromAny(fake, options).object();
+            }
+        } else {
+            // this happens to all entries when the enum isn't registered
+            const fake = .{ .name = std.enums.tagName(T, arg), .value = int_value };
+            break :init Object.StdClass.createFromAny(fake, options).object();
+        }
+    };
+    return fromObject(obj);
 }
 
 pub fn fromStruct(arg: anytype, options: ConversionOptions) @This() {
@@ -533,8 +547,10 @@ pub fn fromStruct(arg: anytype, options: ConversionOptions) @This() {
         .fromAny(@as(Int, @bitCast(arg)), .{})
     else if (st.is_tuple)
         .fromArray(.createFromAny(arg, options))
+    else if (Class.Custom(T).isRegistered())
+        .fromObject(.createCustom(T, arg))
     else
-        .fromObject(.createCustom(T, arg));
+        .fromObject(Object.StdClass.createFromAny(arg, options).object());
 }
 
 pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@TypeOf(arg))) {
@@ -544,7 +560,7 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
     const T = @TypeOf(arg);
     if (T == @This()) return arg;
     return switch (@typeInfo(T)) {
-        .void => .fromNull(),
+        .void, .null, .undefined => .fromNull(),
         .bool => .fromBoolean(arg),
         .int => |int| switch (int.signedness) {
             .signed => .fromInteger(arg),

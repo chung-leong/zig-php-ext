@@ -18,15 +18,15 @@ const argCount = php.util.argCount;
 pub fn @"fn"(comptime T: type) type {
     return struct {
         pub fn @"enum"(self: *const @This()) *Enum {
-            return @constCast(&self.enum_entry);
+            return @constCast(&self.enum_instance);
         }
 
         pub fn name(self: *const @This()) *String {
-            return self.enum_entry.class().name();
+            return self.enum_instance.class().name();
         }
 
         pub fn class(self: *const @This()) *Class {
-            return self.enum_entry.class();
+            return self.enum_instance.class();
         }
 
         pub fn get() *@This() {
@@ -51,8 +51,8 @@ pub fn @"fn"(comptime T: type) type {
         pub fn register(comptime full_name: []const u8) !*@This() {
             if (status.registered) return instance;
             status.registered = true;
-            const enum_entry: *Enum = try .register(full_name, .integer);
-            const cls = enum_entry.class();
+            const enum_instance: *Enum = try .register(full_name, .integer);
+            const cls = enum_instance.class();
             // use our own get_method when there're user-defined static methods
             if (@typeInfo(@TypeOf(static_method_set)).@"struct".field_names.len > 0) {
                 cls.impl.get_static_method = @ptrCast(&getStaticMethod);
@@ -60,7 +60,7 @@ pub fn @"fn"(comptime T: type) type {
             // add the cases
             const en = @typeInfo(T).@"enum";
             inline for (en.field_names, en.field_values) |field_name, field_value| {
-                enum_entry.addCase(.static(field_name), .fromAny(field_value, .{}));
+                enum_instance.addCase(.static(field_name), .fromAny(field_value, .{}));
             }
             // add aliases (i.e. public decls that refer to actual enum items)
             inline for (en.decl_names) |decl_name| {
@@ -75,7 +75,7 @@ pub fn @"fn"(comptime T: type) type {
                     _ = try Class.Constant.register(decl_name, ast_ref.toValue(), cls);
                 }
             }
-            const self: *@This() = @ptrCast(enum_entry);
+            const self: *@This() = @ptrCast(enum_instance);
             instance = self;
             return self;
         }
@@ -242,6 +242,6 @@ pub fn @"fn"(comptime T: type) type {
         var instance_get_method: *const fn (**Object, *String, *Value) callconv(.c) ?*const Function = undefined;
         var instance_handlers: Object.Handlers = undefined;
 
-        enum_entry: Enum,
+        enum_instance: Enum,
     };
 }

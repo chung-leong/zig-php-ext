@@ -74,3 +74,10 @@ pub fn @"call show_constant"(_: *@This(), args: struct {
     defer value.release();
     php.print("{s}\n", .{value.string().slice()});
 }
+
+const Pet = enum { cat, dog, cow };
+
+pub fn @"call return_unregistered_enum"(_: *@This()) Pet {
+    const a: Pet = .cow;
+    return a;
+}

@@ -29,7 +29,11 @@ final class ReturnValueTest extends ExtensionTestCase
             [name] => dog
             [value] => 1
         )
-        123
+        stdClass Object
+        (
+            [name] =>
+            [value] => 123
+        )
         OUTPUT, implode(PHP_EOL, $lines));
     }
 
