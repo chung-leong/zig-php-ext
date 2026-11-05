@@ -22,6 +22,16 @@ pub fn fieldCount(comptime T: anytype) usize {
     return std.meta.fieldNames(T).len;
 }
 
+pub fn functionCount(comptime T: anytype) usize {
+    return comptime count: {
+        var count: usize = 0;
+        for (std.meta.declarations(T)) |decl_name| {
+            if (@typeInfo(@TypeOf(@field(T, decl_name))) == .@"fn") count += 1;
+        }
+        break :count count;
+    };
+}
+
 pub fn argCount(comptime F: type) usize {
     return switch (@typeInfo(F)) {
         .pointer => |pt| argCount(pt.child),
@@ -290,6 +300,36 @@ pub fn freeAny(arg: anytype) void {
         },
         else => {},
     }
+}
+
+pub fn autoConvertible(T: type) bool {
+    return switch (@typeInfo(T)) {
+        .void, .null, .undefined, .bool, .comptime_int, .float, .comptime_float, .@"enum", .enum_literal => true,
+        .int => true,
+        .error_union => |eu| autoConvertible(eu.payload),
+        .array, .vector => |ar| autoConvertible(ar.child),
+        .optional => |op| autoConvertible(op.child),
+        .pointer => |pt| switch (pt.size) {
+            .one => switch (pt.child) {
+                Array, Object, Object.StdClass, Reference, Resource, Stream, String => true,
+                else => switch (@typeInfo(pt.child)) {
+                    .array => |ar| ar.child == u8,
+                    .@"struct" => true,
+                    else => false,
+                },
+            },
+            .slice => switch (pt.child) {
+                u8 => true,
+                else => autoConvertible(pt.child),
+            },
+            else => false,
+        },
+        .@"struct" => true,
+        .@"union" => |un| inline for (un.field_types) |FT| {
+            if (!autoConvertible(FT)) break false;
+        } else true,
+        else => false,
+    };
 }
 
 pub fn autoFreeable(comptime T: type) bool {

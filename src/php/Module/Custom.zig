@@ -334,8 +334,8 @@ pub fn @"fn"(comptime T: type, comptime options: struct {
             }
         }
 
-        const getters = php.util.symbol.GetterExporter(T, .instance).get();
-        const setters = php.util.symbol.SetterExporter(T, .instance).get();
+        const getters = php.util.symbol.GetterExporter(T, .instance, .module).get();
+        const setters = php.util.symbol.SetterExporter(T, .instance, .module).get();
         const functions = php.util.symbol.MethodExporter(T, .instance).get();
         const constants = php.util.symbol.ConstantExporter(T).get();
         const enums = php.util.symbol.EnumExporter(T).get();

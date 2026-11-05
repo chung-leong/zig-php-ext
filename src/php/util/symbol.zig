@@ -5,14 +5,17 @@ const Array = php.Array;
 const Class = php.Class;
 const Constant = php.Constant;
 const Enum = php.Enum;
+const IniEntry = php.IniEntry;
 const Object = php.Object;
 const fieldCount = php.util.fieldCount;
+const functionCount = php.util.functionCount;
 const ReturnType = php.util.ReturnType;
 const WithoutError = php.util.WithoutError;
 
 pub const Scope = enum { instance, static };
+pub const Purpose = enum { module, object };
 
-pub fn GetterExporter(comptime T: type, comptime scope: Scope) type {
+pub fn GetterExporter(comptime T: type, comptime scope: Scope, comptime purpose: Purpose) type {
     const DefinedGetterExtractor = DeclarationExtractor(T, struct {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "get", scope) orelse return null;
@@ -25,14 +28,17 @@ pub fn GetterExporter(comptime T: type, comptime scope: Scope) type {
     const defined = DefinedGetterExtractor.get();
     const use_auto_getter: bool = switch (@hasDecl(T, "use auto getter")) {
         true => T.@"use auto getter",
-        false => fieldCount(@TypeOf(defined)) == 0,
+        false => comptime functionCount(T) == 0,
     };
     if (!use_auto_getter) return DefinedGetterExtractor;
     // return struct type that adds auto-getters
-    return GetterSetterGenerator(T, scope, defined, Object.getter);
+    return GetterSetterGenerator(T, scope, defined, switch (purpose) {
+        .module => IniEntry.getter,
+        .object => Object.getter,
+    });
 }
 
-pub fn SetterExporter(comptime T: type, comptime scope: Scope) type {
+pub fn SetterExporter(comptime T: type, comptime scope: Scope, comptime purpose: Purpose) type {
     const DefinedSetterExtractor = DeclarationExtractor(T, struct {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "set", scope) orelse return null;
@@ -49,11 +55,14 @@ pub fn SetterExporter(comptime T: type, comptime scope: Scope) type {
     const defined = DefinedSetterExtractor.get();
     const use_auto_setter: bool = switch (@hasDecl(T, "use auto setter")) {
         true => T.@"use auto setter",
-        false => fieldCount(@TypeOf(defined)) == 0,
+        false => functionCount(T) == 0,
     };
     if (!use_auto_setter) return DefinedSetterExtractor;
     // return struct type that adds auto-getters
-    return GetterSetterGenerator(T, scope, defined, Object.setter);
+    return GetterSetterGenerator(T, scope, defined, switch (purpose) {
+        .module => IniEntry.setter,
+        .object => Object.setter,
+    });
 }
 
 pub fn MethodExporter(comptime T: type, comptime scope: Scope) type {
@@ -174,17 +183,18 @@ fn GetterSetterGenerator(comptime T: type, comptime scope: Scope, defined: anyty
     var field_attrs: [max_len]std.lang.Type.Struct.FieldAttributes = undefined;
     var index: usize = 0;
     const FieldEnum = std.meta.FieldEnum(T);
-    const st = @typeInfo(Defined).@"struct";
+    const d_st = @typeInfo(Defined).@"struct";
     // copy user-defined getters first
-    inline for (st.field_names, st.field_types) |field_name, FT| {
+    inline for (d_st.field_names, d_st.field_types) |field_name, FT| {
         field_names[index] = field_name;
         field_types[index] = FT;
         field_attrs[index] = .{};
-        index += usize;
+        index += 1;
     }
     // then generate getters for remaining fields
-    inline for (comptime std.meta.fieldNames(T)) |field_name| {
-        if (!@hasField(Defined, field_name)) {
+    const st = @typeInfo(T).@"struct";
+    inline for (st.field_names, st.field_types) |field_name, FT| {
+        if (!@hasField(Defined, field_name) and comptime php.util.autoConvertible(FT)) {
             field_types[index] = @TypeOf(create_fn(Self, @field(FieldEnum, field_name)));
             field_names[index] = field_name;
             field_attrs[index] = .{};
@@ -194,11 +204,11 @@ fn GetterSetterGenerator(comptime T: type, comptime scope: Scope, defined: anyty
     const Struct = @Struct(.auto, null, field_names[0..index], field_types[0..index], field_attrs[0..index]);
     const result = comptime init: {
         var result: Struct = undefined;
-        for (st.field_names) |field_name| {
+        for (d_st.field_names) |field_name| {
             @field(result, field_name) = @field(defined, field_name);
         }
-        for (std.meta.fieldNames(T)) |field_name| {
-            if (!@hasField(Defined, field_name)) {
+        for (st.field_names, st.field_types) |field_name, FT| {
+            if (!@hasField(Defined, field_name) and php.util.autoConvertible(FT)) {
                 @field(result, field_name) = create_fn(Self, @field(FieldEnum, field_name));
             }
         }

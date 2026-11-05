@@ -279,7 +279,19 @@ pub fn @"fn"(comptime T: type) type {
 
         fn writeProperty(obj: *Object, name: *String, value: *Value, cache_slot: ?[*]?*anyopaque) callconv(.c) ?*Value {
             tryWriteProperty(obj, name, value, cache_slot) catch |err| {
-                failure.throw(fieldError(obj, name, .write, err));
+                const exists = check: {
+                    if (failure.match(err, error.Undefined)) {
+                        // see if reading is possible
+                        if (tryHasProperty(obj, name, null) catch false) {
+                            break :check true;
+                        }
+                    }
+                    break :check false;
+                };
+                switch (exists) {
+                    true => failure.throw(fieldError(obj, name, .write, error.ReadOnly)),
+                    false => failure.throw(fieldError(obj, name, .write, err)),
+                }
             };
             return value;
         }
@@ -664,14 +676,14 @@ pub fn @"fn"(comptime T: type) type {
             if (failure.match(err, error.FailureReported)) {
                 return error.FailureReported;
             } else if (failure.match(err, error.Undefined)) {
-                return failure.report("no field named '{s}' in {s}", .{
+                return failure.report("no property named '{s}' in {s}", .{
                     name.slice(),
                     obj.class().name().slice(),
                 });
             } else {
                 const message = failure.acquireMessage(err);
                 defer failure.freeMessage(message);
-                return failure.report("unable to {s} field '{s}' in {s} - {s}", .{
+                return failure.report("unable to {s} property '{s}' in {s} - {s}", .{
                     @tagName(access),
                     name.slice(),
                     obj.class().name().slice(),
@@ -701,8 +713,8 @@ pub fn @"fn"(comptime T: type) type {
             return if (@typeInfo(PT) == .optional) set(self.custom(), null) else error.CannotBeNull;
         }
 
-        const getters = php.util.symbol.GetterExporter(T, .instance).get();
-        const setters = php.util.symbol.SetterExporter(T, .instance).get();
+        const getters = php.util.symbol.GetterExporter(T, .instance, .object).get();
+        const setters = php.util.symbol.SetterExporter(T, .instance, .object).get();
         const methods = php.util.symbol.MethodExporter(T, .instance).get();
         const method_set = init: {
             const method_names = std.meta.fieldNames(@TypeOf(methods));
