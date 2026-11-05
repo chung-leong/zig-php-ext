@@ -10,3 +10,4 @@ echo "a = ";
 print_r(ConstType::a);
 echo "b = ";
 print_r(ConstType::b);
+print_r(CONST_ENUM);

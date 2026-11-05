@@ -8,12 +8,16 @@ const Enum = php.Enum;
 const Module = php.Module;
 const String = php.String;
 
+const Pet = enum { cat, dog, cow };
+
 pub const @"export CONST_BOOL" = true;
 pub const @"export CONST_INT" = 1234;
 pub const @"export CONST_STRING" = "Hello world";
 pub const @"export CONST_ARRAY" = [4]i32{ 1, 2, 3, 4 };
 pub const @"export CONST_STRING_ARRAY" = [2][]const u8{ "Hello", "world" };
 pub const @"export CONST_OBJECT" = .{ .cow = 123, .pig = 456 };
+pub const @"export CONST_LITERAL" = .@"Hello world";
+pub const @"export CONST_ENUM": Pet = .dog;
 
 pub const @"export ConstEnum" = Enum.Custom(enum { hello, world });
 pub const @"export ConstType" = Enum.Custom(enum(i32) {
@@ -74,8 +78,6 @@ pub fn @"call show_constant"(_: *@This(), args: struct {
     defer value.release();
     php.print("{s}\n", .{value.string().slice()});
 }
-
-const Pet = enum { cat, dog, cow };
 
 pub fn @"call return_unregistered_enum"(_: *@This()) Pet {
     const a: Pet = .cow;

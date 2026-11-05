@@ -569,6 +569,7 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
         .comptime_int => .fromInteger(arg),
         .float, .comptime_float => .fromFloat(arg),
         .@"enum" => .fromEnum(arg, options),
+        .enum_literal => .fromString(.static(@tagName(arg))),
         .error_union => if (arg) |payload| .fromAny(payload, options) else |err| err,
         .array, .vector => .fromArray(.createFromAny(arg, options)),
         .optional => if (arg) |p| fromAny(p, options) else .fromNull(),

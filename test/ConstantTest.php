@@ -70,6 +70,11 @@ final class ConstantTest extends ExtensionTestCase
             [name] => beta
             [value] => 456
         )
+        stdClass Object
+        (
+            [name] => dog
+            [value] => 1
+        )
         OUTPUT, implode(PHP_EOL, $lines));
     }
 
@@ -154,6 +159,13 @@ final class ConstantTest extends ExtensionTestCase
             [name] => cow
             [value] => 2
         )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testEnumLiteral(): void {
+        $lines = $this->runTest("constant", "enum-literal.php");
+        $this->assertSame(<<<OUTPUT
+        Hello world
         OUTPUT, implode(PHP_EOL, $lines));
     }
 }

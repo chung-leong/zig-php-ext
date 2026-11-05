@@ -56,6 +56,7 @@ pub fn WithoutError(comptime T: type) type {
 pub fn isScalarType(comptime T: type) bool {
     return switch (@typeInfo(T)) {
         .bool, .comptime_int, .int, .comptime_float, .float => true,
+        .enum_literal => true,
         .pointer => |pt| switch (pt.size) {
             .one => switch (@typeInfo(pt.child)) {
                 .array => |ar| ar.child == u8,
@@ -70,6 +71,7 @@ pub fn isScalarType(comptime T: type) bool {
 
 pub fn canBeConstant(comptime T: type) bool {
     return comptime switch (@typeInfo(T)) {
+        .@"enum" => true,
         .array => |ar| isScalarType(ar.child),
         .@"struct" => |st| for (st.field_types) |FT| {
             if (!isScalarType(FT)) break false;
