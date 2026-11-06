@@ -44,7 +44,8 @@ pub fn @"fn"(comptime T: type) type {
         pub fn getValueOf(obj: *Object) !T {
             if (!isRegistered()) return error.EnumNotRegistered;
             if (!obj.isInstanceOf(instance.class())) return error.EnumTypeMismatch;
-            const int = obj.getStaticPropertyByIndex(1).integer();
+            const props: [*]Value = @ptrCast(&obj.impl.properties_table[0]);
+            const int = props[1].integer();
             return std.enums.fromInt(T, int) orelse error.InvalidEnumValue;
         }
 

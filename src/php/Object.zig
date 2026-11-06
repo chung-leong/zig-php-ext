@@ -1,3 +1,4 @@
+//! Data structure corresponding to an object in PHP.
 const std = @import("std");
 const builtin = @import("builtin");
 
@@ -18,24 +19,34 @@ const unsupported = failure.unsupported;
 const Function = php.Function;
 const String = php.String;
 const Value = php.Value;
+/// Struct containing handlers.
 pub const Handlers = c.zend_object_handlers;
 
+/// Allocator for allocating memory for custom objects. Extra bytes are added in front of each
+/// memory block so that a PHP object wrapper can be added later:
+///
+/// [ extra bytes ][ bytes returned to caller ]
+///
+/// Initially, the extra bytes contain all zeroes. If they are still zeroes when `free` is called,
+/// the allocator frees the memory in the normal manner. If a PHP object has been created around
+/// the data, that object is released.
 pub const allocator: std.mem.Allocator = .{ .ptr = undefined, .vtable = &Allocator.vtable };
-
+/// Return the `Class` of each the object is an instance.
 pub fn class(self: *const @This()) *const Class {
     return @ptrCast(self.impl.ce);
 }
-
+/// Return the object's internal handle.
 pub fn handle(self: *const @This()) c.zend_long {
     return @ptrCast(self.impl.handle);
 }
-
+/// Return the object's dynamic properties. Only relevant when the object is an instance of
+/// stdclass.
 pub fn properties(self: *const @This()) *Array {
     return @ptrCast(self.impl.properties);
 }
-
-pub fn create(ce: *const Class, params: []const Value) !*@This() {
-    const zobj = pi.zend_objects_new(@ptrCast(@constCast(ce)));
+/// Create an instance of the given class and invoke its constructor.
+pub fn create(cls: *const Class, params: []const Value) !*@This() {
+    const zobj = pi.zend_objects_new(@ptrCast(@constCast(cls)));
     const handlers = zobj.*.handlers;
     const handler = handlers.*.get_constructor;
     const ctor = handler.?(zobj);
@@ -49,67 +60,72 @@ pub fn create(ce: *const Class, params: []const Value) !*@This() {
     }
     return @ptrCast(zobj);
 }
-
+/// Create a standard object (stdclass).
 pub fn createStandard() *@This() {
     const ce = Class.builtin(.standard);
     const zobj = pi.zend_objects_new(@ptrCast(@constCast(ce)));
     return @ptrCast(zobj);
 }
-
+/// Create an instance of a class defined using `Class.Custom` and copy `initializers` into the
+/// custom portion.
+///
+/// If `Class.Custom(T)` has not been exported, a panic would occur.
 pub fn createCustom(comptime T: type, initializers: T) *@This() {
     const custom_obj = Object.Custom(T).create();
     custom_obj.custom().* = initializers;
     custom_obj.flags.initialized = true;
     return custom_obj.object();
 }
-
+/// Look up a class by name and create an instance of it.
+///
+/// `name` can be `[]const u8` or `String`.
 pub fn createFromName(name: anytype, params: []const Value) !*@This() {
-    const ce = Class.find(name) orelse return error.ClassNotFound;
-    return .create(ce, params);
+    const cls = Class.find(name) orelse return error.ClassNotFound;
+    return .create(cls, params);
 }
-
+/// Create a standard object and attach the given array to it as its properties.
 pub fn createFromArray(arr: *Array) *@This() {
     const obj: Object = .createStandard();
     obj.properties = arr;
     return obj;
 }
-
+/// Increase the object's refcount by one and return the object.
 pub fn retain(self: *@This()) *@This() {
     self.addRef();
     return self;
 }
-
+/// Increase the object's refcount by one.
 pub fn addRef(self: *@This()) void {
     self.impl.gc.refcount += 1;
 }
-
+/// Reduce the array's refcount by one. Free the object if the refcount has reached zero.
 pub fn release(self: *@This()) void {
     const zobj = &self.impl;
     pi.zend_object_release(zobj);
 }
-
+/// Reduce the object's refcount by one.
 pub fn subtractRef(self: *@This()) void {
     self.impl.gc.refcount -= 1;
 }
-
+/// Place the object into a `Value`.
 pub fn toValue(self: *const @This()) Value {
     return .fromObject(self);
 }
-
+/// Return true if the given object does not actually exist.
 pub fn isUninitialized(self: *const @This()) bool {
     return self.impl.handlers == null;
 }
-
-pub fn isInstanceOf(self: *const @This(), ce: *const Class) bool {
+/// Check if the object is an instance of the given class.
+pub fn isInstanceOf(self: *const @This(), cls: *const Class) bool {
     const zobj = &self.impl;
-    const zce: *const c.zend_class_entry = @ptrCast(ce);
+    const zce: *const c.zend_class_entry = @ptrCast(cls);
     return (zobj.ce == zce) or pi.instanceof_function_slow(zobj.ce, zce);
 }
-
+/// Check if the object implements a given interface.
 pub fn hasInterface(self: *const @This(), iface: Class.InterfaceId) bool {
     return self.isInstanceOf(iface.get());
 }
-
+/// Check if an array-like object contains an element at the given key.
 pub fn hasDimension(self: *const @This(), key: anytype) !bool {
     const zobj = @constCast(&self.impl);
     const k: Value = .createFromAny(key);
@@ -125,7 +141,12 @@ pub fn hasDimension(self: *const @This(), key: anytype) !bool {
     const rv = handler(zobj, zk, false);
     return rv != null;
 }
-
+/// Obtain an element from an array-like object.
+///
+/// `key` can be an integer, `[]const u8`, or `String`.
+///
+/// If there is no element matching the given key, `error.Missing` is returned.
+/// `error.NoArrayAccess` is return when the object is not array-like.
 pub fn readDimension(self: *const @This(), key: anytype) !Value {
     const zobj = @constCast(&self.impl);
     const k: Key = .createFromAny(key);
@@ -144,16 +165,20 @@ pub fn readDimension(self: *const @This(), key: anytype) !Value {
     if (rv == null) return error.Missing;
     return @as(*Value, @ptrCast(rv)).*;
 }
-
+/// Obtain the element count from an array-like object.
+///
+/// If the object is unable to provide a length `error.NotKnowable` is returned.
 pub fn countElements(self: *const @This()) !usize {
     const zobj = @constCast(&self.impl);
-    const handler = zobj.handlers.*.count_elements orelse return error.NoPropertyAccess;
+    const handler = zobj.handlers.*.count_elements orelse return error.NoArrayAccess;
     var count: c.zend_long = undefined;
     const result = handler(zobj, &count);
-    if (result != c.SUCCESS) return error.Missing;
+    if (result != c.SUCCESS) return error.NotKnowable;
     return @intCast(count);
 }
-
+/// Obtain a property of the object.
+///
+/// If the object does not have a property by that name, `error.Missing` is returned.
 pub fn readProperty(self: *const @This(), name: anytype) !Value {
     const zobj = @constCast(&self.impl);
     const n: *String = .createFromAny(name);
@@ -167,7 +192,7 @@ pub fn readProperty(self: *const @This(), name: anytype) !Value {
     if (result == null) return error.Missing;
     return .fromZval(result.*);
 }
-
+/// Check if the object has a property by the given name.
 pub fn hasProperty(self: *const @This(), name: anytype) !bool {
     const zobj = @constCast(&self.impl);
     const n: *String = .createFromAny(name);
@@ -178,33 +203,33 @@ pub fn hasProperty(self: *const @This(), name: anytype) !bool {
     const result = handler(zobj, zn, @backingInt(state), null);
     return result != 0;
 }
-
+/// Return all properties of the object in an array.
 pub fn getProperties(self: *const @This()) *Array {
     var value = self.toValue();
     const zval: *c.zval = @ptrCast(&value);
     const ht = pi.zend_get_properties_for(zval, c.ZEND_PROP_PURPOSE_ARRAY_CAST).?;
     return @ptrCast(ht);
 }
-
-pub fn getDynamicProperties(self: *const @This()) ?*Array {
-    return @ptrCast(self.impl.properties);
-}
-
-pub fn getStaticPropertyByIndex(self: *const @This(), index: usize) Value {
-    const zobj = @constCast(&self.impl);
-    const props: [*]Value = @ptrCast(&zobj.properties_table[0]);
-    return props[index];
-}
-
+/// Return true if the object is an instance of a custom class.
 pub fn isCustom(self: *const @This(), comptime T: type) bool {
     return @intFromPtr(self.impl.handlers) == @intFromPtr(&Custom(T).handlers);
 }
-
+/// Return a pointer to the custom portion of a custom object.
+///
+/// A custom object contains a PHP portion and a custom portion. The PHP portion, holding
+/// internal fields used by the Zend Engine, sits at the beginning of the memory block. The
+/// custom portion (i.e. `T`) follows:
+///
+/// [ PHP portion ][ custom portion ]
+///
+/// This function simply shifts `self` pointer forward by a certain number of bytes.
 pub fn custom(self: *const @This(), comptime T: type) *T {
     const custom_obj: *Custom(T) = @ptrCast(@constCast(self));
     return custom_obj.custom();
 }
-
+/// Return a pointer to `Object` given a pointer to the custom portion of a custom object.
+///
+/// This function is the inverse of `custom`.
 pub fn fromCustom(custom_ptr: anytype) *@This() {
     const T = @TypeOf(custom_ptr.*);
     const custom_obj = Custom(T).fromCustom(custom_ptr);
@@ -217,11 +242,11 @@ pub fn fromCustom(custom_ptr: anytype) *@This() {
     }
     return self;
 }
-
+/// Return the object handlers used by instances of `stdclass`.
 pub fn standardHandlers() *const Handlers {
     return deref(&pi.std_object_handlers);
 }
-
+/// Utility function for creating property getters for a custom object
 pub fn getter(comptime T: type, comptime field: std.meta.FieldEnum(T)) RT: {
     const field_name = @tagName(field);
     const FT = @FieldType(T, field_name);
@@ -236,7 +261,7 @@ pub fn getter(comptime T: type, comptime field: std.meta.FieldEnum(T)) RT: {
     };
     return ns.@"fn";
 }
-
+/// Utility function for creating property setters for a custom object
 pub fn setter(comptime T: type, comptime field: std.meta.FieldEnum(T)) RT: {
     const field_name = @tagName(field);
     const FT = @FieldType(T, field_name);
@@ -258,17 +283,18 @@ pub fn setter(comptime T: type, comptime field: std.meta.FieldEnum(T)) RT: {
     };
     return ns.@"fn";
 }
-
+/// Struct returned by the `getGarbageCollection` handler.
 pub const GarbageCollectionResult = struct {
     slice: []const *Value = &.{},
     array: ?*Array = null,
 };
+/// Struct returned by the `gteClosure` handler.
 pub const ClosureResult = struct {
     class: ?*const Class = null,
     function: ?*const Function = null,
     object: ?*const Object = null,
 };
-/// Purpose the data to be returned by getProperties()
+/// Purpose of the data to be returned by the `getProperties` handler
 pub const PropertiesPurpose = enum(c_int) {
     /// Used for debugging. Supersedes get_debug_info handler.
     debug = c.ZEND_PROP_PURPOSE_DEBUG,
@@ -288,11 +314,6 @@ pub const PropertiesPurpose = enum(c_int) {
         false => c.ZEND_PROP_PURPOSE_JSON + 1,
     },
     default,
-};
-pub const PropertyStatus = enum(c_int) {
-    isset = c.ZEND_PROPERTY_ISSET,
-    not_empty = c.ZEND_PROPERTY_NOT_EMPTY,
-    exists = c.ZEND_PROPERTY_EXISTS,
 };
 
 const Key = struct {

@@ -1,3 +1,4 @@
+//! Allocator that allocates memory from PHP's memory manager.
 const std = @import("std");
 
 const php = @import("root.zig");
@@ -5,12 +6,19 @@ const argCount = php.util.argCount;
 const c = php.c;
 const pi = php.imports;
 
+/// The allocator's vtable. Used by `php.allocator`.
 pub const vtable: std.mem.Allocator.VTable = .{
     .alloc = alloc,
     .resize = resize,
     .remap = remap,
     .free = free,
 };
+/// Different allocation modes.
+pub const Mode = enum { persistent, per_request };
+/// The current allocation mode. When set to `persistent`, allocated memory persists until it's
+/// explicitly freed. Memory allocated under `per_request` mode on the other hand are
+/// automatically reclaimed by the language engine at the end of a request.
+pub threadlocal var mode: Mode = .persistent;
 
 fn alloc(_: *anyopaque, len: usize, alignment: std.mem.Alignment, return_address: usize) ?[*]u8 {
     _ = return_address;
@@ -49,10 +57,6 @@ fn free(_: *anyopaque, memory: []u8, alignment: std.mem.Alignment, return_addres
         .per_request => efree(memory.ptr, @src()),
     }
 }
-
-pub const Mode = enum { persistent, per_request };
-
-pub threadlocal var mode: Mode = .persistent;
 
 fn emalloc(size: usize, comptime src: std.builtin.SourceLocation) [*]u8 {
     const ptr = switch (comptime argCount(@TypeOf(pi._emalloc))) {
