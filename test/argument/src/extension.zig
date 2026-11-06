@@ -238,3 +238,10 @@ pub const @"export Turkey" = Class.Custom(Turkey);
 
 const Chicken = struct {};
 const Turkey = struct {};
+
+pub const @"export Packed" = Class.Custom(packed struct {
+    a: bool = false,
+    b: bool = false,
+    c: bool = false,
+    d: bool = false,
+});

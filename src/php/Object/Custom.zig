@@ -143,6 +143,13 @@ pub fn @"fn"(comptime T: type) type {
                     // skip if argument is null (leaving default value intact)
                     if (arg) |value| try errable(set(self.custom(), value));
                 }
+                const backing_int = @typeInfo(T).@"struct".backing_integer;
+                if (backing_int) |Int| {
+                    if (args.options.backing_integer) |int| {
+                        const custom_int_ptr: *Int = @ptrCast(self.custom());
+                        custom_int_ptr.* = int;
+                    }
+                }
             }
             self.flags.initialized = true;
         }
@@ -713,8 +720,8 @@ pub fn @"fn"(comptime T: type) type {
             return if (@typeInfo(PT) == .optional) set(self.custom(), null) else error.CannotBeNull;
         }
 
-        const getters = php.util.symbol.GetterExporter(T, .instance, .object).get();
-        const setters = php.util.symbol.SetterExporter(T, .instance, .object).get();
+        const getters = php.util.symbol.GetterExporter(T, .instance).get();
+        const setters = php.util.symbol.SetterExporter(T, .instance).get();
         const methods = php.util.symbol.MethodExporter(T, .instance).get();
         const method_set = init: {
             const method_names = std.meta.fieldNames(@TypeOf(methods));
@@ -749,7 +756,9 @@ pub fn @"fn"(comptime T: type) type {
             } else {
                 // use setters to initialize custom struct
                 const setter_names = std.meta.fieldNames(@TypeOf(setters));
-                const len = setter_names.len;
+                const backing_int = @typeInfo(T).@"struct".backing_integer;
+                // capture named arguments if it's a packed struct
+                const len = setter_names.len + if (backing_int != null) 1 else 0;
                 var field_names: [len][:0]const u8 = undefined;
                 var field_types: [len]type = undefined;
                 var field_attrs: [len]std.lang.Type.Struct.FieldAttributes = undefined;
@@ -762,6 +771,15 @@ pub fn @"fn"(comptime T: type) type {
                         else => ?Arg,
                     };
                     field_attrs[i] = .{};
+                }
+                if (backing_int) |Int| {
+                    // add options field for getting the backing int
+                    const last = field_names.len - 1;
+                    const Options = struct { backing_integer: ?Int = null };
+                    const default_options: Options = .{};
+                    field_names[last] = "options";
+                    field_types[last] = Options;
+                    field_attrs[last] = .{ .default_value_ptr = &default_options };
                 }
                 const Args = @Struct(.auto, null, &field_names, &field_types, &field_attrs);
                 break :init .{ .exists = false, .Args = Args };

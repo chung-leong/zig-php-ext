@@ -17,30 +17,17 @@ const String = php.String;
 const Value = php.Value;
 
 pub fn init(args: *const Arguments) @This() {
-    var info: c.arg_extra_info = undefined;
-    c.get_argument_info(@ptrCast(args), &info);
-    var len = info.len;
-    const named = get: {
-        if (info.extra) {
-            // extra_named_params contains bogus values when it's not used
-            if (args.getExtraNamed()) |arr| {
-                len += 1;
-                break :get arr.toValue();
-            }
-        }
-        break :get null;
-    };
+    const result = args.obtain();
     return .{
-        .arg_ptr = @ptrCast(info.ptr),
-        .len = len,
-        .this = args.this(),
-        .named_params = named,
+        .args = result.regular,
+        .this = result.this.*,
+        .named_params = result.named,
         .callee = args.callee(),
     };
 }
 
 pub fn length(self: *const @This()) usize {
-    return self.len;
+    return self.args.len;
 }
 
 pub fn hasNamed(self: *const @This()) bool {
@@ -48,35 +35,18 @@ pub fn hasNamed(self: *const @This()) bool {
 }
 
 pub fn next(self: *@This()) ?Value {
-    return if (self.peek(self.index)) |value| get: {
-        self.index += 1;
-        break :get value;
-    } else null;
+    const value = self.peek(self.index) orelse return null;
+    self.index += 1;
+    return value;
 }
 
 pub fn peek(self: *@This(), index: usize) ?Value {
-    if (index < self.len) {
-        // return named parameters as last argument
-        if (index == self.len - 1) {
-            if (self.named_params) |p| return p;
-        }
-        // return this pointer as first argument
-        if (self.use_this_first and index == 0) return self.this;
-        // return regular argument
-        const offset: usize = if (self.use_this_first) 1 else 0;
-        return self.arg_ptr[index - offset];
-    } else {
-        return null;
-    }
+    return if (index < self.args.len) self.args[index] else null;
 }
 
 pub fn remaining(self: *@This()) []const Value {
-    const offset: usize = if (self.use_this_first) 1 else 0;
-    const index = self.index;
-    var len = self.len;
-    if (self.named_params != null) len -= 1;
-    self.index = self.len;
-    return self.arg_ptr[index - offset .. len];
+    defer self.index = self.args.len;
+    return self.args[self.index..];
 }
 
 pub fn reset(self: *@This()) void {
@@ -88,13 +58,6 @@ pub fn createArrayOf(self: *@This()) *Array {
     const arr = Array.create();
     while (self.next()) |value| arr.append(value);
     return arr;
-}
-
-pub fn makeThisFirst(self: *@This()) !void {
-    if (!self.use_this_first) {
-        self.use_this_first = true;
-        self.len += 1;
-    }
 }
 
 pub fn extract(self: *@This(), allocator: std.mem.Allocator, comptime T: type) !T {
@@ -129,18 +92,17 @@ pub fn extract(self: *@This(), allocator: std.mem.Allocator, comptime T: type) !
     var set: T = undefined;
     var mismatch: Mismatch = .{};
     var required_remaining = min;
-    inline for (st.field_names, 0..) |arg_name, i| {
+    inline for (st.field_names, st.field_types, 0..) |arg_name, FT, i| {
         if (comptime Function.isExtraArg(arg_name)) |variadic_type| {
             @field(set, arg_name) = switch (variadic_type) {
-                .named => if (self.named_params) |np| np.array() else null,
+                .named => if (self.named_params) |np| np else null,
                 .unnamed => self.remaining(),
             };
         } else {
-            const FT = @TypeOf(@field(set, arg_name));
             const optional = comptime isFieldOptional(T, i);
             // take value for optional argument only when there're enough left to satistfy
             // remaining required ones
-            if (!optional or i + required_remaining < self.len) {
+            if (!optional or i + required_remaining < self.args.len) {
                 const arg = self.next().?;
                 const value = arg.extract(allocator, FT) catch |err| report: {
                     // remember the first mismatch
@@ -153,40 +115,38 @@ pub fn extract(self: *@This(), allocator: std.mem.Allocator, comptime T: type) !
                 @field(set, arg_name) = value;
                 if (!optional) required_remaining -= 1;
             } else {
-                @field(set, arg_name) = fieldDefaultValue(T, i);
+                const last = i == st.field_names.len - 1;
+                @field(set, arg_name) = switch (last and self.hasNamed() and comptime isRegularStruct(FT)) {
+                    // use named arguments to initialize the last argument
+                    true => try self.extractNamed(allocator, FT),
+                    false => fieldDefaultValue(T, i),
+                };
             }
         }
     }
     if (mismatch.recorded) {
         // report the mismatch only if we've failed to reach the end
-        if (self.index < self.len) return mismatch.report();
+        if (self.index < self.args.len) return mismatch.report();
     }
     return set;
 }
 
 pub fn extractNamed(self: *@This(), allocator: std.mem.Allocator, comptime T: type) !T {
-    // method should be called prior to actual iteration
-    std.debug.assert(self.index == 0);
-    // make sure T is a tuple
-    const valid = switch (@typeInfo(T)) {
-        .@"struct" => |st| !st.is_tuple,
-        else => false,
-    };
-    if (!valid) @compileError("Struct type expected, received: " ++ @typeName(T));
+    if (comptime !isRegularStruct(T)) @compileError("Struct type expected, received: " ++ @typeName(T));
     var set: T = undefined;
     var mismatch: Mismatch = .{};
-    inline for (@typeInfo(T).@"struct".field_names, 0..) |arg_name, i| {
-        const FT = @TypeOf(@field(set, arg_name));
+    const st = @typeInfo(T).@"struct";
+    inline for (st.field_names, st.field_types, 0..) |arg_name, FT, i| {
         const VT, const optional = switch (@typeInfo(FT)) {
             .optional => |opt| .{ opt.child, true },
             else => .{ FT, false },
         };
-        const arg_maybe: ?*Value = get: {
+        const arg_maybe: ?Value = get: {
             const args = self.named_params orelse break :get null;
-            if (args.get(arg_name) catch null) |value| {
-                args.delete(arg_name);
-                break :get value;
-            }
+            const name = String.static(arg_name);
+            const value = args.get(name) catch break :get null;
+            args.delete(name);
+            break :get value;
         };
         if (arg_maybe) |arg| {
             const value = arg.extract(allocator, VT) catch |err| {
@@ -204,21 +164,15 @@ pub fn extractNamed(self: *@This(), allocator: std.mem.Allocator, comptime T: ty
         }
     }
     if (mismatch.recorded) return mismatch.report();
-    if (self.named_params) |args| {
-        // if all named arguments were taken out, shrink the argument list
-        if (args.length() == 0) {
-            self.named_params = null;
-            self.len -= 1;
-        }
-    }
     return set;
 }
 
 pub fn verifyCount(self: *const @This(), min: usize, max: usize) !void {
-    if (self.len < min or self.len > max) {
+    const len = self.args.len;
+    if (len < min or len > max) {
         const desc, const count = if (max == min)
             .{ "exactly", min }
-        else if (self.len > max)
+        else if (len > max)
             .{ "at most", max }
         else
             .{ "at least", min };
@@ -227,10 +181,17 @@ pub fn verifyCount(self: *const @This(), min: usize, max: usize) !void {
             desc,
             count,
             if (count != 1) "s" else "",
-            self.len,
+            len,
             if (self.hasNamed()) " (the last being named arguments)" else "",
         });
     }
+}
+
+fn isRegularStruct(comptime T: type) bool {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |st| !st.is_tuple,
+        else => false,
+    };
 }
 
 fn isFieldOptional(comptime T: type, comptime index: usize) bool {
@@ -289,10 +250,8 @@ const Mismatch = struct {
     }
 };
 
-arg_ptr: [*]Value,
+args: []Value,
 this: Value,
-use_this_first: bool = false,
-named_params: ?Value,
-len: usize,
+named_params: ?*Array,
 index: usize = 0,
 callee: *Function,

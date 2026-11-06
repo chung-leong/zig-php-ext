@@ -177,4 +177,18 @@ final class ArgumentTest extends ExtensionTestCase
         printStructRequireMultiple(): argument #1 (\$data) is incorrect - 'list', 'number', and 'boolean' are required fields
         OUTPUT, implode(PHP_EOL, $lines));
     }
+
+    public function testPackedStructConstructor(): void
+    {
+        $lines = $this->runTest("argument", "packed.php");
+        $this->assertSame(<<<OUTPUT
+        Packed Object
+        (
+            [a] =>
+            [b] =>
+            [c] =>
+            [d] => 1
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
 }
