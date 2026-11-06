@@ -254,9 +254,18 @@ pub fn @"fn"(comptime T: type) type {
 
         fn tryCastObject(obj: *Object, zv_type: c_int) !Value {
             const self: *@This() = @ptrCast(obj);
+            const desired_kind: Value.Kind = .fromZvalType(zv_type);
             return switch (@hasDecl(T, "castObject")) {
-                true => T.castObject(self.custom(), .fromZvalType(zv_type)),
-                false => error.InvalidOperation,
+                true => T.castObject(self.custom(), desired_kind),
+                false => cast: {
+                    if (@typeInfo(T).@"struct".backing_integer) |Int| {
+                        if (desired_kind == .integer) {
+                            const custom_int_ptr: *const Int = @ptrCast(self.custom());
+                            break :cast .fromAny(custom_int_ptr.*, .{});
+                        }
+                    }
+                    break :cast error.InvalidOperation;
+                },
             };
         }
 
@@ -720,8 +729,8 @@ pub fn @"fn"(comptime T: type) type {
             return if (@typeInfo(PT) == .optional) set(self.custom(), null) else error.CannotBeNull;
         }
 
-        const getters = php.util.symbol.GetterExporter(T, .instance).get();
-        const setters = php.util.symbol.SetterExporter(T, .instance).get();
+        const getters = php.util.symbol.GetterExporter(T, .instance, .object).get();
+        const setters = php.util.symbol.SetterExporter(T, .instance, .object).get();
         const methods = php.util.symbol.MethodExporter(T, .instance).get();
         const method_set = init: {
             const method_names = std.meta.fieldNames(@TypeOf(methods));

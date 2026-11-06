@@ -13,9 +13,10 @@ const ReturnType = php.util.ReturnType;
 const WithoutError = php.util.WithoutError;
 
 pub const Scope = enum { instance, static };
+pub const Purpose = enum { module, object };
 
-pub fn GetterExporter(comptime T: type, comptime scope: Scope) type {
-    return DeclarationExtractor(T, struct {
+pub fn GetterExporter(comptime T: type, comptime scope: Scope, comptime purpose: Purpose) type {
+    const DefinedGetterExtractor = DeclarationExtractor(T, struct {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "get", scope) orelse return null;
             if (!checkMethod(decl, T, scope, 1)) {
@@ -24,10 +25,21 @@ pub fn GetterExporter(comptime T: type, comptime scope: Scope) type {
             return name;
         }
     });
+    const defined = DefinedGetterExtractor.get();
+    const use_auto_getter: bool = switch (@hasDecl(T, "use auto getter")) {
+        true => T.@"use auto getter",
+        false => comptime functionCount(T) == 0,
+    };
+    if (!use_auto_getter) return DefinedGetterExtractor;
+    // return struct type that adds auto-getters
+    return GetterSetterGenerator(T, scope, defined, switch (purpose) {
+        .module => IniEntry.getter,
+        .object => Object.getter,
+    });
 }
 
-pub fn SetterExporter(comptime T: type, comptime scope: Scope) type {
-    return DeclarationExtractor(T, struct {
+pub fn SetterExporter(comptime T: type, comptime scope: Scope, comptime purpose: Purpose) type {
+    const DefinedSetterExtractor = DeclarationExtractor(T, struct {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {
             const name = removePrefix(decl_name, "set", scope) orelse return null;
             if (!checkMethod(decl, T, scope, 2)) {
@@ -40,8 +52,18 @@ pub fn SetterExporter(comptime T: type, comptime scope: Scope) type {
             return name;
         }
     });
+    const defined = DefinedSetterExtractor.get();
+    const use_auto_setter: bool = switch (@hasDecl(T, "use auto setter")) {
+        true => T.@"use auto setter",
+        false => functionCount(T) == 0,
+    };
+    if (!use_auto_setter) return DefinedSetterExtractor;
+    // return struct type that adds auto-getters
+    return GetterSetterGenerator(T, scope, defined, switch (purpose) {
+        .module => IniEntry.setter,
+        .object => Object.setter,
+    });
 }
-
 pub fn MethodExporter(comptime T: type, comptime scope: Scope) type {
     return DeclarationExtractor(T, struct {
         pub fn match(comptime decl_name: []const u8, comptime decl: anytype) ?[]const u8 {

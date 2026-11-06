@@ -95,7 +95,13 @@ pub fn extract(self: *@This(), allocator: std.mem.Allocator, comptime T: type) !
     inline for (st.field_names, st.field_types, 0..) |arg_name, FT, i| {
         if (comptime Function.isExtraArg(arg_name)) |variadic_type| {
             @field(set, arg_name) = switch (variadic_type) {
-                .named => if (self.named_params) |np| np else null,
+                .named => get: {
+                    if (self.named_params) |np| {
+                        self.named_params = null;
+                        if (np.length() > 0) break :get np;
+                    }
+                    break :get null;
+                },
                 .unnamed => self.remaining(),
             };
         } else {
@@ -128,6 +134,27 @@ pub fn extract(self: *@This(), allocator: std.mem.Allocator, comptime T: type) !
         // report the mismatch only if we've failed to reach the end
         if (self.index < self.args.len) return mismatch.report();
     }
+    if (self.named_params) |np| {
+        // if there're named arguments remaining, they weren't supposed to be there
+        var iter = np.iterate(.{});
+        if (iter.next()) |_| {
+            const name = iter.key().string().slice();
+            const possible_names = get: {
+                if (st.field_names.len > 0) {
+                    const Last = st.field_types[st.field_types.len - 1];
+                    if (comptime isRegularStruct(Last)) {
+                        break :get comptime php.util.getFieldList(T, "and");
+                    }
+                }
+                break :get "none";
+            };
+            const fn_name = self.callee.name().slice();
+            return failure.report(
+                "{s}(): encountered unknown named argument '{s}', expecting {s}",
+                .{ fn_name, name, possible_names },
+            );
+        }
+    }
     return set;
 }
 
@@ -137,10 +164,7 @@ pub fn extractNamed(self: *@This(), allocator: std.mem.Allocator, comptime T: ty
     var mismatch: Mismatch = .{};
     const st = @typeInfo(T).@"struct";
     inline for (st.field_names, st.field_types, 0..) |arg_name, FT, i| {
-        const VT, const optional = switch (@typeInfo(FT)) {
-            .optional => |opt| .{ opt.child, true },
-            else => .{ FT, false },
-        };
+        const optional = comptime isFieldOptional(T, i);
         const arg_maybe: ?Value = get: {
             const args = self.named_params orelse break :get null;
             const name = String.static(arg_name);
@@ -149,7 +173,7 @@ pub fn extractNamed(self: *@This(), allocator: std.mem.Allocator, comptime T: ty
             break :get value;
         };
         if (arg_maybe) |arg| {
-            const value = arg.extract(allocator, VT) catch |err| {
+            const value = arg.extract(allocator, FT) catch |err| {
                 mismatch.record(self.callee.name(), arg_name, null, arg, err);
                 break;
             };
@@ -170,20 +194,14 @@ pub fn extractNamed(self: *@This(), allocator: std.mem.Allocator, comptime T: ty
 pub fn verifyCount(self: *const @This(), min: usize, max: usize) !void {
     const len = self.args.len;
     if (len < min or len > max) {
-        const desc, const count = if (max == min)
-            .{ "exactly", min }
-        else if (len > max)
-            .{ "at most", max }
-        else
-            .{ "at least", min };
-        return failure.report("{s}() expects {s} {d} argument{s}, {d} given{s}", .{
-            self.callee.name().slice(),
-            desc,
-            count,
-            if (count != 1) "s" else "",
-            len,
-            if (self.hasNamed()) " (the last being named arguments)" else "",
-        });
+        const desc = if (max == min) "exactly" else if (len > max) "at most" else "at least";
+        const count = if (len > max) max else min;
+        const s = if (count != 1) "s" else "";
+        const fn_name = self.callee.name().slice();
+        return failure.report(
+            "{s}() expects {s} {d} argument{s}, {d} given",
+            .{ fn_name, desc, count, s, len },
+        );
     }
 }
 

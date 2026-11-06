@@ -169,9 +169,9 @@ final class ArgumentTest extends ExtensionTestCase
         printUnion(): argument #1 (\$input) is incorrect - not string, array, or floating pointer number
         printIntOrFloat(): argument #1 (\$input) is incorrect - not integer or floating pointer number
         acceptPoultry(): argument #1 (\$animal) is incorrect - not Chicken or Turkey
-        acceptOptions(): argument #2 (\$options) is incorrect - unable to obtain value for field 'alpha' - not boolean
-        acceptOptions(): argument #2 (\$options) is incorrect - unable to obtain value for field 'beta' - 'hello' is not a recognized enum member, which has to be 'cow', 'pig', or 'chicken'
-        acceptOptions(): argument #2 (\$options) is incorrect - encountered unknown field 'gamma', expecting 'alpha' and 'beta'
+        acceptOptions(): named argument \$alpha is incorrect: not boolean
+        acceptOptions(): named argument \$beta is incorrect: 'hello' is not a recognized enum member, which has to be 'cow', 'pig', or 'chicken'
+        acceptOptions(): encountered unknown named argument 'gamma', expecting 'arg1' and 'options'
         printStruct(): argument #1 (\$data) is incorrect - 'number' is a required field
         printStructRequireTwo(): argument #1 (\$data) is incorrect - 'list' and 'number' are required fields
         printStructRequireMultiple(): argument #1 (\$data) is incorrect - 'list', 'number', and 'boolean' are required fields
@@ -189,6 +189,7 @@ final class ArgumentTest extends ExtensionTestCase
             [c] =>
             [d] => 1
         )
+        8
         OUTPUT, implode(PHP_EOL, $lines));
     }
 }

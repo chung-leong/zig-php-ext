@@ -304,7 +304,7 @@ pub fn freeAny(arg: anytype) void {
 
 pub fn autoConvertible(T: type) bool {
     return switch (@typeInfo(T)) {
-        .void, .null, .undefined, .bool, .comptime_int, .float, .comptime_float, .@"enum", .enum_literal => true,
+        .void, .null, .bool, .float, .@"enum" => true,
         .int => true,
         .error_union => |eu| autoConvertible(eu.payload),
         .array, .vector => |ar| autoConvertible(ar.child),
