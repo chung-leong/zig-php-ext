@@ -1,12 +1,12 @@
 <?php declare(strict_types=1);
 
-require_once __DIR__ . '/ExtensionTestCase.php';
+require_once __DIR__ . '/../ExtensionTestCase.php';
 
 final class ModuleTest extends ExtensionTestCase
 {   
     public function testLifecycleHandler(): void
     {
-        $lines = $this->runTest("module", "test.php");
+        $lines = $this->runTest("module", "test.php", __DIR__);
         $this->assertSame(<<<OUTPUT
         moduleStartup: .persistent
         requestStartup: .persistent
