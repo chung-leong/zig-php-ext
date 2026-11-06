@@ -103,18 +103,11 @@ pub fn InstanceTuple(types: anytype) type {
 fn DeclarationExtractor(comptime T: type, criteria: type) type {
     @setEvalBranchQuota(2000000);
     const decl_names = comptime std.meta.declarations(T);
-    var count: usize = 0;
-    for (decl_names) |decl_name| {
-        const DeclPtr = @TypeOf(&@field(T, decl_name));
-        if (@typeInfo(DeclPtr).pointer.attrs.@"const") {
-            const decl = @field(T, decl_name);
-            if (criteria.match(decl_name, decl)) |_| count += 1;
-        }
-    }
-    var selected_decl_names: [count][]const u8 = undefined;
-    var names: [count][]const u8 = undefined;
-    var types: [count]type = undefined;
-    var attributes: [count]std.lang.Type.Struct.FieldAttributes = undefined;
+    const max_len = decl_names.len;
+    var selected_decl_names: [max_len][]const u8 = undefined;
+    var names: [max_len][]const u8 = undefined;
+    var types: [max_len]type = undefined;
+    var attributes: [max_len]std.lang.Type.Struct.FieldAttributes = undefined;
     var index: usize = 0;
     for (decl_names) |decl_name| {
         const DeclPtr = @TypeOf(&@field(T, decl_name));
@@ -129,10 +122,10 @@ fn DeclarationExtractor(comptime T: type, criteria: type) type {
             }
         }
     }
-    const Struct = @Struct(.auto, null, &names, &types, &attributes);
+    const Struct = @Struct(.auto, null, names[0..index], types[0..index], attributes[0..index]);
     const result = init: {
         var res: Struct = undefined;
-        for (selected_decl_names, names) |decl_name, name| {
+        for (selected_decl_names[0..index], names[0..index]) |decl_name, name| {
             @field(res, name) = @field(T, decl_name);
         }
         break :init res;
