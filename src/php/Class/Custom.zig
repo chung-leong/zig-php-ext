@@ -21,7 +21,7 @@ const Value = php.Value;
 const ReturnType = php.util.ReturnType;
 const ClassValidator = php.util.api.ClassValidator;
 
-pub fn @"fn"(comptime T: type) type {
+pub fn _(comptime T: type) type {
     comptime ClassValidator(T).check();
     return struct {
         pub fn name(self: *const @This()) *String {

@@ -2,8 +2,11 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 pub const c = @import("c");
+/// PHP major version (e.g. 8)
 pub const major_version = c.PHP_MAJOR_VERSION;
+/// PHP minor version (e.g. 5)
 pub const minor_version = c.PHP_MINOR_VERSION;
+/// PHP API number
 pub const api_no = c.ZEND_MODULE_API_NO;
 
 pub const Allocator = @import("Allocator.zig");
@@ -11,18 +14,18 @@ pub const Array = @import("Array.zig");
 pub const Callable = @import("Callable.zig");
 pub const Class = @import("Class.zig");
 pub const Constant = @import("Constant.zig");
-pub const Dictionary = @import("Dictionary.zig").@"union";
+pub const Dictionary = @import("Dictionary.zig")._;
 pub const Enum = @import("Enum.zig");
 pub const failure = @import("failure.zig");
 pub const Function = @import("Function.zig");
 pub const InfoTable = @import("InfoTable.zig");
 pub const IniEntry = @import("IniEntry.zig");
-pub const List = @import("List.zig").@"union";
+pub const List = @import("List.zig")._;
 pub const Module = @import("Module.zig");
 pub const Object = @import("Object.zig");
 pub const Reference = @import("Reference.zig");
 pub const Resource = @import("Resource.zig");
-pub const Singleton = @import("Singleton.zig").@"fn";
+pub const Singleton = @import("Singleton.zig")._;
 pub const Stream = @import("Stream.zig");
 pub const String = @import("String.zig");
 pub const util = @import("util.zig");
@@ -54,7 +57,7 @@ pub const linkWindowsImports = switch (builtin.target.os.tag) {
     .windows => imports.link,
     else => {},
 };
-/// Dereference a pointer on Windows. On other platform, the function simply returns the argument.
+/// Dereference a pointer on Windows. On other platforms the function simply returns the argument.
 pub inline fn deref(arg: anytype) switch (builtin.target.os.tag) {
     .windows => @TypeOf(arg.*),
     else => @TypeOf(arg),
@@ -80,7 +83,7 @@ pub fn constants() *Array {
     return @ptrCast(eg.zend_constants);
 }
 /// Throw an exception object.
-pub fn throwException(obj: *Object) error{ExceptionThrown} {
+pub fn throwException(obj: *Object) @TypeOf(error.ExceptionThrown) {
     const value: Value = .fromObject(obj);
     imports.zend_throw_exception_object(@ptrCast(@constCast(&value)));
     return error.ExceptionThrown;

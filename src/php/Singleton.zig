@@ -2,7 +2,7 @@ const php = @import("root.zig");
 const c = php.c;
 const errable = php.util.errable;
 
-pub fn @"fn"(comptime T: type) type {
+pub fn _(comptime T: type) type {
     return struct {
         pub fn init() !void {
             if (@hasDecl(T, "init")) {

@@ -10,7 +10,7 @@ const php_al = php.allocator;
 const String = php.String;
 const Value = php.Value;
 
-pub const @"union" = union(enum) {
+pub const _ = union(enum) {
     pub fn addRef(self: @This()) void {
         return switch (self) {
             .array => |arr| arr.addRef(),

@@ -688,7 +688,7 @@ pub fn @"fn"(comptime T: type) type {
             };
         }
 
-        fn fieldError(obj: *Object, name: *String, access: Value.Access, err: anytype) error{FailureReported} {
+        fn fieldError(obj: *Object, name: *String, access: Value.Access, err: anytype) @TypeOf(error.FailureReported) {
             if (failure.match(err, error.FailureReported)) {
                 return error.FailureReported;
             } else if (failure.match(err, error.Undefined)) {
