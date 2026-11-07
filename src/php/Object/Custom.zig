@@ -20,7 +20,7 @@ const argCount = php.util.argCount;
 const WithoutError = php.util.WithoutError;
 const errable = php.util.errable;
 
-pub fn @"fn"(comptime T: type) type {
+pub fn _(comptime T: type) type {
     return struct {
         pub fn object(self: *const @This()) *Object {
             return @ptrCast(@constCast(&self.php_object));

@@ -1,3 +1,4 @@
+//! Data structure for referencing an Abstract Syntax Tree, used to constant expression.
 const std = @import("std");
 const builtin = @import("builtin");
 
@@ -9,6 +10,7 @@ const String = php.String;
 const Value = php.Value;
 const isScalarType = php.util.isScalarType;
 
+/// Create an AST for fetching a class constant.
 pub fn createClassConstFetch(class_name: *String, const_name: *String) *@This() {
     var na: NodeAllocator(.{
         .ref = .{ .type = c.zend_ast_ref },
@@ -27,7 +29,9 @@ pub fn createClassConstFetch(class_name: *String, const_name: *String) *@This() 
     writeNode(class_const_node, .class_const, .{ class_node, const_node });
     return @ptrCast(ref);
 }
-
+/// Create an AST for declaring an array or object literal based on the given argument. 
+/// 
+/// The function currently can only handler containers holding scalar elements.
 pub fn createLiteral(comptime T: type, arg: T) *@This() {
     if (comptime !php.util.canBeConstant(T)) {
         @compileError("Unsupported type for constants: " ++ @typeName(T));
@@ -97,7 +101,7 @@ pub fn createLiteral(comptime T: type, arg: T) *@This() {
     }
     return @ptrCast(ref);
 }
-
+/// Place the AST reference in a `Value`.
 pub fn toValue(self: *@This()) Value {
     return .{
         .impl = .{
@@ -106,7 +110,7 @@ pub fn toValue(self: *@This()) Value {
         },
     };
 }
-
+/// Different kinds of AST nodes.
 pub const Kind = enum(u16) {
     // special nodes
     zval = c.ZEND_AST_ZVAL,

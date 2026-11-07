@@ -3,10 +3,10 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 pub const Allocator = @import("Object/Allocator.zig");
-pub const Custom = @import("Object/Custom.zig").@"fn";
+pub const Custom = @import("Object/Custom.zig")._;
 pub const Iterator = @import("Object/Iterator.zig");
-pub const MethodSet = @import("Object/MethodSet.zig").@"fn";
-pub const Opcode = @import("Object/Opcode.zig").@"enum";
+pub const MethodSet = @import("Object/MethodSet.zig")._;
+pub const Opcode = @import("Object/Opcode.zig")._;
 pub const StdClass = @import("Object/StdClass.zig");
 const php = @import("root.zig");
 const Array = php.Array;

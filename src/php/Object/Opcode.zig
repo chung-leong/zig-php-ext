@@ -1,16 +1,22 @@
-/// Opcodes supported by doOperation()
+//! Opcodes supported by the `doOperation` handler
 const php = @import("../root.zig");
 const c = php.c;
 const pi = php.imports;
 const Value = php.Value;
 
-pub const @"enum" = enum(u8) {
+pub const _ = enum(u8) {
     add = c.ZEND_ADD,
     sub = c.ZEND_SUB,
     mul = c.ZEND_MUL,
     div = c.ZEND_DIV,
     mod = c.ZEND_MOD,
     pow = c.ZEND_POW,
+    shift_left = c.ZEND_SL,
+    shift_right = c.ZEND_SR,
+    bitwise_or = c.ZEND_BW_OR,
+    bitwise_and = c.ZEND_BW_AND,
+    bitwise_xor = c.ZEND_BW_XOR,
+    bitwise_not = c.ZEND_BW_NOT,
     _,
 
     pub fn perform(self: @This(), op1: Value, op2: Value) !Value {

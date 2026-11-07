@@ -1,3 +1,5 @@
+//! Union type container holding either an associative array or an object. If it holds an array,
+//! it is guaranteed to have only string keys.
 const std = @import("std");
 
 pub const Iterator = @import("Dictionary/Iterator.zig");
@@ -11,32 +13,39 @@ const Value = php.Value;
 const failure = php.failure;
 
 pub const _ = union(enum) {
+    /// Increase the refcount of the array or object by one and return itself.
+    pub fn retain(self: @This()) @This() {
+        self.addRef();
+        return self;
+    }
+    /// Increase the refcount of the array or object by one.
     pub fn addRef(self: @This()) void {
         return switch (self) {
             .array => |arr| arr.addRef(),
             .object => |obj| obj.addRef(),
         };
     }
-
+    /// Reduce the refcount by one. When the refcount reaches zero, the array or object is freed.
     pub fn release(self: @This()) void {
         return switch (self) {
             .array => |arr| arr.release(),
             .object => |obj| obj.release(),
         };
     }
-
-    pub fn retain(self: @This()) @This() {
-        self.addRef();
-        return self;
-    }
-
+    /// Check if the array or object has a particular property.
+    ///
+    /// `key` should be `[]const u8` or `String`.
     pub fn has(self: @This(), key: anytype) bool {
         return switch (self) {
             .array => |arr| arr.has(key),
             .object => |obj| obj.hasProperty(key) catch false,
         };
     }
-
+    /// Obtain a property from the array or object.
+    ///
+    /// `key` should be `[]const u8` or `String`.
+    ///
+    /// The value returned must be released after the caller is done using it.
     pub fn read(self: @This(), key: anytype) !Value {
         return switch (self) {
             .array => |arr| get: {
@@ -46,18 +55,23 @@ pub const _ = union(enum) {
             .object => |obj| try obj.readProperty(key),
         };
     }
-
+    /// Return an iterate for traversing the array or object.
     pub fn iterate(self: @This(), options: Iterator.Options) Iterator {
         return .init(self, options);
     }
-
+    /// Place the array or object in a `Value`.
     pub fn toValue(self: @This()) Value {
         return switch (self) {
             .array => |arr| arr.toValue(),
             .object => |obj| obj.toValue(),
         };
     }
-
+    /// Extract a struct from the array or object. The function fails when a required field (i.e.
+    /// without a default value) is absent. It also fails when unrecognized properties are
+    /// present.
+    ///
+    /// On failure, `error.FailureReported` is returned. A detailed error message can be obtain
+    /// using `failure.acquireMessage`.
     pub fn extract(self: *const @This(), allocator: std.mem.Allocator, comptime T: type) !T {
         const st = switch (@typeInfo(T)) {
             .@"struct" => |st| st,
@@ -99,7 +113,7 @@ pub const _ = union(enum) {
             if (unknown) {
                 const possible_names = comptime php.util.getFieldList(T, "and");
                 return failure.report(
-                    "encountered unknown field '{s}', expecting {s}",
+                    "encountered unknown property '{s}', expecting {s}",
                     .{ name.slice(), possible_names },
                 );
             }

@@ -1,3 +1,4 @@
+//! Data structure corresponding to a value in PHP (aka zval).
 const std = @import("std");
 
 const php = @import("root.zig");
@@ -18,68 +19,65 @@ const String = php.String;
 const unsupported = php.failure.unsupported;
 const Array = php.Array;
 
+/// Return an enum indicating the kind of value currently being held
 pub fn kind(self: *const @This()) Kind {
     return switch (self.impl.u1.v.type) {
         c.IS_TRUE => .boolean,
         else => @fromBackingInt(@intCast(self.impl.u1.v.type)),
     };
 }
-
+/// Return true if the value is null.
 pub fn isNull(self: *const @This()) bool {
     return self.kind() == .null;
 }
-
+/// Check if the value can be called as a function.
 pub fn isCallable(self: *const @This()) bool {
     const zval = @constCast(&self.impl);
     return pi.zend_is_callable_ex(zval, null, 0, null, null, null);
 }
-
+/// Return a boolean.
 pub fn boolean(self: *const @This()) bool {
     return self.impl.u1.v.type == c.IS_TRUE;
 }
-
+/// Return a integer.
 pub fn integer(self: *const @This()) c.zend_long {
     return self.impl.value.lval;
 }
-
+/// Return a floating-point number.
 pub fn float(self: *const @This()) f64 {
     return self.impl.value.dval;
 }
-
+/// Return a string.
 pub fn string(self: *const @This()) *String {
     return @ptrCast(self.impl.value.str);
 }
-
+/// Return an array.
 pub fn array(self: *const @This()) *Array {
     return @ptrCast(self.impl.value.arr);
 }
-
+/// Return an object.
 pub fn object(self: *const @This()) *Object {
     return @ptrCast(self.impl.value.obj);
 }
-
+/// Return a resource.
 pub fn resource(self: *const @This()) *Resource {
     return @ptrCast(self.impl.value.res);
 }
-
+/// Return a reference.
 pub fn reference(self: *const @This()) *Reference {
     return @ptrCast(self.impl.value.ref);
 }
-
+/// Return a pointer.
 pub fn pointer(self: *const @This()) *anyopaque {
     return @ptrCast(self.impl.value.ptr);
 }
-
+/// Increase the refcount by one if the value is holding a ref-counted object. Return the
+/// same value.
 pub fn retain(self: *const @This()) @This() {
     self.addRef();
     return self.*;
 }
-
-pub fn replace(self: *@This(), new_value: @This()) void {
-    self.release();
-    self.* = new_value;
-}
-
+/// Increase the refcount by one if the value is holding a ref-counted object.
 pub fn addRef(self: *const @This()) void {
     const zval = &self.impl;
     // persistent value
@@ -118,7 +116,11 @@ pub fn subtractRef(self: *@This()) void {
         else => {},
     }
 }
-
+/// Set the value to the given value, first releasing the current value.
+pub fn replace(self: *@This(), new_value: @This()) void {
+    self.release();
+    self.* = new_value;
+}
 pub fn getNull(self: *const @This()) !void {
     return switch (self.kind()) {
         .null => {},
@@ -623,7 +625,7 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
         else => unsupported(T),
     };
 }
-
+/// Different value types.
 pub const Kind = enum(u8) {
     undefined = c.IS_UNDEF, // 0
     null = c.IS_NULL, // 1
@@ -661,6 +663,7 @@ pub const Kind = enum(u8) {
         };
     }
 };
+/// Different variable access types. Used by the `readProperty` and `readDimension` handlers.
 pub const Access = enum(c_int) {
     read = c.BP_VAR_R,
     write = c.BP_VAR_W,
@@ -669,11 +672,13 @@ pub const Access = enum(c_int) {
     argument = c.BP_VAR_FUNC_ARG,
     unset = c.BP_VAR_UNSET,
 };
+/// Potential value states. Used by the `hasProperty` handler.
 pub const State = enum(c_int) {
     not_null,
     not_false,
     present,
 };
+/// Conversion options for `fromAny`, `fromStruct`, and `fromEnum`.
 pub const ConversionOptions = packed struct {
     free_pointer: bool = false,
     get_string_from_slice: bool = false,

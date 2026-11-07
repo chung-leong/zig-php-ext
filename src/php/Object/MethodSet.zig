@@ -6,7 +6,7 @@ const Function = php.Function;
 const String = php.String;
 const Value = php.Value;
 
-pub fn @"fn"(comptime names: anytype) type {
+pub fn _(comptime names: anytype) type {
     const Container, const CallCacheContainer, const Name = init: {
         var field_names: [names.len][]const u8 = undefined;
         var field_types: [names.len]type = undefined;
