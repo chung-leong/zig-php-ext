@@ -4,21 +4,21 @@ require_once __DIR__ . '/ExtensionTestCase.php';
 
 final class GetterSetterTest extends ExtensionTestCase
 {   
-    public function testStructWithNoGettersOrSetters(): void
+    public function testStructWithAutoGettersAutoSetters(): void
     {
-        $lines = $this->runTest("getter-setter", "no-get-no-set.php");
+        $lines = $this->runTest("getter-setter", "auto-get-auto-set.php");
         $this->assertSame(<<<OUTPUT
-        WithNoGettersOrSetters Object
+        WithAutoGettersAutoSetters Object
         (
             [hello] => 123
             [world] => 456
         )
-        WithNoGettersOrSetters Object
+        WithAutoGettersAutoSetters Object
         (
             [hello] => 45
             [world] => 456
         )
-        WithNoGettersOrSetters Object
+        WithAutoGettersAutoSetters Object
         (
             [hello] => 45
             [world] => 777
@@ -26,12 +26,12 @@ final class GetterSetterTest extends ExtensionTestCase
         OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testStructWithNoGettersNoAutoSetters(): void
+    public function testStructWithAutoGetters(): void
     {
-        $lines = $this->runTest("getter-setter", "no-get-no-auto-set.php");
+        $lines = $this->runTest("getter-setter", "auto-get.php");
         $this->assertSame(<<<OUTPUT
-        unable to write property 'world' in WithNoGettersNoAutoSet - read only
-        WithNoGettersNoAutoSet Object
+        unable to write property 'world' in WithAutoGetters - read only
+        WithAutoGetters Object
         (
             [hello] => 123
             [world] => 456
@@ -62,14 +62,6 @@ final class GetterSetterTest extends ExtensionTestCase
             [world] => 456
         )
         unable to write property 'hello' in WithOneGetterAutoGet - pants on fire
-        OUTPUT, implode(PHP_EOL, $lines));
-    }
-
-    public function testStructWithNoGettersOrSettersOneFunction(): void
-    {
-        $lines = $this->runTest("getter-setter", "no-get-no-set-func.php");
-        $this->assertSame(<<<OUTPUT
-        WithNoGettersOrSettersOneFunction Object
         OUTPUT, implode(PHP_EOL, $lines));
     }
 }

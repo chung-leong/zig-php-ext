@@ -240,6 +240,9 @@ const Chicken = struct {};
 const Turkey = struct {};
 
 pub const @"export Packed" = Class.Custom(packed struct {
+    pub const @"use auto getters" = true;
+    pub const @"use auto setters" = true;
+
     a: bool = false,
     b: bool = false,
     c: bool = false,

@@ -1,6 +1,6 @@
 <?php
 
-$obj = new WithNoGettersNoAutoSet;
+$obj = new WithAutoGetters;
 try {
     $obj->world = 777;
 } catch (Exception $e) {

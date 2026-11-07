@@ -3,16 +3,19 @@ const Class = php.Class;
 const getter = php.IniEntry.getter;
 const setter = php.IniEntry.setter;
 
-pub const @"export WithNoGettersOrSetters" = Class.Custom(struct {
+pub const @"export WithAutoGettersAutoSetters" = Class.Custom(struct {
     hello: i32 = 123,
     world: i32 = 456,
+
+    pub const @"use auto getters" = true;
+    pub const @"use auto setters" = true;
 });
 
-pub const @"export WithNoGettersNoAutoSet" = Class.Custom(struct {
+pub const @"export WithAutoGetters" = Class.Custom(struct {
     hello: i32 = 123,
     world: i32 = 456,
 
-    pub const @"use auto setter" = false;
+    pub const @"use auto getters" = true;
 });
 
 pub const @"export WithOneGetter" = Class.Custom(struct {
@@ -37,12 +40,5 @@ pub const @"export WithOneGetterAutoGet" = Class.Custom(struct {
         self.hello = value;
     }
 
-    pub const @"use auto getter" = true;
-});
-
-pub const @"export WithNoGettersOrSettersOneFunction" = Class.Custom(struct {
-    hello: i32 = 123,
-    world: i32 = 456,
-
-    pub fn hi() void {}
+    pub const @"use auto getters" = true;
 });
