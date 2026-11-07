@@ -1,0 +1,13 @@
+.{
+    .name = .roaring,
+    .version = "0.0.1",
+    .dependencies = .{
+        .zroaring = .{
+            .url = "git+https://codeberg.org/archaistvolts/zroaring#1c8e9680e033d2fef2378bc807f36c344d6415bd",
+            .hash = "zroaring-0.0.1-hM66q7_EHgCzlSD_ch5i0m48h7QAvKDUnbqYjeglF-Dc",
+        },
+    },
+    .minimum_zig_version = "0.17.1",
+    .paths = .{""},
+    .fingerprint = 0x15f3d764ec619815,
+}
