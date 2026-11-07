@@ -2,7 +2,7 @@ const std = @import("std");
 
 const ArrayBuffer = @import("ArrayBuffer.zig");
 const php = @import("php/root.zig");
-const TypedArray = @import("TypedArray.zig").@"fn";
+const TypedArray = @import("TypedArray.zig")._;
 
 pub const @"export ArrayBuffer" = php.Class.Custom(ArrayBuffer);
 

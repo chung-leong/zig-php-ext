@@ -1,7 +1,7 @@
 //! Data structure corresponding to a PHP enumeration.
 const std = @import("std");
 
-pub const Custom = @import("Enum/Custom.zig").@"fn";
+pub const Custom = @import("Enum/Custom.zig")._;
 const php = @import("root.zig");
 const c = php.c;
 const Array = php.Array;

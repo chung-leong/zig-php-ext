@@ -21,6 +21,7 @@ const WithoutError = php.util.WithoutError;
 const errable = php.util.errable;
 
 pub fn _(comptime T: type) type {
+    if (!comptime php.util.api.canBeCustomClass(T)) return struct {};
     return struct {
         pub fn object(self: *const @This()) *Object {
             return @ptrCast(@constCast(&self.php_object));
@@ -62,7 +63,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryGetIterator(obj: *Object) !?*Iterator {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             if (!has_iterator) return null;
             if (@hasDecl(T, "getIterator")) {
                 return T.getIterator(self.custom());
@@ -121,7 +122,7 @@ pub fn _(comptime T: type) type {
         pub const custom_type: php.util.api.custom.Type = .object;
 
         fn construct(obj: *Object, args: init_fn.Args) !void {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             if (init_fn.exists) {
                 if (init_fn.by_value) {
                     self.custom_struct = try errable(if (init_fn.uses_args) T.init(args) else T.init());
@@ -155,7 +156,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn destruct(obj: *Object) void {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             switch (deinit_fn.exists) {
                 true => T.deinit(self.custom()),
                 false => {
@@ -184,7 +185,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryFreeObject(obj: *Object) !void {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             // perform standard destruction process unless custom constructor is used
             if (!@hasDecl(T, "getConstructor")) {
                 defer if (self.flags.initialized) destruct(obj);
@@ -211,7 +212,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryDestroyObject(obj: *Object) !void {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "destroyObject")) {
                 true => T.destroyObject(self.custom()),
                 false => {},
@@ -226,7 +227,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryCloneObject(obj: *Object) !?*Object {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "cloneObject")) {
                 true => T.cloneObject(self.custom()),
                 false => switch (@hasDecl(T, "clone")) {
@@ -253,7 +254,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryCastObject(obj: *Object, zv_type: c_int) !Value {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             const desired_kind: Value.Kind = .fromZvalType(zv_type);
             return switch (@hasDecl(T, "castObject")) {
                 true => T.castObject(self.custom(), desired_kind),
@@ -280,7 +281,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryReadProperty(obj: *Object, name: *String, access: Value.Access, cache_slot: ?[*]?*anyopaque) !Value {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return inline for (comptime std.meta.fieldNames(@TypeOf(getters))) |getter_name| {
                 if (name.matchStatic(getter_name)) break self.callGetter(getter_name);
             } else switch (@hasDecl(T, "readProperty")) {
@@ -313,7 +314,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryWriteProperty(obj: *Object, name: *String, value: *Value, cache_slot: ?[*]?*anyopaque) !void {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
                 if (name.matchStatic(setter_name)) break self.callSetter(setter_name, value.*);
             } else switch (@hasDecl(T, "writeProperty")) {
@@ -353,7 +354,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryHasProperty(obj: *Object, name: *String, cache_slot: ?[*]?*anyopaque) !bool {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return inline for (comptime std.meta.fieldNames(@TypeOf(getters))) |getter_name| {
                 if (name.matchStatic(getter_name)) break true;
             } else switch (@hasDecl(T, "hasProperty")) {
@@ -373,7 +374,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryUnsetProperty(obj: *Object, name: *String, cache_slot: ?[*]?*anyopaque) !void {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
                 if (name.matchStatic(setter_name)) break self.callSetterWithNull(setter_name);
             } else switch (@hasDecl(T, "unsetProperty")) {
@@ -404,7 +405,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryGetPropertiesFor(obj: *Object, purpose: PropertiesPurpose) !?*Array {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             const Self = @This();
             const getter_names = comptime std.meta.fieldNames(@TypeOf(getters));
             const from = struct {
@@ -456,7 +457,7 @@ pub fn _(comptime T: type) type {
 
         fn tryGetPropertyPointer(obj: *Object, name: *String, access: Value.Access, cache_slot: ?[*]?*anyopaque) !?*Value {
             _ = cache_slot;
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "getPropertyPointer")) {
                 true => T.getPropertyPointer(self.custom(), name, access),
                 false => error.InvalidOperation,
@@ -474,7 +475,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryReadDimension(obj: *Object, offset: *Value, access: Value.Access) !Value {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "readDimension")) {
                 true => T.readDimension(self.custom(), offset.*, access),
                 false => error.InvalidOperation,
@@ -488,7 +489,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryWriteDimension(obj: *Object, offset: *Value, value: *Value) !void {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "writeDimension")) {
                 true => T.writeDimension(self.custom(), offset.*, value.*),
                 false => error.InvalidOperation,
@@ -505,7 +506,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryHasDimension(obj: *Object, offset: *Value, check_empty: c_int) !bool {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "hasDimension")) {
                 true => T.hasDimension(self.custom(), offset.*, check_empty != 0),
                 false => error.InvalidOperation,
@@ -519,7 +520,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryUnsetDimension(obj: *Object, offset: *Value) !void {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "unsetDimension")) {
                 true => T.unsetDimension(self.custom(), offset.*),
                 false => error.InvalidOperation,
@@ -537,7 +538,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryCountElements(obj: *Object) !usize {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "countElements")) {
                 true => T.countElements(self.custom()),
                 false => error.InvalidOperation,
@@ -556,7 +557,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryGetMethod(obj_ptr: **Object, name: *String, key: *Value) !*const Function {
-            const self: *@This() = @ptrCast(obj_ptr.*);
+            const self: *@This() = @ptrCast(@alignCast(obj_ptr.*));
             return method_set.find(key.string()) orelse switch (@hasDecl(T, "getMethod")) {
                 true => switch (comptime argCount(@TypeOf(T.getMethod))) {
                     2 => T.getMethod(self.custom(), key.string()),
@@ -576,7 +577,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryGetConstructor(obj: *Object) !?*const Function {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "getConstructor")) {
                 true => T.getConstructor(self.custom()),
                 false => &constructor,
@@ -592,7 +593,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryGetClassName(obj: *Object) !*String {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "getClassName")) {
                 true => T.getClassName(self.custom()),
                 false => obj.class().name().retain(),
@@ -625,7 +626,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryCompareWith(obj: *Object, value: Value) !c_int {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "compareWith")) {
                 true => T.compareWith(self.custom(), value),
                 false => error.IllegalOperation,
@@ -645,7 +646,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryGetClosure(obj: *Object, check_only: bool) !ClosureResult {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "getClosure")) {
                 true => T.getClosure(self.custom(), check_only),
                 false => error.IllegalOperation,
@@ -663,7 +664,7 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryGetGarbageCollection(obj: *Object) !GarbageCollectionResult {
-            const self: *@This() = @ptrCast(obj);
+            const self: *@This() = @ptrCast(@alignCast(obj));
             return switch (@hasDecl(T, "getGarbageCollection")) {
                 true => T.getGarbageCollection(self.custom()),
                 false => GarbageCollectionResult{},
@@ -744,16 +745,7 @@ pub fn _(comptime T: type) type {
             break :init result;
         };
         const init_fn = init: {
-            if (@hasDecl(T, "init")) {
-                const Init = @TypeOf(T.init);
-                const arg_count = php.util.argCount(Init);
-                const Arg0 = switch (arg_count) {
-                    0 => struct {},
-                    1 => php.util.ArgType(Init, 0),
-                    else => unreachable,
-                };
-                break :init .{ .exists = true, .Args = Arg0, .uses_args = arg_count > 0, .by_value = true };
-            } else if (@hasDecl(T, "initSelf")) {
+            if (@hasDecl(T, "initSelf")) {
                 const InitSelf = @TypeOf(T.initSelf);
                 const arg_count = php.util.argCount(InitSelf);
                 const Arg0 = switch (arg_count) {
@@ -762,6 +754,15 @@ pub fn _(comptime T: type) type {
                     else => unreachable,
                 };
                 break :init .{ .exists = true, .Args = Arg0, .uses_args = arg_count > 1, .by_value = false };
+            } else if (@hasDecl(T, "init")) {
+                const Init = @TypeOf(T.init);
+                const arg_count = php.util.argCount(Init);
+                const Arg0 = switch (arg_count) {
+                    0 => struct {},
+                    1 => php.util.ArgType(Init, 0),
+                    else => unreachable,
+                };
+                break :init .{ .exists = true, .Args = Arg0, .uses_args = arg_count > 0, .by_value = true };
             } else {
                 // use setters to initialize custom struct
                 const setter_names = std.meta.fieldNames(@TypeOf(setters));

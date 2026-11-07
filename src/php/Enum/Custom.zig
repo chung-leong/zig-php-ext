@@ -15,7 +15,8 @@ const String = php.String;
 const Value = php.Value;
 const argCount = php.util.argCount;
 
-pub fn @"fn"(comptime T: type) type {
+pub fn _(comptime T: type) type {
+    comptime try php.util.api.Validator(T, .@"enum", .{}).check();
     return struct {
         pub fn @"enum"(self: *const @This()) *Enum {
             return @constCast(&self.enum_instance);

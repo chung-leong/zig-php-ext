@@ -71,6 +71,7 @@ pub fn createStandard() *@This() {
 ///
 /// If `Class.Custom(T)` has not been exported, a panic would occur.
 pub fn createCustom(comptime T: type, initializers: T) *@This() {
+    // when T fails validation the Object.Custom(T) yields an empty struct
     const custom_obj = Object.Custom(T).create();
     custom_obj.custom().* = initializers;
     custom_obj.flags.initialized = true;
@@ -255,11 +256,11 @@ pub fn getter(comptime T: type, comptime field: std.meta.FieldEnum(T)) RT: {
     const field_name = @tagName(field);
     const FT = @FieldType(T, field_name);
     const ns = struct {
-        fn @"fn"(self: *const T) FT {
+        fn _(self: *const T) FT {
             return php.util.retainAny(@field(self, field_name), .{ .duplicate_slice = false });
         }
     };
-    return ns.@"fn";
+    return ns._;
 }
 /// Utility function for creating property setters for a custom object
 pub fn setter(comptime T: type, comptime field: std.meta.FieldEnum(T)) RT: {
@@ -270,7 +271,7 @@ pub fn setter(comptime T: type, comptime field: std.meta.FieldEnum(T)) RT: {
     const field_name = @tagName(field);
     const FT = @FieldType(T, field_name);
     const ns = struct {
-        fn @"fn"(self: *T, value: FT) void {
+        fn _(self: *T, value: FT) void {
             if (comptime php.util.hasPointer(FT)) {
                 if (!php.util.fieldHasDefaultValue(self, field_name)) {
                     php.util.freeAny(@field(self, field_name));
@@ -281,7 +282,7 @@ pub fn setter(comptime T: type, comptime field: std.meta.FieldEnum(T)) RT: {
             }
         }
     };
-    return ns.@"fn";
+    return ns._;
 }
 /// Struct returned by the `getGarbageCollection` handler.
 pub const GarbageCollectionResult = struct {

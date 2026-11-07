@@ -19,10 +19,9 @@ const Singleton = php.Singleton;
 const String = php.String;
 const Value = php.Value;
 const ReturnType = php.util.ReturnType;
-const ClassValidator = php.util.api.ClassValidator;
 
 pub fn _(comptime T: type) type {
-    comptime ClassValidator(T).check();
+    comptime try php.util.api.Validator(T, .class, .{}).check();
     return struct {
         pub fn name(self: *const @This()) *String {
             return self.class_instance.name();

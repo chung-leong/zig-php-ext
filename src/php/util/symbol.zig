@@ -25,7 +25,11 @@ pub fn GetterExporter(comptime T: type, comptime scope: Scope, comptime purpose:
             return name;
         }
     });
-    if (!@hasDecl(T, "use auto getters") or !T.@"use auto getters") return DefinedGetterExtractor;
+    const user_auto_getters = switch (@hasDecl(T, "use auto getters")) {
+        true => T.@"use auto getters",
+        false => functionCount(T) == 0,
+    };
+    if (!user_auto_getters) return DefinedGetterExtractor;
     const defined = DefinedGetterExtractor.get();
     // return struct type that adds auto-getters
     return GetterSetterGenerator(T, scope, defined, switch (purpose) {
@@ -48,7 +52,11 @@ pub fn SetterExporter(comptime T: type, comptime scope: Scope, comptime purpose:
             return name;
         }
     });
-    if (!@hasDecl(T, "use auto setters") or !T.@"use auto setters") return DefinedSetterExtractor;
+    const user_auto_setters = switch (@hasDecl(T, "use auto setters")) {
+        true => T.@"use auto setters",
+        false => false,
+    };
+    if (!user_auto_setters) return DefinedSetterExtractor;
     const defined = DefinedSetterExtractor.get();
     // return struct type that adds auto-getters
     return GetterSetterGenerator(T, scope, defined, switch (purpose) {

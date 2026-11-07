@@ -20,7 +20,7 @@ const errable = php.util.errable;
 const ReturnType = php.util.ReturnType;
 const WithoutError = php.util.WithoutError;
 
-pub fn @"fn"(comptime T: type) type {
+pub fn _(comptime T: type) type {
     if (!@hasDecl(T, "next")) @compileError("No next method: " ++ @typeName(T));
     const Next = @TypeOf(T.next);
     const next_arg_count = comptime argCount(Next);
@@ -41,7 +41,13 @@ pub fn @"fn"(comptime T: type) type {
                 true => switch (st.field_types.len) {
                     2 => {
                         const Key = st.field_types[0];
-                        if (Key != *String and Key != c.zend_long and Key != Value) {
+                        const valid = switch (@typeInfo(Key)) {
+                            .pointer => |pt| pt.child == String,
+                            .@"struct" => Key == Value,
+                            .int => |int| int.bits <= @bitSizeOf(c.zend_long),
+                            else => false,
+                        };
+                        if (!valid) {
                             @compileError("Key must be Value, *String, or " ++ @typeName(c.zend_long));
                         }
                         break :init st.field_types[1];

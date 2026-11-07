@@ -549,10 +549,12 @@ pub fn fromStruct(arg: anytype, options: ConversionOptions) @This() {
         .fromAny(@as(Int, @bitCast(arg)), .{})
     else if (st.is_tuple)
         .fromArray(.createFromAny(arg, options))
-    else if (Class.Custom(T).isRegistered())
+    else if ((comptime php.util.api.canBeCustomClass(T)) and Class.Custom(T).isRegistered())
         .fromObject(.createCustom(T, arg))
+    else if (comptime php.util.functionCount(T) == 0 and php.util.autoConvertible(T))
+        .fromObject(Object.StdClass.createFromAny(arg, options).object())
     else
-        .fromObject(Object.StdClass.createFromAny(arg, options).object());
+        @panic("Struct has not been exported as a custom class and cannot be automatically converted to stdclass: " ++ @typeName(T));
 }
 
 pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@TypeOf(arg))) {

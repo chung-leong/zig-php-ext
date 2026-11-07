@@ -8,7 +8,7 @@ const Object = php.Object;
 const String = php.String;
 const Value = php.Value;
 
-pub fn @"fn"(comptime T: type, comptime options: struct {
+pub fn _(comptime T: type, comptime options: struct {
     clamped: bool = false,
 }) type {
     return struct {

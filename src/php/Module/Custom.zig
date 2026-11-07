@@ -19,16 +19,15 @@ const Singleton = php.Singleton;
 const String = php.String;
 const Value = php.Value;
 const Dependency = php.Module.Dependency;
-const ModuleValidator = php.util.api.ModuleValidator;
 const FunctionEntry = @import("Custom/FunctionEntry.zig");
 const IniEntryDef = @import("Custom/IniEntryDef.zig");
 
-pub fn @"fn"(comptime T: type, comptime options: struct {
+pub fn _(comptime T: type, comptime options: struct {
     name: [:0]const u8,
     version: [:0]const u8,
     dependency: ?[]const Dependency = null,
 }) type {
-    comptime ModuleValidator(T).check();
+    try comptime php.util.api.Validator(T, .module, .{}).check();
     return struct {
         pub fn init() @This() {
             return .{

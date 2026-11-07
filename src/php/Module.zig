@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub const Custom = @import("Module/Custom.zig").@"fn";
+pub const Custom = @import("Module/Custom.zig")._;
 const php = @import("root.zig");
 const c = php.c;
 const pi = php.imports;

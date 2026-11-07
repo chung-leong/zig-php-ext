@@ -5,7 +5,7 @@ const php_al = php.allocator;
 const pi = php.imports;
 const Value = php.Value;
 pub const Functions = c.zend_object_iterator_funcs;
-pub const Custom = @import("Iterator/Custom.zig").@"fn";
+pub const Custom = @import("Iterator/Custom.zig")._;
 
 pub fn init(functions: *const Functions) @This() {
     var self: @This() = undefined;
