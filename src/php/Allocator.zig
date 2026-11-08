@@ -20,20 +20,26 @@ pub const Mode = enum { persistent, per_request };
 /// automatically reclaimed by the language engine at the end of a request.
 pub threadlocal var mode: Mode = .persistent;
 
-fn alloc(_: *anyopaque, len: usize, alignment: std.mem.Alignment, return_address: usize) ?[*]u8 {
-    _ = return_address;
-    _ = alignment;
+fn alloc(_: *anyopaque, len: usize, alignment: std.mem.Alignment, _: usize) ?[*]u8 {
     std.debug.assert(len > 0);
-    const ptr = switch (mode) {
-        .persistent => malloc(len),
-        .per_request => emalloc(len, @src()),
+    const ptr = switch (alignment) {
+        .@"1", .@"2", .@"4", .@"8" => pemalloc(len, @src()),
+        else => over_alloc: { // use code borrowed from c_allocator
+            // Overallocate to account for alignment padding and store the original pointer
+            // returned by `malloc` before the aligned address.
+            const padded_len = len + @sizeOf(usize) + alignment.toByteUnits() - 1;
+            const unaligned_ptr: [*]u8 = pemalloc(padded_len, @src()) orelse return null;
+            const unaligned_addr = @intFromPtr(unaligned_ptr);
+            const aligned_addr = alignment.forward(unaligned_addr + @sizeOf(usize));
+            const aligned_ptr = unaligned_ptr + (aligned_addr - unaligned_addr);
+            manualAlignHeader(aligned_ptr).* = unaligned_ptr;
+            break :over_alloc aligned_ptr;
+        },
     };
     return @ptrCast(ptr);
 }
 
-fn resize(_: *anyopaque, memory: []u8, alignment: std.mem.Alignment, new_len: usize, return_address: usize) bool {
-    _ = alignment;
-    _ = return_address;
+fn resize(_: *anyopaque, memory: []u8, _: std.mem.Alignment, new_len: usize, _: usize) bool {
     std.debug.assert(new_len > 0);
     if (new_len <= memory.len) {
         return true; // in-place shrink always works
@@ -49,12 +55,10 @@ fn remap(ctx: *anyopaque, memory: []u8, alignment: std.mem.Alignment, new_len: u
     return null;
 }
 
-fn free(_: *anyopaque, memory: []u8, alignment: std.mem.Alignment, return_address: usize) void {
-    _ = return_address;
-    _ = alignment;
-    switch (mode) {
-        .persistent => c.free(memory.ptr),
-        .per_request => efree(memory.ptr, @src()),
+fn free(_: *anyopaque, memory: []u8, alignment: std.mem.Alignment, _: usize) void {
+    switch (alignment) {
+        .@"1", .@"2", .@"4", .@"8" => pefree(memory.ptr, @src()),
+        else => pefree(manualAlignHeader(memory.ptr).*, @src()),
     }
 }
 
@@ -75,7 +79,7 @@ fn efree(ptr: *anyopaque, comptime src: std.builtin.SourceLocation) void {
     }
 }
 
-fn malloc(size: usize) [*]u8 {
+fn malloc(size: usize) ?[*]u8 {
     const src = @src();
     const ptr = switch (comptime argCount(@TypeOf(pi.__zend_malloc))) {
         5 => pi.__zend_malloc(size, src.file, src.line + 1, null, 0),
@@ -83,4 +87,23 @@ fn malloc(size: usize) [*]u8 {
         else => @compileError("Unexpected __zend_malloc argument count"),
     };
     return @ptrCast(ptr);
+}
+
+inline fn pemalloc(size: usize, comptime src: std.builtin.SourceLocation) ?[*]u8 {
+    const ptr = switch (mode) {
+        .persistent => malloc(size),
+        .per_request => emalloc(size, src),
+    };
+    return ptr;
+}
+
+inline fn pefree(ptr: *anyopaque, comptime src: std.builtin.SourceLocation) void {
+    switch (mode) {
+        .persistent => c.free(ptr),
+        .per_request => efree(ptr, src),
+    }
+}
+
+fn manualAlignHeader(aligned_ptr: [*]u8) *[*]u8 {
+    return @ptrCast(@alignCast(aligned_ptr - @sizeOf(usize)));
 }
