@@ -8,6 +8,10 @@ pub const major_version = c.PHP_MAJOR_VERSION;
 pub const minor_version = c.PHP_MINOR_VERSION;
 /// PHP API number
 pub const api_no = c.ZEND_MODULE_API_NO;
+/// Signed integer type. `i64` on 64-bit systems.
+pub const Long = c.zend_long;
+/// Unsigned integer type. `u64` on 64-bit systems.
+pub const Ulong = c.zend_ulong;
 
 pub const Allocator = @import("Allocator.zig");
 pub const Array = @import("Array.zig");

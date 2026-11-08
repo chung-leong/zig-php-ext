@@ -31,7 +31,7 @@ pub const _ = union(enum) {
     }
 
     pub fn has(self: @This(), index: usize) bool {
-        const long: c.zend_long = @intCast(index);
+        const long: php.Long = @intCast(index);
         return switch (self) {
             .array => |arr| try arr.has(long),
             .object => |obj| try obj.hasDimension(.fromInteger(long)),
@@ -39,7 +39,7 @@ pub const _ = union(enum) {
     }
 
     pub fn read(self: @This(), index: usize) !Value {
-        const long: c.zend_long = @intCast(index);
+        const long: php.Long = @intCast(index);
         return switch (self) {
             .array => |arr| get: {
                 const value = try arr.get(long);

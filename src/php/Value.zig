@@ -40,7 +40,7 @@ pub fn boolean(self: *const @This()) bool {
     return self.impl.u1.v.type == c.IS_TRUE;
 }
 /// Return a integer.
-pub fn integer(self: *const @This()) c.zend_long {
+pub fn integer(self: *const @This()) php.Long {
     return self.impl.value.lval;
 }
 /// Return a floating-point number.
@@ -135,7 +135,7 @@ pub fn getBoolean(self: *const @This()) !bool {
     };
 }
 
-pub fn getInteger(self: *const @This()) !c.zend_long {
+pub fn getInteger(self: *const @This()) !php.Long {
     return switch (self.kind()) {
         .integer => self.integer(),
         .float => try floatToInteger(self.float()),
@@ -147,9 +147,35 @@ pub fn getInteger(self: *const @This()) !c.zend_long {
     };
 }
 
-pub fn getUnsigned(self: *const @This()) !c.zend_ulong {
-    const i = try self.getInteger();
-    return if (i >= 0) @intCast(i) else error.NegativeValue;
+pub fn getTypedInt(self: *const @This(), comptime T: type, options: IntCastOptions) !T {
+    const long = try self.getInteger();
+    switch (@typeInfo(T)) {
+        .int => |int| switch (int.signedness) {
+            .signed => {
+                if (options.allow_overflow) return @truncate(long);
+                if (long < std.math.minInt(T) or long > std.math.maxInt(T)) {
+                    return error.IntegerOverflow;
+                }
+                return @intCast(long);
+            },
+            .unsigned => {
+                if (!options.allow_overflow) {
+                    if (long < 0) return error.NegativeValue;
+                }
+                const ulong: php.Ulong = @bitCast(long);
+                if (options.allow_overflow) return @truncate(ulong);
+                if (long < std.math.minInt(T) or long > std.math.maxInt(T)) {
+                    return error.IntegerOverflow;
+                }
+                return @intCast(long);
+            },
+        },
+        else => @compileLog("Integer type expected, received: " ++ @typeName(T)),
+    }
+}
+
+pub fn getUnsigned(self: *const @This()) !php.Ulong {
+    return try self.getTypedInt(php.Ulong, .{});
 }
 
 pub fn getFloat(self: *const @This()) !f64 {
@@ -285,7 +311,7 @@ pub fn getStruct(self: *const @This(), allocator: std.mem.Allocator, comptime T:
     const st = @typeInfo(T).@"struct";
     if (st.backing_integer) |Int| {
         if (self.getInteger()) |int| {
-            const bits: @Int(@typeInfo(Int).int.signedness, @bitSizeOf(c.zend_long)) = @bitCast(int);
+            const bits: @Int(@typeInfo(Int).int.signedness, @bitSizeOf(php.Long)) = @bitCast(int);
             const backing_int: Int = @truncate(bits);
             return @bitCast(backing_int);
         } else |_| {}
@@ -422,7 +448,7 @@ pub fn fromBoolean(b: bool) @This() {
     };
 }
 
-pub fn fromInteger(lval: c.zend_long) @This() {
+pub fn fromInteger(lval: php.Long) @This() {
     return .{
         .impl = .{
             .u1 = .{ .type_info = c.IS_LONG },
@@ -431,7 +457,7 @@ pub fn fromInteger(lval: c.zend_long) @This() {
     };
 }
 
-pub fn fromUnsigned(ul: c.zend_ulong) @This() {
+pub fn fromUnsigned(ul: php.Ulong) @This() {
     return fromInteger(@intCast(ul));
 }
 
@@ -710,10 +736,14 @@ pub const ConversionOptions = packed struct {
             null;
     }
 };
+/// Integer casting options for `getTypedInt`
+pub const IntCastOptions = packed struct {
+    allow_overflow: bool = false,
+};
 
-fn floatToInteger(value: f64) !c.zend_long {
+fn floatToInteger(value: f64) !php.Long {
     @setRuntimeSafety(false);
-    const long: c.zend_long = @intFromFloat(value);
+    const long: php.Long = @intFromFloat(value);
     const double: f64 = @floatFromInt(long);
     return switch (double == value) {
         true => long,
@@ -721,10 +751,10 @@ fn floatToInteger(value: f64) !c.zend_long {
     };
 }
 
-fn integerToFloat(value: c.zend_long) !f64 {
+fn integerToFloat(value: php.Long) !f64 {
     @setRuntimeSafety(false);
     const double: f64 = @floatFromInt(value);
-    const long: c.zend_long = @intFromFloat(double);
+    const long: php.Long = @intFromFloat(double);
     return switch (long == value) {
         true => double,
         else => error.NotFloatingPoint,

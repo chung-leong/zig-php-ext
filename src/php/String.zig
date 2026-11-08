@@ -170,11 +170,11 @@ pub fn toValue(self: *const @This()) Value {
 }
 /// Extract either an integer or floating-point nuimber from a string.
 pub fn toNumeric(self: *const @This()) !union(enum) {
-    integer: c.zend_long,
+    integer: php.Long,
     float: f64,
 } {
     const s = self.slice();
-    var long: c.zend_long = undefined;
+    var long: php.Long = undefined;
     var double: f64 = undefined;
     const result = if (s[0] > '9')
         c.IS_UNDEF
@@ -193,7 +193,7 @@ pub fn parseBoolean(self: *const @This()) bool {
     return pi.zend_ini_parse_bool(zstr);
 }
 /// Convert a string to an integer.
-pub fn parseInteger(self: *const @This()) c.zend_long {
+pub fn parseInteger(self: *const @This()) php.Long {
     const s = self.slice();
     return pi.zend_atol(s.ptr, s.len);
 }

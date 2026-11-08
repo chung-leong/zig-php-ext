@@ -44,11 +44,11 @@ pub fn _(comptime T: type) type {
                         const valid = switch (@typeInfo(Key)) {
                             .pointer => |pt| pt.child == String,
                             .@"struct" => Key == Value,
-                            .int => |int| int.bits <= @bitSizeOf(c.zend_long),
+                            .int => |int| int.bits <= @bitSizeOf(php.Long),
                             else => false,
                         };
                         if (!valid) {
-                            @compileError("Key must be Value, *String, or " ++ @typeName(c.zend_long));
+                            @compileError("Key must be Value, *String, or " ++ @typeName(php.Long));
                         }
                         break :init st.field_types[1];
                     },

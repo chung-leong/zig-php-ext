@@ -36,7 +36,7 @@ pub fn class(self: *const @This()) *const Class {
     return @ptrCast(self.impl.ce);
 }
 /// Return the object's internal handle.
-pub fn handle(self: *const @This()) c.zend_long {
+pub fn handle(self: *const @This()) php.Long {
     return @ptrCast(self.impl.handle);
 }
 /// Return the object's dynamic properties. Only relevant when the object is an instance of

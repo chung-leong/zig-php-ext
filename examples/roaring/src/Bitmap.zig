@@ -59,7 +59,7 @@ pub fn iterate(self: *@This()) Iterator {
 }
 
 pub fn readDimension(self: *@This(), key: php.Value, _: php.Value.Access) !php.Value {
-    const index = try getIndex(key);
+    const index = try key.getTypedInt(u32, .{});
     const found = self.bitmap.contains(index);
     return .fromBoolean(found);
 }
@@ -70,7 +70,7 @@ pub fn hasDimension(_: *@This(), _: php.Value, _: bool) bool {
 
 pub fn writeDimension(self: *@This(), key: php.Value, value: php.Value) !void {
     if (self.frozen != null) return error.Frozen;
-    const index = try getIndex(key);
+    const index = try key.getTypedInt(u32, .{});
     const state = try value.getBoolean();
     if (state) {
         try self.bitmap.add(php.allocator, index);
@@ -82,6 +82,10 @@ pub fn writeDimension(self: *@This(), key: php.Value, value: php.Value) !void {
 pub fn countElements(self: *@This()) usize {
     const card = self.bitmap.get_cardinality();
     return @intCast(card);
+}
+
+pub fn unsetDimension(_: *@This(), _: php.Value) !void {
+    return error.InvalidOperation;
 }
 
 pub fn getProperties(self: *@This(), _: php.Object.PropertiesPurpose) ?*php.Array {
@@ -142,12 +146,6 @@ const Iterator = struct {
 
     bm_iter: zroaring.Iterator,
 };
-
-fn getIndex(key: php.Value) !u32 {
-    const index = try key.getUnsigned();
-    if (index > std.math.maxInt(u32)) return error.Overflow;
-    return @intCast(index);
-}
 
 bitmap: zroaring.Bitmap,
 frozen: ?[]align(zroaring.constants.BLOCK_ALIGN) u8 = null,
