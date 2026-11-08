@@ -45,6 +45,7 @@ pub fn _(comptime T: type) type {
                     @field(self.custom_struct, field_name) = def_value;
                 }
             }
+            if (@FieldType(@This(), "flags") != void) self.flags = .{};
             return self;
         }
 
@@ -807,7 +808,9 @@ pub fn _(comptime T: type) type {
         custom_struct: T,
         flags: switch (@hasDecl(T, "getConstructor")) {
             true => void,
-            false => packed struct { initialized: bool },
+            false => packed struct {
+                initialized: bool = false,
+            },
         },
 
         comptime {

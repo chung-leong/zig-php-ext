@@ -1,5 +1,3 @@
-const std = @import("std");
-
 const zroaring = @import("zroaring");
 
 const php = @import("php/root.zig");
@@ -64,28 +62,28 @@ pub fn readDimension(self: *@This(), key: php.Value, _: php.Value.Access) !php.V
     return .fromBoolean(found);
 }
 
-pub fn hasDimension(_: *@This(), _: php.Value, _: bool) bool {
+pub fn hasDimension(_: *@This(), key: php.Value, _: bool) bool {
+    _ = try key.getTypedInt(u32, .{});
     return true;
 }
 
 pub fn writeDimension(self: *@This(), key: php.Value, value: php.Value) !void {
     if (self.frozen != null) return error.Frozen;
     const index = try key.getTypedInt(u32, .{});
-    const state = try value.getBoolean();
-    if (state) {
+    if (try value.getBoolean()) {
         try self.bitmap.add(php.allocator, index);
     } else {
         try self.bitmap.remove(php.allocator, index);
     }
 }
 
+pub fn unsetDimension(_: *@This(), _: php.Value) !void {
+    return error.InvalidOperation;
+}
+
 pub fn countElements(self: *@This()) usize {
     const card = self.bitmap.get_cardinality();
     return @intCast(card);
-}
-
-pub fn unsetDimension(_: *@This(), _: php.Value) !void {
-    return error.InvalidOperation;
 }
 
 pub fn getProperties(self: *@This(), _: php.Object.PropertiesPurpose) ?*php.Array {
