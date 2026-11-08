@@ -5,14 +5,57 @@ const zroaring = @import("zroaring");
 const php = @import("php/root.zig");
 const Object = php.Object;
 
-pub fn init(args: struct { indices: []const u32 = &.{} }) !@This() {
-    var bm: zroaring.Bitmap = .empty;
-    _ = try bm.add_many(php.allocator, args.indices);
-    return .{ .bitmap = bm };
+var gpa = std.heap.DebugAllocator(.{}).init;
+const allocator = gpa.allocator();
+
+pub fn init(args: struct { init: union(enum) {
+    indices: []const u32,
+    frozen: []const u8,
+} = .{ .indices = &.{} } }) !@This() {
+    switch (args.init) {
+        .indices => |indices| {
+            var bm: zroaring.Bitmap = .empty;
+            _ = try bm.add_many(allocator, indices);
+            return .{ .bitmap = bm };
+        },
+        .frozen => |frozen| {
+            const bytes = try allocator.alignedAlloc(u8, .fromByteUnits(zroaring.constants.BLOCK_ALIGN), frozen.len);
+            errdefer allocator.free(bytes);
+            @memcpy(bytes, frozen);
+            const bm: zroaring.Bitmap = try .frozen_view(allocator, bytes);
+            return .{ .bitmap = bm, .frozen = bytes };
+        },
+    }
 }
 
 pub fn deinit(self: *@This()) void {
-    self.bitmap.deinit(php.allocator);
+    self.bitmap.deinit(allocator);
+    if (self.frozen) |bytes| allocator.free(bytes);
+}
+
+pub fn freeze(self: *@This()) !void {
+    if (self.frozen != null) return;
+    if (try self.bitmap.run_optimize(allocator)) {
+        _ = try self.bitmap.shrink_to_fit(allocator);
+    }
+    const size = self.bitmap.frozen_size_in_bytes();
+    const bytes = try allocator.alignedAlloc(u8, .fromByteUnits(zroaring.constants.BLOCK_ALIGN), size);
+    errdefer allocator.free(bytes);
+    try self.bitmap.frozen_serialize(bytes);
+    const new_bm: zroaring.Bitmap = try .frozen_view(allocator, bytes);
+    // free the existing one
+    self.bitmap.deinit(allocator);
+    self.bitmap = new_bm;
+    self.frozen = bytes;
+}
+
+pub fn unfreeze(self: *@This()) !void {
+    if (self.frozen == null) return;
+    const new_bm = try self.bitmap.@"or"(allocator, self.bitmap);
+    self.bitmap.deinit(allocator);
+    allocator.free(self.frozen.?);
+    self.bitmap = new_bm;
+    self.frozen = null;
 }
 
 pub fn iterate(self: *@This()) Iterator {
@@ -30,12 +73,13 @@ pub fn hasDimension(_: *@This(), _: php.Value, _: bool) bool {
 }
 
 pub fn writeDimension(self: *@This(), key: php.Value, value: php.Value) !void {
+    if (self.frozen != null) return error.Frozen;
     const index = try getIndex(key);
     const state = try value.getBoolean();
     if (state) {
-        try self.bitmap.add(php.allocator, index);
+        try self.bitmap.add(allocator, index);
     } else {
-        try self.bitmap.remove(php.allocator, index);
+        try self.bitmap.remove(allocator, index);
     }
 }
 
@@ -67,14 +111,24 @@ pub fn doOperation(opcode: Object.Opcode, op1: php.Value, op2: php.Value) !php.V
     const self = try op1.getCustom(@This());
     const other = try op2.getCustom(@This());
     const output = switch (opcode) {
-        .bitwise_and => try self.bitmap.@"and"(php.allocator, other.bitmap),
-        .bitwise_or => try self.bitmap.@"or"(php.allocator, other.bitmap),
-        .bitwise_xor => try self.bitmap.xor(php.allocator, other.bitmap),
+        .bitwise_and => try self.bitmap.@"and"(allocator, other.bitmap),
+        .bitwise_or => try self.bitmap.@"or"(allocator, other.bitmap),
+        .bitwise_xor => try self.bitmap.xor(allocator, other.bitmap),
         else => return error.IllegalOperation,
     };
     const result: @This() = .{ .bitmap = output };
     return .fromAny(result, .{});
 }
+
+pub fn castObject(self: *@This(), kind: php.Value.Kind) !php.Value {
+    return switch (kind) {
+        .string => if (self.frozen) |bytes| .fromString(.create(bytes)) else error.NotFrozen,
+        else => error.IllegalOperation,
+    };
+}
+
+pub const @"call freeze" = freeze;
+pub const @"call unfreeze" = unfreeze;
 
 const Iterator = struct {
     pub fn init(bitmap: zroaring.Bitmap) @This() {
@@ -96,3 +150,4 @@ fn getIndex(key: php.Value) !u32 {
 }
 
 bitmap: zroaring.Bitmap,
+frozen: ?[]align(zroaring.constants.BLOCK_ALIGN) u8 = null,
