@@ -147,7 +147,7 @@ pub fn getInteger(self: *const @This()) !php.Long {
     };
 }
 
-pub fn getTypedInt(self: *const @This(), comptime T: type, options: IntCastOptions) !T {
+pub fn getIntegerAs(self: *const @This(), comptime T: type, options: IntCastOptions) !T {
     const long = try self.getInteger();
     switch (@typeInfo(T)) {
         .int => |int| switch (int.signedness) {
@@ -175,7 +175,7 @@ pub fn getTypedInt(self: *const @This(), comptime T: type, options: IntCastOptio
 }
 
 pub fn getUnsigned(self: *const @This()) !php.Ulong {
-    return try self.getTypedInt(php.Ulong, .{});
+    return try self.getIntegerAs(php.Ulong, .{});
 }
 
 pub fn getFloat(self: *const @This()) !f64 {
@@ -245,7 +245,7 @@ pub fn getPointer(self: *const @This()) !*anyopaque {
     };
 }
 
-pub fn getPointerOf(self: *const @This(), comptime T: type) !*T {
+pub fn getPointerAs(self: *const @This(), comptime T: type) !T {
     const ptr = try self.getPointer();
     return @ptrCast(@alignCast(ptr));
 }
@@ -736,7 +736,7 @@ pub const ConversionOptions = packed struct {
             null;
     }
 };
-/// Integer casting options for `getTypedInt`
+/// Integer casting options for `getIntegerAs`
 pub const IntCastOptions = packed struct {
     allow_overflow: bool = false,
 };

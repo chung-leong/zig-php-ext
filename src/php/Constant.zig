@@ -20,7 +20,7 @@ pub fn find(n: *String) ?*@This() {
     const eg = php.globals("executor");
     const list: *Array = @ptrCast(eg.zend_constants);
     const v = list.get(n) catch return null;
-    return v.getPointerOf(@This()) catch return null;
+    return v.getPointerAs(*@This()) catch return null;
 }
 /// Create a constant and add it to the global namespace.
 ///

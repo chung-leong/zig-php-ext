@@ -637,7 +637,6 @@ final class ClassTest extends ExtensionTestCase
     public function testDeinitAvoidance(): void
     {
         $lines = $this->runTest("class", "uncreatable.php");
-        echo implode(PHP_EOL, $lines), "\n";
         $this->assertSame(<<<OUTPUT
         init
         uncreatable

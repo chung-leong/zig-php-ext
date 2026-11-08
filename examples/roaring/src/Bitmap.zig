@@ -57,19 +57,19 @@ pub fn iterate(self: *@This()) Iterator {
 }
 
 pub fn readDimension(self: *@This(), key: php.Value, _: php.Value.Access) !php.Value {
-    const index = try key.getTypedInt(u32, .{});
+    const index = try key.getIntegerAs(u32, .{});
     const found = self.bitmap.contains(index);
     return .fromBoolean(found);
 }
 
-pub fn hasDimension(_: *@This(), key: php.Value, _: bool) bool {
-    _ = try key.getTypedInt(u32, .{});
+pub fn hasDimension(_: *@This(), key: php.Value, _: bool) !bool {
+    _ = try key.getIntegerAs(u32, .{});
     return true;
 }
 
 pub fn writeDimension(self: *@This(), key: php.Value, value: php.Value) !void {
     if (self.frozen != null) return error.Frozen;
-    const index = try key.getTypedInt(u32, .{});
+    const index = try key.getIntegerAs(u32, .{});
     if (try value.getBoolean()) {
         try self.bitmap.add(php.allocator, index);
     } else {
