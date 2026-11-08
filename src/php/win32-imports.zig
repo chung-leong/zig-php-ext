@@ -218,6 +218,7 @@ pub var zend_iterator_dtor: Ptr("zend_iterator_dtor") = undefined;
 pub var zend_iterator_init: Ptr("zend_iterator_init") = undefined;
 pub var zend_list_delete: Ptr("zend_list_delete") = undefined;
 pub var zend_lookup_class: Ptr("zend_lookup_class") = undefined;
+pub var zend_map_ptr_new: Ptr("zend_map_ptr_new") = undefined;
 pub var zend_object_std_init: Ptr("zend_object_std_init") = undefined;
 pub var zend_objects_new: Ptr("zend_objects_new") = undefined;
 pub var zend_objects_store_del: Ptr("zend_objects_store_del") = undefined;
@@ -236,6 +237,7 @@ pub var zend_throw_exception_ex: Ptr("zend_throw_exception_ex") = undefined;
 pub var zend_throw_exception_object: Ptr("zend_throw_exception_object") = undefined;
 pub var zend_trace_to_string: Ptr("zend_trace_to_string") = undefined;
 pub var zend_unregister_ini_entries: Ptr("zend_unregister_ini_entries") = undefined;
+pub var zval_update_constant_ex: Ptr("zval_update_constant_ex") = undefined;
 pub var zval_ptr_dtor: Ptr("zval_ptr_dtor") = undefined;
 
 // renamed functions in 8.6
@@ -296,4 +298,8 @@ fn efree(ptr: ?*anyopaque, comptime src: std.builtin.SourceLocation) void {
         1 => _efree(ptr),
         else => @compileError("Unexpected ptr argument count"),
     }
+}
+
+export fn zend_map_ptr_new_local() ?*anyopaque {
+    return zend_map_ptr_new();
 }

@@ -2,10 +2,12 @@ const zroaring = @import("zroaring");
 
 const php = @import("php/root.zig");
 
-pub fn init(args: struct { init: union(enum) {
-    indices: []const u32,
-    frozen: []const u8,
-} = .{ .indices = &.{} } }) !@This() {
+pub fn init(args: struct {
+    init: union(enum) {
+        indices: []const u32,
+        frozen: []const u8,
+    } = .{ .indices = &.{} },
+}) !@This() {
     switch (args.init) {
         .indices => |indices| {
             var bm: zroaring.Bitmap = .empty;
@@ -29,13 +31,17 @@ pub fn deinit(self: *@This()) void {
 
 pub fn freeze(self: *@This()) !void {
     if (self.frozen != null) return;
+    // optimize the data first
     if (try self.bitmap.run_optimize(php.allocator)) {
         _ = try self.bitmap.shrink_to_fit(php.allocator);
     }
+    // allocate aligned memory for frozen representation
     const size = self.bitmap.frozen_size_in_bytes();
     const bytes = try php.allocator.alignedAlloc(u8, .fromByteUnits(zroaring.constants.BLOCK_ALIGN), size);
     errdefer php.allocator.free(bytes);
+    // obtain the frozen form
     try self.bitmap.frozen_serialize(bytes);
+    // create a new bitmap based on the frozen data
     const new_bm: zroaring.Bitmap = try .frozen_view(php.allocator, bytes);
     // free the existing one
     self.bitmap.deinit(php.allocator);
@@ -45,7 +51,9 @@ pub fn freeze(self: *@This()) !void {
 
 pub fn thaw(self: *@This()) !void {
     if (self.frozen == null) return;
+    // create mutatable copy
     const new_bm = try self.bitmap.@"or"(php.allocator, self.bitmap);
+    // free the frozen bitmap and memory
     self.bitmap.deinit(php.allocator);
     php.allocator.free(self.frozen.?);
     self.bitmap = new_bm;

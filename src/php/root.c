@@ -1,4 +1,9 @@
 #include "include/root.h"
+#ifdef _WIN32
+    /* call the function defined in win32-imports.zig instead */
+    #define zend_map_ptr_new zend_map_ptr_new_local
+    extern void* zend_map_ptr_new_local();
+#endif
 
 /* AST constants require the separation of the class's constant table */
 void enable_ast_constants(zend_class_entry* ce) {
