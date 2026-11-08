@@ -3,10 +3,6 @@ const std = @import("std");
 const zroaring = @import("zroaring");
 
 const php = @import("php/root.zig");
-const Object = php.Object;
-
-var gpa = std.heap.DebugAllocator(.{}).init;
-const allocator = gpa.allocator();
 
 pub fn init(args: struct { init: union(enum) {
     indices: []const u32,
@@ -15,45 +11,45 @@ pub fn init(args: struct { init: union(enum) {
     switch (args.init) {
         .indices => |indices| {
             var bm: zroaring.Bitmap = .empty;
-            _ = try bm.add_many(allocator, indices);
+            _ = try bm.add_many(php.allocator, indices);
             return .{ .bitmap = bm };
         },
         .frozen => |frozen| {
-            const bytes = try allocator.alignedAlloc(u8, .fromByteUnits(zroaring.constants.BLOCK_ALIGN), frozen.len);
-            errdefer allocator.free(bytes);
+            const bytes = try php.allocator.alignedAlloc(u8, .fromByteUnits(zroaring.constants.BLOCK_ALIGN), frozen.len);
+            errdefer php.allocator.free(bytes);
             @memcpy(bytes, frozen);
-            const bm: zroaring.Bitmap = try .frozen_view(allocator, bytes);
+            const bm: zroaring.Bitmap = try .frozen_view(php.allocator, bytes);
             return .{ .bitmap = bm, .frozen = bytes };
         },
     }
 }
 
 pub fn deinit(self: *@This()) void {
-    self.bitmap.deinit(allocator);
-    if (self.frozen) |bytes| allocator.free(bytes);
+    self.bitmap.deinit(php.allocator);
+    if (self.frozen) |bytes| php.allocator.free(bytes);
 }
 
 pub fn freeze(self: *@This()) !void {
     if (self.frozen != null) return;
-    if (try self.bitmap.run_optimize(allocator)) {
-        _ = try self.bitmap.shrink_to_fit(allocator);
+    if (try self.bitmap.run_optimize(php.allocator)) {
+        _ = try self.bitmap.shrink_to_fit(php.allocator);
     }
     const size = self.bitmap.frozen_size_in_bytes();
-    const bytes = try allocator.alignedAlloc(u8, .fromByteUnits(zroaring.constants.BLOCK_ALIGN), size);
-    errdefer allocator.free(bytes);
+    const bytes = try php.allocator.alignedAlloc(u8, .fromByteUnits(zroaring.constants.BLOCK_ALIGN), size);
+    errdefer php.allocator.free(bytes);
     try self.bitmap.frozen_serialize(bytes);
-    const new_bm: zroaring.Bitmap = try .frozen_view(allocator, bytes);
+    const new_bm: zroaring.Bitmap = try .frozen_view(php.allocator, bytes);
     // free the existing one
-    self.bitmap.deinit(allocator);
+    self.bitmap.deinit(php.allocator);
     self.bitmap = new_bm;
     self.frozen = bytes;
 }
 
-pub fn unfreeze(self: *@This()) !void {
+pub fn thaw(self: *@This()) !void {
     if (self.frozen == null) return;
-    const new_bm = try self.bitmap.@"or"(allocator, self.bitmap);
-    self.bitmap.deinit(allocator);
-    allocator.free(self.frozen.?);
+    const new_bm = try self.bitmap.@"or"(php.allocator, self.bitmap);
+    self.bitmap.deinit(php.allocator);
+    php.allocator.free(self.frozen.?);
     self.bitmap = new_bm;
     self.frozen = null;
 }
@@ -77,9 +73,9 @@ pub fn writeDimension(self: *@This(), key: php.Value, value: php.Value) !void {
     const index = try getIndex(key);
     const state = try value.getBoolean();
     if (state) {
-        try self.bitmap.add(allocator, index);
+        try self.bitmap.add(php.allocator, index);
     } else {
-        try self.bitmap.remove(allocator, index);
+        try self.bitmap.remove(php.allocator, index);
     }
 }
 
@@ -88,7 +84,7 @@ pub fn countElements(self: *@This()) usize {
     return @intCast(card);
 }
 
-pub fn getProperties(self: *@This(), _: Object.PropertiesPurpose) ?*php.Array {
+pub fn getProperties(self: *@This(), _: php.Object.PropertiesPurpose) ?*php.Array {
     const arr: *php.Array = .create();
     var iter: zroaring.Iterator = .init(self.bitmap);
     while (iter.next()) |index| {
@@ -107,13 +103,13 @@ pub fn compareWith(self: *@This(), other_value: php.Value) !c_int {
         1;
 }
 
-pub fn doOperation(opcode: Object.Opcode, op1: php.Value, op2: php.Value) !php.Value {
+pub fn doOperation(opcode: php.Object.Opcode, op1: php.Value, op2: php.Value) !php.Value {
     const self = try op1.getCustom(@This());
     const other = try op2.getCustom(@This());
     const output = switch (opcode) {
-        .bitwise_and => try self.bitmap.@"and"(allocator, other.bitmap),
-        .bitwise_or => try self.bitmap.@"or"(allocator, other.bitmap),
-        .bitwise_xor => try self.bitmap.xor(allocator, other.bitmap),
+        .bitwise_and => try self.bitmap.@"and"(php.allocator, other.bitmap),
+        .bitwise_or => try self.bitmap.@"or"(php.allocator, other.bitmap),
+        .bitwise_xor => try self.bitmap.xor(php.allocator, other.bitmap),
         else => return error.IllegalOperation,
     };
     const result: @This() = .{ .bitmap = output };
@@ -128,7 +124,11 @@ pub fn castObject(self: *@This(), kind: php.Value.Kind) !php.Value {
 }
 
 pub const @"call freeze" = freeze;
-pub const @"call unfreeze" = unfreeze;
+pub const @"call thaw" = thaw;
+
+pub fn @"get frozen"(self: *@This()) bool {
+    return self.frozen != null;
+}
 
 const Iterator = struct {
     pub fn init(bitmap: zroaring.Bitmap) @This() {
