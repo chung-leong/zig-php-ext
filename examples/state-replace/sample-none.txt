@@ -1,0 +1,6 @@
+The Mechanics of Mechanical Watches
+
+Mechanical watches are marvels of traditional engineering, operating entirely without batteries or electronic components. At the core of these timepieces is the mainspring, a tightly coiled metal ribbon that stores potential energy when wound manually or through the movement of the wearer's wrist. As the mainspring slowly unwinds, it releases power through a series of gears known as the wheel train.
+
+This energy is regulated by the escapement, which delivers precise impulses to the balance wheel. The balance wheel oscillates back and forth at a constant rate, acting as the watch's heartbeat. This regulated motion is what ultimately turns the hands on the watch face, allowing for highly accurate timekeeping driven purely by physics and craftsmanship.
+
