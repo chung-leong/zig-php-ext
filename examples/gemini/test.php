@@ -1,23 +1,6 @@
-const std = @import("std");
+<?php
 
-const ComptimeReplacer = @import("gemini.zig").ComptimeReplacer;
-const php = @import("php/root.zig");
-
-pub fn @"call replace_states"(_: *@This(), allocator: std.mem.Allocator, args: struct {
-    text: []const u8,
-    replacements: StateReplacements,
-}) ![]const u8 {
-    const replacer: ComptimeReplacer(StateReplacements) = .init(args.replacements);
-    return replacer.replace(allocator, args.text);
-}
-
-const StateReplacements = init: {
-    const field_types: [states.len]type = @splat([]const u8);
-    const field_attributes: [states.len]std.lang.Type.Struct.FieldAttributes = @splat(.{});
-    break :init @Struct(.auto, null, &states, &field_types, &field_attributes);
-};
-
-const states = [_][]const u8{
+$states = [
     "Alabama",
     "Alaska",
     "Arizona",
@@ -67,5 +50,15 @@ const states = [_][]const u8{
     "Washington",
     "West Virginia",
     "Wisconsin",
-    "Wyoming",
-};
+    "Wyoming"
+];
+
+$text = file_get_contents(__DIR__ . "/sample-many.txt");
+$replacements = [];
+foreach ($states as $state) {
+    $replacements[$state] = "**$state**";
+}
+echo replace_states($text, $replacements);
+
+echo 'is_variable("hello world") => ', is_variable("hello world"), "\n";
+echo 'is_variable("\$hello") => ', is_variable("\$hello"), "\n";

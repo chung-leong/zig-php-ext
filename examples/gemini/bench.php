@@ -1,5 +1,21 @@
 <?php
 
+// extension function
+$start = hrtime(true);
+for ($i = 0; $i < 100000; $i++) {
+    $b = is_variable_name('$hello_world');
+}
+$end = hrtime(true);
+echo "extension: ", ($end - $start) / 100_000_000, "\n";
+
+// builtin function
+$start = hrtime(true);
+for ($i = 0; $i < 100000; $i++) {
+    $b = preg_match('/^$\w+$/', '$hello_world');
+}
+$end = hrtime(true);
+echo "preg_match: ", ($end - $start) / 100_000_000, "\n";
+
 $states = [
     "Alabama",
     "Alaska",
