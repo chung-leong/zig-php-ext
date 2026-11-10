@@ -68,7 +68,7 @@ const std = @import("std");
 const config = @import("config");
 const php = @import("php/root.zig");
 
-var module: php.Module.Custom(@import("extension.zig"), .{
+var module: php.Module.Custom(@import("Extension.zig"), .{
     // ext name and version are extracted from composer.json by build.zig
     .name = config.ext_name,
     .version = config.ext_version,
@@ -87,10 +87,10 @@ pub fn DllMain(
 ```
 
 `Module.Custom` is a parametric struct type for defining an extension. It accepts a struct type 
-and an option struct as arguments. The struct is defined in `extension.zig`. This is the file 
+and an option struct as arguments. The struct is defined in `Extension.zig`. This is the file 
 you'll be modifying to create your own extension.
 
-**src/extension.zig**:
+**src/Extension.zig**:
 
 ```zig
 const php = @import("php/root.zig");
