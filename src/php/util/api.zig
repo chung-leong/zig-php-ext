@@ -118,6 +118,14 @@ pub fn canBeCustomClass(comptime T: type) bool {
     Validator(T, .class, .{ .comptime_error = false }).check() catch return false;
     return true;
 }
+pub fn canBeStdClass(comptime T: type) bool {
+    if (@typeInfo(T) != .@"struct") @compileError("Struct type expected, received: " ++ @typeName(T));
+    // struct should have no functions and all its fields must be convertible
+    return php.util.functionCount(T) == 0 and for (@typeInfo(T).@"struct".field_types) |FT| {
+        if (!php.util.autoConvertible(FT)) break false;
+    } else true;
+}
+
 /// Types of validation.
 pub const Validation = enum { module, class, @"enum" };
 /// API Validator.

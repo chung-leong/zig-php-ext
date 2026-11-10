@@ -22,6 +22,10 @@ const errable = php.util.errable;
 
 pub fn _(comptime T: type) type {
     if (!comptime php.util.api.canBeCustomClass(T)) return struct {};
+    const st = @typeInfo(T).@"struct";
+    const has_required_fields = inline for (st.field_attrs) |field_attrs| {
+        if (field_attrs.default_value_ptr == null) break true;
+    } else false;
     return struct {
         pub fn object(self: *const @This()) *Object {
             return @ptrCast(@constCast(&self.php_object));
@@ -132,25 +136,21 @@ pub fn _(comptime T: type) type {
                     try errable(if (init_fn.uses_args) T.initSelf(ptr, args) else T.initSelf(ptr));
                 }
             } else {
-                self.custom_struct = undefined;
-                const st = @typeInfo(T).@"struct";
-                inline for (st.field_names, st.field_attrs, st.field_types) |field_name, field_attrs, FT| {
-                    if (field_attrs.defaultValue(FT)) |def_value| {
-                        @field(self.custom_struct, field_name) = def_value;
-                    }
-                }
-                inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
-                    const set = @field(setters, setter_name);
-                    const arg = @field(args, setter_name);
-                    // skip if argument is null (leaving default value intact)
-                    if (arg) |value| try errable(set(self.custom(), value));
-                }
                 const backing_int = @typeInfo(T).@"struct".backing_integer;
                 if (backing_int) |Int| {
                     if (args.options.backing_integer) |int| {
                         const custom_int_ptr: *Int = @ptrCast(self.custom());
                         custom_int_ptr.* = int;
+                        return;
                     }
+                }
+                if (has_required_fields) return error.NotPermitted;
+                self.custom_struct = .{};
+                inline for (comptime std.meta.fieldNames(@TypeOf(setters))) |setter_name| {
+                    const set = @field(setters, setter_name);
+                    const arg = @field(args, setter_name);
+                    // skip if argument is null (leaving default value intact)
+                    if (arg) |value| try errable(set(self.custom(), value));
                 }
             }
             self.flags.initialized = true;
@@ -161,12 +161,10 @@ pub fn _(comptime T: type) type {
             switch (deinit_fn.exists) {
                 true => T.deinit(self.custom()),
                 false => {
-                    if (comptime php.util.hasPointer(T)) {
-                        // free memory allocated by setters
-                        if (!comptime php.util.autoFreeable(T)) {
-                            @compileError("Unable to free custom struct automatically: " ++ @typeName(T));
+                    inline for (st.field_names, st.field_types) |field_name, FT| {
+                        if (comptime php.util.autoFreeable(FT)) {
+                            php.util.freeAny(@field(self.custom_struct, field_name));
                         }
-                        php.util.freeAny(self.custom_struct);
                     }
                 },
             }

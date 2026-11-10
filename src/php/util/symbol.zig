@@ -27,7 +27,7 @@ pub fn GetterExporter(comptime T: type, comptime scope: Scope, comptime purpose:
     });
     const user_auto_getters = switch (@hasDecl(T, "use auto getters")) {
         true => T.@"use auto getters",
-        false => functionCount(T) == 0,
+        false => false,
     };
     if (!user_auto_getters) return DefinedGetterExtractor;
     const defined = DefinedGetterExtractor.get();
@@ -96,7 +96,7 @@ pub fn ConstantExporter(comptime T: type) type {
             if (@typeInfo(@TypeOf(decl)) != .type) return name;
             if (comptime php.util.api.isCustomType(decl)) switch (decl.custom_type) {
                 .class, .@"enum" => return null,
-                else => |tag| @compileError("Expected custom class or enum type, received: " ++ @tagName(tag)),
+                else => |tag| @compileError("Expected custom class or enum type, received: custom " ++ @tagName(tag)),
             } else @compileError("Expected custom type or constant value, received: " ++ @typeName(decl));
         }
     });
