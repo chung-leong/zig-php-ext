@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/../ExtensionTestCase.php';
 
-final class FunctionTest extends ExtensionTestCase
+final class WikiFunctionTest extends ExtensionTestCase
 {   
     public function testFunctionExportSyntax(): void
     {
