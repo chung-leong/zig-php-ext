@@ -72,6 +72,7 @@ const ZendFastCall = enum {
     zend_objects_store_del,
     zend_str_tolower,
     zend_string_tolower_ex,
+    zval_update_constant_ex,
 };
 
 fn Ptr(comptime name: []const u8) type {

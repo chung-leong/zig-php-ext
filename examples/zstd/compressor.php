@@ -2,6 +2,9 @@
 
 $compressor = new zstd\Compressor(level: 9);
 $data = file_get_contents(__DIR__ . "/data/macbeth.txt");
+if (PHP_EOL != "\n") {
+    $data = strtr($data, PHP_EOL, "\n");
+}
 $complete = $compressor->compress($data, true);
 
 $compressor = new zstd\Compressor(level: 9);
