@@ -176,24 +176,31 @@ fn GetterSetterGenerator(comptime T: type, comptime scope: Scope, defined: anyty
     var field_attrs: [max_len]std.lang.Type.Struct.FieldAttributes = undefined;
     var index: usize = 0;
     const FieldEnum = std.meta.FieldEnum(T);
-    const d_st = @typeInfo(Defined).@"struct";
-    // copy user-defined getters first
-    inline for (d_st.field_names, d_st.field_types) |field_name, FT| {
-        field_names[index] = field_name;
+    // make sure the getters/setters follow the same order as the fields
+    const st = @typeInfo(T).@"struct";
+    inline for (st.field_names) |field_name| {
+        const FT = switch (@hasField(Defined, field_name)) {
+            // use user-defined function when there's one
+            true => @TypeOf(@field(Defined, field_name)),
+            // generate getter/setter otherwise
+            false => @TypeOf(create_fn(Self, @field(FieldEnum, field_name))),
+        };
         field_types[index] = FT;
+        field_names[index] = field_name;
         field_attrs[index] = .{};
         index += 1;
     }
-    // then generate getters for remaining fields
-    const st = @typeInfo(T).@"struct";
-    inline for (st.field_names, st.field_types) |field_name, FT| {
-        if (!@hasField(Defined, field_name) and comptime php.util.autoConvertible(FT)) {
-            field_types[index] = @TypeOf(create_fn(Self, @field(FieldEnum, field_name)));
+    const d_st = @typeInfo(Defined).@"struct";
+    // add user-defined functions whose names don't match any field
+    inline for (d_st.field_names, d_st.field_types) |field_name, FT| {
+        if (!@hasField(T, field_name)) {
             field_names[index] = field_name;
+            field_types[index] = FT;
             field_attrs[index] = .{};
             index += 1;
         }
     }
+    // define the struct then populate it
     const Struct = @Struct(.auto, null, field_names[0..index], field_types[0..index], field_attrs[0..index]);
     const result = comptime init: {
         var result: Struct = undefined;
