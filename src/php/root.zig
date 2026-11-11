@@ -103,10 +103,10 @@ pub fn write(bytes: []const u8) !usize {
     if (written < 0) return error.Failed;
     return @intCast(written);
 }
-/// Format a string using std.fmt.bufPrint() and send the result to PHP's output stream. Fall back to std.fmt.print() if the resulting string is too long for the fixed buffer.
+/// Format a string using std.mem.print() and send the result to PHP's output stream. Fall back to std.fmt.print() if the resulting string is too long for the fixed buffer.
 pub fn print(comptime fmt: []const u8, args: anytype) void {
     var buffer: [1024]u8 = undefined;
-    if (std.fmt.bufPrint(&buffer, fmt, args)) |str| {
+    if (std.mem.print(&buffer, fmt, args)) |str| {
         _ = write(str) catch {};
     } else |_| {
         const str = allocator.print(fmt, args) catch unreachable;

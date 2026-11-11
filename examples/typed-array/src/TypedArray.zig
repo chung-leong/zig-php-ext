@@ -95,7 +95,7 @@ pub fn _(comptime T: type, comptime options: struct {
                     const remaining = elements.len - i;
                     if (remaining > 1) {
                         var buffer: [128]u8 = undefined;
-                        const text = try std.fmt.bufPrint(&buffer, "... {d} more items", .{remaining});
+                        const text = try std.mem.print(&buffer, "... {d} more items", .{remaining});
                         const text_value: Value = .fromString(.create(text));
                         items_arr.append(text_value);
                         break;
