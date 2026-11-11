@@ -2,8 +2,9 @@
 <phpunit>
     <testsuites>
         <testsuite name="Application Test Suite">
-            <directory>test</directory>           
+            <directory>./test</directory>
             <exclude>vendor</exclude>
+            <exclude>php-devel</exclude>
         </testsuite>
     </testsuites>
 </phpunit>

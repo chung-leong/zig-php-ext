@@ -125,7 +125,6 @@ pub fn canBeStdClass(comptime T: type) bool {
         if (!php.util.autoConvertible(FT)) break false;
     } else true;
 }
-
 /// Types of validation.
 pub const Validation = enum { module, class, @"enum" };
 /// API Validator.
