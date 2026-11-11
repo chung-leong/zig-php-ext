@@ -44,9 +44,11 @@ pub fn _(comptime T: type) type {
             const self = php_al.create(@This()) catch unreachable;
             self.initPhpPortion();
             // set fields of custom struct to their default values (when available)
-            inline for (comptime std.meta.fieldNames(T)) |field_name| {
-                if (php.util.getFieldDefaultValue(T, field_name)) |def_value| {
-                    @field(self.custom_struct, field_name) = def_value;
+            inline for (st.field_names, st.field_attrs) |field_name, field_attrs| {
+                if (!field_attrs.@"comptime") {
+                    if (php.util.getFieldDefaultValue(T, field_name)) |def_value| {
+                        @field(self.custom_struct, field_name) = def_value;
+                    }
                 }
             }
             if (@FieldType(@This(), "flags") != void) self.flags = .{};

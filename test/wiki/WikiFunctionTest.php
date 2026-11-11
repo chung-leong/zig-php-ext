@@ -19,5 +19,4 @@ final class WikiFunctionTest extends ExtensionTestCase
         Cześć, Agnieszko!
         OUTPUT, implode(PHP_EOL, $lines));
     }
-
 }
