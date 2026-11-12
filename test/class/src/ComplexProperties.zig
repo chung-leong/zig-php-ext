@@ -23,37 +23,31 @@ pub fn init() !@This() {
         .array = .create(),
         .object = .createStandard(),
         .child = init: {
-            const child = try php.Object.allocator.create(Child);
+            const child = php.Object.Custom(Child).create().custom();
             child.* = .{};
-            php.Object.fromCustom(child).addRef();
             break :init child;
         },
         .children = init: {
             const children = try php.allocator.alloc(*Child, 3);
             for (children, 0..) |*ptr, i| {
-                const new_child = try php.Object.allocator.create(Child);
+                const new_child = php.Object.Custom(Child).create().custom();
                 new_child.* = .{ .number = @intCast(100 + i) };
-                php.Object.fromCustom(new_child).addRef();
                 ptr.* = new_child;
             }
             break :init children;
         },
         .twins = init: {
-            const child1 = try php.Object.allocator.create(Child);
+            const child1 = php.Object.Custom(Child).create().custom();
             child1.* = .{ .number = 201 };
-            php.Object.fromCustom(child1).addRef();
-            const child2 = try php.Object.allocator.create(Child);
+            const child2 = php.Object.Custom(Child).create().custom();
             child2.* = .{ .number = 202 };
-            php.Object.fromCustom(child2).addRef();
             break :init .{ child1, child2 };
         },
         .friends = init: {
-            const child1 = try php.Object.allocator.create(Child);
+            const child1 = php.Object.Custom(Child).create().custom();
             child1.* = .{ .number = 41 };
-            php.Object.fromCustom(child1).addRef();
-            const child2 = try php.Object.allocator.create(Child);
+            const child2 = php.Object.Custom(Child).create().custom();
             child2.* = .{ .number = 42 };
-            php.Object.fromCustom(child2).addRef();
             break :init .{ .bob = child1, .jack = child2 };
         },
     };
