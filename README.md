@@ -1,6 +1,6 @@
 # ZPX
 
-<img src="img/logo.png" align="right" width="200" height="150" alt="AI-generated logo">
+<img src="img/logo.png" align="right" alt="AI-generated logo">
 
 ZPX (Zig PHP eXtension) is a framework for creating PHP extensions using the Zig programming 
 language. It's designed, first and foremost, with ease of development in mind. Set-up is simple.
@@ -13,6 +13,8 @@ The goal of the project is to enable everyday PHP programmers to create custom e
 matter of hours.
 
 ZPX is designed for Zig 0.17.0+ and supports PHP 8.1 through 8.6.
+
+Version 0.17.1 is being prepared right now. It'll be released in the coming days.
 
 ## Getting started
 
@@ -150,6 +152,10 @@ The `@"export ..."` prefix is used to add constants and
 [enumerations](https://www.php.net/manual/en/language.types.enumerations.php) specific to the 
 extension. It's also used for adding custom classes. We'll get to that in later sections.
 
+## Documentation
+
+* [User guide and tutorials](https://github.com/chung-leong/zpx/wiki)
+* [API references]()
 
 
 ## Complete examples
