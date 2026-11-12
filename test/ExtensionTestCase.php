@@ -27,8 +27,8 @@ class ExtensionTestCase extends TestCase
         }
         $parts[] = "php_" . strtr($test_name, '-', '_') . ".$so_ext";
         $ext_path =  implode(DIRECTORY_SEPARATOR, $parts);
-        $cmd = "php -d extension=\"$ext_path\" \"$script_name\"";
-        $result = exec($cmd, $lines, $code);
+        $cmd = "php -d extension=\"$ext_path\" \"$script_name\" 2>&1";
+        $result = exec($cmd, $lines, $code); 
         if ($result === false) {
             throw new Exception("Unable to run PHP with extension: $test_name");
         } else if ($code !== 0) {

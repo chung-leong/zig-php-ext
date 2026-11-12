@@ -6,7 +6,7 @@ final class WikiErrorTest extends ExtensionTestCase
 {   
     public function testFactorialError(): void
     {
-        $lines = $this->runTest("constant-global", "test.php");
+        $lines = $this->runTest("error-factorial", "test.php");
         $this->assertSame(<<<OUTPUT
         120
         too large

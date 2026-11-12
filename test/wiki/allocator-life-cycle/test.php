@@ -1,0 +1,3 @@
+<?php
+
+show("Hello world");
