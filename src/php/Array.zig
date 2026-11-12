@@ -74,11 +74,11 @@ pub fn createFromAny(arg: anytype, options: Value.ConversionOptions) *@This() {
     switch (@typeInfo(T)) {
         .vector => |ve| {
             // vectors require an unrolled loop
-            inline for (0..ve.len) |i| arr.append(.fromAny(arg[i], options));
+            inline for (0..ve.len) |i| arr.append(.createFromAny(arg[i], options));
         },
         .@"struct" => |st| if (st.is_tuple) {
             inline for (arg) |item| {
-                const value: Value = .fromAny(item, options);
+                const value: Value = .createFromAny(item, options);
                 defer value.release();
                 arr.append(value);
             }
@@ -86,14 +86,14 @@ pub fn createFromAny(arg: anytype, options: Value.ConversionOptions) *@This() {
             inline for (st.field_names) |field_name| {
                 const item = @field(arg, field_name);
                 const key = String.static(field_name);
-                const value: Value = .fromAny(item, options);
+                const value: Value = .createFromAny(item, options);
                 defer value.release();
                 arr.set(key, value);
             }
         },
         else => {
             for (arg) |item| {
-                const value: Value = .fromAny(item, options);
+                const value: Value = .createFromAny(item, options);
                 defer value.release();
                 arr.append(value);
             }
@@ -106,6 +106,11 @@ pub fn retain(self: *@This()) *@This() {
     self.addRef();
     return self;
 }
+/// Reduce the array's refcount by one and return it.
+pub fn cede(self: *@This()) *@This() {
+    self.impl.gc.refcount -= 1;
+    return self;
+}
 /// Increase the array's refcount by one.
 pub fn addRef(self: *@This()) void {
     self.impl.gc.refcount += 1;
@@ -114,10 +119,6 @@ pub fn addRef(self: *@This()) void {
 pub fn release(self: *@This()) void {
     const arr = &self.impl;
     pi.zend_hash_release(arr);
-}
-/// Reduce the array's refcount by one.
-pub fn subtractRef(self: *@This()) void {
-    self.impl.gc.refcount -= 1;
 }
 /// Check whether the array contains an element with the given key.
 ///

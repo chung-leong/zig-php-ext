@@ -366,7 +366,6 @@ final class ClassTest extends ExtensionTestCase
         greeting: Hello
         template: Hello, \$name!
         OUTPUT, implode(PHP_EOL, $lines));
-        // echo implode(PHP_EOL, $lines);
     }
 
     public function testGetIterator(): void

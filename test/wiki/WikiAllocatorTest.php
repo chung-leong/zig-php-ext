@@ -35,11 +35,9 @@ final class WikiAllocatorTest extends ExtensionTestCase
     public function testStringAllocator(): void
     {
         $lines = $this->runTest("allocator-string", "test.php");
-        echo implode(PHP_EOL, $lines), "\n";
-        $this->assertSame(<<<OUTPUT
-        address of allocated memory = 0x7577d9a82068
-        Hello, Joe!
-        address of string contents = 0x7577d9a82068
-        OUTPUT, implode(PHP_EOL, $lines));
+        $this->assertMatchesRegularExpression(
+            '/address of allocated memory = 0x(\w++)\nHello, Joe!\naddress of string contents = 0x\1/', 
+            implode("\n", $lines)
+        );
     }
 }

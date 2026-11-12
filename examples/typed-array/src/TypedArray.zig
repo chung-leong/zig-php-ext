@@ -101,7 +101,7 @@ pub fn _(comptime T: type, comptime options: struct {
                         break;
                     }
                 }
-                items_arr.append(.fromAny(element, .{}));
+                items_arr.append(.createFromAny(element, .{}));
             }
             arr.set("[ITEMS]", .fromArray(items_arr));
             // don't show items of ArrayBuffer
@@ -113,7 +113,7 @@ pub fn _(comptime T: type, comptime options: struct {
             const elements = try self.getElements();
             const index = try key.getUnsigned();
             if (index >= elements.len) return error.OutOfBound;
-            return .fromAny(elements[index], .{});
+            return .createFromAny(elements[index], .{});
         }
 
         pub fn writeDimension(self: *@This(), key: Value, value: Value) !void {
@@ -228,10 +228,10 @@ pub fn _(comptime T: type, comptime options: struct {
             return if (result) |i| @intCast(i) else -1;
         }
 
-        pub fn @"call reverse"(self: *@This()) !*Object {
+        pub fn @"call reverse"(self: *@This()) !*@This() {
             const elements = try self.getElements();
             std.mem.reverse(T, elements);
-            return Object.fromCustom(self).retain();
+            return self;
         }
 
         pub fn @"call set"(self: *@This(), args: struct {
@@ -250,10 +250,10 @@ pub fn _(comptime T: type, comptime options: struct {
             @memcpy(dest[args.offset .. args.offset + src.len], src);
         }
 
-        pub fn @"call sort"(self: *@This()) !*Object {
+        pub fn @"call sort"(self: *@This()) !*@This() {
             const elements = try self.getElements();
             std.mem.sortUnstable(T, elements, {}, std.sort.asc(T));
-            return Object.fromCustom(self).retain();
+            return self;
         }
 
         fn toAbsoluteIndex(self: *@This(), i: isize) !usize {

@@ -28,6 +28,11 @@ pub fn retain(self: *@This()) *@This() {
     self.addRef();
     return self;
 }
+/// Reduce the reference's refcount by one and return it.
+pub fn cede(self: *@This()) *@This() {
+    self.impl.gc.refcount -= 1;
+    return self;
+}
 /// Increase the reference's refcount by one.
 pub fn addRef(self: *@This()) void {
     self.impl.gc.refcount += 1;
@@ -39,10 +44,6 @@ pub fn release(self: *@This()) void {
     if (self.impl.gc.refcount == 0) {
         _ = pi.zend_reference_destroy(zres);
     }
-}
-/// Reduce the reference's refcount by one.
-pub fn subtractRef(self: *@This()) void {
-    self.impl.gc.refcount -= 1;
 }
 
 impl: c.zend_reference,

@@ -127,7 +127,6 @@ final class TypedArrayTest extends ExtensionTestCase
         0
         3
         OUTPUT, implode(PHP_EOL, $lines));
-        // echo implode(PHP_EOL, $lines);
     }
 
     public function testSet(): void

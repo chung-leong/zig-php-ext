@@ -8,6 +8,11 @@ pub fn retain(self: *@This()) *@This() {
     self.addRef();
     return self;
 }
+/// Reduce the resource's refcount by one.
+pub fn cede(self: *@This()) *@This() {
+    self.impl.gc.refcount -= 1;
+    return self;
+}
 /// Increase the resource's refcount by one.
 pub fn addRef(self: *@This()) void {
     self.impl.gc.refcount += 1;
@@ -16,10 +21,6 @@ pub fn addRef(self: *@This()) void {
 pub fn release(self: *@This()) void {
     const zres = &self.impl;
     _ = pi.zend_list_delete(zres);
-}
-/// Reduce the resource's refcount by one.
-pub fn subtractRef(self: *@This()) void {
-    self.impl.gc.refcount -= 1;
 }
 
 impl: c.zend_resource,

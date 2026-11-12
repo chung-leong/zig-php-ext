@@ -21,16 +21,21 @@ pub fn create(func: *const Function, scope: ?*Class, called_scope: ?*Class, this
     return .{ .value = result };
 }
 
+pub fn retain(self: *const @This()) *@This() {
+    self.addRef();
+    return self;
+}
+
+pub fn cede(self: *const @This()) *@This() {
+    self.value.cede();
+}
+
 pub fn addRef(self: *const @This()) void {
     self.value.addRef();
 }
 
 pub fn release(self: *const @This()) void {
     self.value.release();
-}
-
-pub fn subtractRef(self: *const @This()) void {
-    self.value.subtractRef();
 }
 
 pub fn fromValue(value: Value) @This() {

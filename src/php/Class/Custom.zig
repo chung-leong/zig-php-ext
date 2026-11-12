@@ -72,7 +72,7 @@ pub fn _(comptime T: type) type {
                 // add bits of bool fields as constants so the user can use the to toggle flags
                 inline for (st.field_names, st.field_types) |field_name, FT| {
                     if (FT == bool) {
-                        const constant_value: Value = .fromAny(1 << @bitOffsetOf(T, field_name), .{});
+                        const constant_value: Value = .fromIntegerAny(1 << @bitOffsetOf(T, field_name));
                         _ = try Class.Constant.register(field_name, constant_value, self.class());
                     }
                 }
@@ -112,7 +112,7 @@ pub fn _(comptime T: type) type {
                 // constants using AST literals
                 const value = @field(constants, const_name);
                 const constant_value: Value = switch (comptime php.util.isScalarType(CT)) {
-                    true => .fromAny(value, .{}),
+                    true => .createFromAny(value, .{}),
                     false => Constant.AstRef.createLiteral(CT, value).toValue(),
                 };
                 _ = try Class.Constant.register(const_name, constant_value, self.class());

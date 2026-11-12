@@ -200,7 +200,7 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
                     true => func(arg0) catch |err| return failure.throw(err),
                     false => func(arg0),
                 };
-                retval.* = .fromAny(result, .{});
+                retval.* = .createFromAny(result, .{});
             } else |err| failure.throw(err);
         }
 
@@ -213,7 +213,7 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
                 true => func(arg0) catch |err| return failure.throw(err),
                 false => func(arg0),
             };
-            retval.* = .fromAny(result, .{});
+            retval.* = .createFromAny(result, .{});
         }
 
         pub fn method1(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
@@ -229,7 +229,7 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
                     true => func(arg0, arg1) catch |err| return failure.throw(err),
                     false => func(arg0, arg1),
                 };
-                retval.* = .fromAny(result, .{});
+                retval.* = .createFromAny(result, .{});
             } else |err| failure.throw(err);
         }
 
@@ -244,7 +244,7 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
                 true => func(arg0, allocator) catch |err| return failure.throw(err),
                 false => func(arg0, allocator),
             };
-            retval.* = .fromAny(result, conv_opts);
+            retval.* = .createFromAny(result, conv_opts);
         }
 
         pub fn method2a(zed: [*c]c.zend_execute_data, zretval: [*c]c.zval) callconv(cc) void {
@@ -261,7 +261,7 @@ pub fn internalFunction(comptime func: anytype, comptime self_src: SelfSource) H
                     true => func(arg0, allocator, arg2) catch |err| return failure.throw(err),
                     false => func(arg0, allocator, arg2),
                 };
-                retval.* = .fromAny(result, conv_opts);
+                retval.* = .createFromAny(result, conv_opts);
             } else |err| failure.throw(err);
         }
 

@@ -123,7 +123,7 @@ pub fn doOperation(opcode: php.Object.Opcode, op1: php.Value, op2: php.Value) !p
         else => return error.IllegalOperation,
     };
     const result: @This() = .{ .bitmap = output };
-    return .fromAny(result, .{});
+    return .createFromStruct(result, .{});
 }
 
 pub fn castObject(self: *@This(), kind: php.Value.Kind) !php.Value {

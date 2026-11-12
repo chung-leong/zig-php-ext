@@ -231,7 +231,7 @@ pub fn _(comptime T: type, comptime options: struct {
                     else => unsupported(Arg),
                 },
                 else => get: {
-                    const value: Value = .fromAny(arg, .{
+                    const value: Value = .createFromAny(arg, .{
                         .convert_enum_to_string = true,
                         .convert_enum_to_integer = true,
                     });
@@ -284,7 +284,7 @@ pub fn _(comptime T: type, comptime options: struct {
             inline for (const_names, const_types) |const_name, CT| {
                 if (comptime php.util.isScalarType(CT)) {
                     const value = @field(constants, const_name);
-                    const constant_value: Value = .fromAny(value, .{});
+                    const constant_value: Value = .createFromAny(value, .{});
                     const constant: *Constant = try .register(const_name, constant_value);
                     _ = constant;
                 } else if (comptime !php.util.canBeConstant(CT)) {
@@ -299,7 +299,7 @@ pub fn _(comptime T: type, comptime options: struct {
             inline for (const_names, const_types) |const_name, CT| {
                 if (!php.util.isScalarType(CT)) {
                     const value = @field(constants, const_name);
-                    const constant_value: Value = .fromAny(value, .{});
+                    const constant_value: Value = .createFromAny(value, .{});
                     const constant: *Constant = try .register(const_name, constant_value);
                     _ = constant;
                 }

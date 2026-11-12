@@ -58,7 +58,7 @@ pub fn @"call get_multiple"(_: *@This(), args: struct {
 }) !*php.Array {
     const array: *php.Array = .create();
     for (0..args.count) |_| {
-        array.append(.fromAny(.{
+        array.append(.createFromAny(.{
             .superhero_name = "Multiple Man",
             .real_name = "Jamie Madrox",
         }));

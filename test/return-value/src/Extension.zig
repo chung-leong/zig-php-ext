@@ -94,9 +94,12 @@ pub const Doctor = struct {
 pub const @"export Doctor" = Class.Custom(Doctor);
 
 pub fn @"call returnAssociativeArray"(_: *@This()) *Array {
-    return .createFromAny(Doctor{ .name = "Doctor Evil", .age = 32 }, .{});
+    const arr: *Array = .createFromAny(Doctor{ .name = "Doctor Evil", .age = 32 }, .{});
+    return arr.cede();
 }
 
 pub fn @"call returnStdClass"(_: *@This()) *Object.StdClass {
-    return .createFromAny(Doctor{ .name = "Doctor Evil", .age = 32 }, .{});
+    const stdclass: *Object.StdClass = .createFromAny(Doctor{ .name = "Doctor Evil", .age = 32 }, .{});
+    _ = stdclass.object().cede();
+    return stdclass;
 }

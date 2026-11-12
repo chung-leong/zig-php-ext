@@ -62,7 +62,7 @@ pub fn _(comptime T: type) type {
             // add the cases
             const en = @typeInfo(T).@"enum";
             inline for (en.field_names, en.field_values) |field_name, field_value| {
-                enum_instance.addCase(.static(field_name), .fromAny(field_value, .{}));
+                enum_instance.addCase(.static(field_name), .fromIntegerAny(field_value));
             }
             // add aliases (i.e. public decls that refer to actual enum items)
             inline for (en.decl_names) |decl_name| {
@@ -113,7 +113,7 @@ pub fn _(comptime T: type) type {
                 // constants using AST literals
                 const value = @field(constants, const_name);
                 const constant_value: Value = switch (comptime php.util.isScalarType(CT)) {
-                    true => .fromAny(value, .{}),
+                    true => .createFromAny(value, .{}),
                     false => Constant.AstRef.createLiteral(CT, value).toValue(),
                 };
                 _ = try Class.Constant.register(const_name, constant_value, self.class());

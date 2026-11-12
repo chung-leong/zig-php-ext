@@ -13,7 +13,6 @@ final class WikiConstantTest extends ExtensionTestCase
         float(3.14159265359)
         int(1234)
         OUTPUT, implode(PHP_EOL, $lines));
-        echo implode(PHP_EOL, $lines), "\n";
     }
 
     public function testGlobalConstantWithNamespace(): void

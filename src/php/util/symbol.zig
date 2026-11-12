@@ -181,7 +181,7 @@ fn GetterSetterGenerator(comptime T: type, comptime scope: Scope, defined: anyty
     inline for (st.field_names) |field_name| {
         const FT = switch (@hasField(Defined, field_name)) {
             // use user-defined function when there's one
-            true => @TypeOf(@field(Defined, field_name)),
+            true => @FieldType(Defined, field_name),
             // generate getter/setter otherwise
             false => @TypeOf(create_fn(Self, @field(FieldEnum, field_name))),
         };

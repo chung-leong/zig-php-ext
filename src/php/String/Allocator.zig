@@ -1,6 +1,8 @@
 const std = @import("std");
 
 const php = @import("../root.zig");
+const c = php.c;
+const php_al = php.allocator;
 const String = php.String;
 
 pub const vtable: std.mem.Allocator.VTable = .{
@@ -11,11 +13,11 @@ pub const vtable: std.mem.Allocator.VTable = .{
 };
 
 fn alloc(_: *anyopaque, len: usize, alignment: std.mem.Alignment, return_address: usize) ?[*]u8 {
-    _ = return_address;
-    _ = alignment;
-    const str: *String = .createUninitialized(len);
-    const s = str.slice();
-    return @ptrCast(@constCast(s.ptr));
+    const mem_offset = @offsetOf(c.zend_string, "val");
+    const total_len = std.mem.alignForward(usize, mem_offset + len + 1, c.ZEND_MM_ALIGNMENT);
+    const byte_ptr = php_al.rawAlloc(total_len, alignment, return_address) orelse return null;
+    @memset(byte_ptr[0..mem_offset], 0);
+    return byte_ptr + mem_offset;
 }
 
 fn resize(_: *anyopaque, memory: []u8, alignment: std.mem.Alignment, new_len: usize, return_address: usize) bool {
@@ -37,8 +39,16 @@ fn remap(ctx: *anyopaque, memory: []u8, alignment: std.mem.Alignment, new_len: u
 }
 
 fn free(_: *anyopaque, memory: []u8, alignment: std.mem.Alignment, return_address: usize) void {
-    _ = return_address;
-    _ = alignment;
-    const str: *String = .fromOwnSlice(memory);
-    str.release();
+    const mem_offset = @offsetOf(c.zend_string, "val");
+    const start_address = @intFromPtr(memory.ptr) - mem_offset;
+    const total_len = std.mem.alignForward(usize, mem_offset + memory.len, c.ZEND_MM_ALIGNMENT);
+    const byte_ptr: [*]u8 = @ptrFromInt(start_address);
+    const str: *String = @ptrCast(@alignCast(byte_ptr));
+    if (str.isUnitialized()) {
+        // string was never created
+        const actual_memory = byte_ptr[0..total_len];
+        php_al.rawFree(actual_memory, alignment, return_address);
+    } else {
+        str.release();
+    }
 }

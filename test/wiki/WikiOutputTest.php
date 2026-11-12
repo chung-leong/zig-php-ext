@@ -17,6 +17,7 @@ final class WikiOutputTest extends ExtensionTestCase
         $lines = $this->runTest("output-write", "test.php");
         $this->assertSame(<<<OUTPUT
         Hello world
+        written = 12
         OUTPUT, implode(PHP_EOL, $lines));
     }
 }

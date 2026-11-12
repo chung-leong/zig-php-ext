@@ -122,6 +122,11 @@ pub fn retain(self: *@This()) *@This() {
     self.addRef();
     return self;
 }
+/// Reduce the string's refcount by one and return the string.
+pub fn cede(self: *@This()) *@This() {
+    self.impl.gc.refcount -= 1;
+    return self;
+}
 /// Increase the string's refcount by one.
 pub fn addRef(self: *@This()) void {
     self.impl.gc.refcount += 1;
@@ -130,10 +135,6 @@ pub fn addRef(self: *@This()) void {
 pub fn release(self: *@This()) void {
     const zstr = &self.impl;
     pi.zend_string_release(zstr);
-}
-/// Reduce the string's refcount by one
-pub fn subtractRef(self: *@This()) void {
-    self.impl.gc.refcount -= 1;
 }
 /// See if the string matches another string.
 pub fn match(self: *const @This(), s2: *const @This()) bool {
@@ -202,18 +203,29 @@ pub fn parseFloat(self: *const @This()) f64 {
     const s = self.slice();
     return pi.zend_strtod(s.ptr, null);
 }
+/// Return true if the string does not exist yet.
+pub fn isUnitialized(self: *const @This()) bool {
+    return self.impl.len == 0 and self.impl.gc.u.type_info == 0;
+}
 /// Obtain a string from a slice pointer, based on the assumption that there're extra valid bytes
 /// in front of the slice.
 ///
 /// `s` should be pointer returned previously by `String.allocator.alloc`.
 pub fn fromOwnSlice(s: []const u8) *@This() {
-    if (s.len == 0) return create(s);
+    if (s.len == 0 and @intFromPtr(s.ptr) == std.math.maxInt(usize)) {
+        return @ptrCast(deref(pi.zend_empty_string));
+    }
     const field_ptr: *@FieldType(c.zend_string, "val") = @ptrCast(@constCast(s.ptr));
     const zstr: *c.zend_string = @alignCast(@fieldParentPtr("val", field_ptr));
-    if (zstr.len != s.len) {
-        // more memory was allocated than used by the slice
-        zstr.len = s.len;
-        const ptr: [*]u8 = @ptrCast(&zstr.val);
+    const self: *@This() = @ptrCast(zstr);
+    if (self.isUnitialized()) {
+        // string hasn't been created yet
+        self.impl.len = s.len;
+        self.impl.gc.u.type_info = switch (php.Allocator.mode) {
+            .per_request => c.GC_STRING,
+            .persistent => c.GC_STRING | c.IS_STR_PERSISTENT,
+        };
+        const ptr: [*]u8 = @ptrCast(&self.impl.val[0]);
         ptr[s.len] = 0;
     }
     return @ptrCast(zstr);

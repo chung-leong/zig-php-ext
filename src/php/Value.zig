@@ -77,6 +77,22 @@ pub fn retain(self: *const @This()) @This() {
     self.addRef();
     return self.*;
 }
+/// Reduce the refcount by one if the value is holding a ref-counted object. Return the
+/// same value.
+pub fn cede(self: *@This()) @This() {
+    const zval = &self.impl;
+    // persistent value
+    if (zval.u1.type_info & c.Z_TYPE_FLAGS_MASK != 0) {
+        switch (self.kind()) {
+            .string => _ = self.string().cede(),
+            .array => _ = self.array().cede(),
+            .object => _ = self.object().cede(),
+            .resource => _ = self.resource().cede(),
+            else => {},
+        }
+    }
+    return self.*;
+}
 /// Increase the refcount by one if the value is holding a ref-counted object.
 pub fn addRef(self: *const @This()) void {
     const zval = &self.impl;
@@ -90,7 +106,8 @@ pub fn addRef(self: *const @This()) void {
         else => {},
     }
 }
-
+/// Decrease the refcount by one if the value is holding a ref-counted object. If the refcount
+/// reaches zero, that object is freed.
 pub fn release(self: *const @This()) void {
     const zval = &self.impl;
     // persistent value
@@ -103,38 +120,27 @@ pub fn release(self: *const @This()) void {
         else => {},
     }
 }
-
-pub fn subtractRef(self: *@This()) void {
-    const zval = &self.impl;
-    // persistent value
-    if (zval.u1.type_info & c.Z_TYPE_FLAGS_MASK == 0) return;
-    switch (self.kind()) {
-        .string => self.string().subtractRef(),
-        .array => self.array().subtractRef(),
-        .object => self.object().subtractRef(),
-        .resource => self.resource().subtractRef(),
-        else => {},
-    }
-}
 /// Set the value to the given value, first releasing the current value.
 pub fn replace(self: *@This(), new_value: @This()) void {
     self.release();
     self.* = new_value;
 }
+/// Return a void if the value is null. Otherwise `error.NotNull` is returned.
 pub fn getNull(self: *const @This()) !void {
     return switch (self.kind()) {
         .null => {},
         else => error.NotNull,
     };
 }
-
+/// Return a boolean if the value is holding a boolean. Otherwise `error.NotBoolean` is returned.
 pub fn getBoolean(self: *const @This()) !bool {
     return switch (self.kind()) {
         .boolean => self.boolean(),
         else => error.NotBoolean,
     };
 }
-
+/// Return a signed integer if the value is holding an integer, a floating point that is a whole
+/// number, or a string representing an integer. Otherwise `error.NotInteger` is returned.
 pub fn getInteger(self: *const @This()) !php.Long {
     return switch (self.kind()) {
         .integer => self.integer(),
@@ -146,38 +152,43 @@ pub fn getInteger(self: *const @This()) !php.Long {
         else => error.NotInteger,
     };
 }
-
+/// Return the given type of integer if the value is holding an integer. Otherwise
+/// `error.NotInteger` is returned. If the `over_overflow` option isn't set and the integer is too
+/// large for the given type, `error.IntegerOverflow` is returned. If the integer is negative and
+/// the given type is unsigned, `error.NegativeValue` is returned.
 pub fn getIntegerAs(self: *const @This(), comptime T: type, options: IntCastOptions) !T {
     const long = try self.getInteger();
-    switch (@typeInfo(T)) {
+    return switch (@typeInfo(T)) {
         .int => |int| switch (int.signedness) {
-            .signed => {
-                if (options.allow_overflow) return @truncate(long);
-                if (long < std.math.minInt(T) or long > std.math.maxInt(T)) {
-                    return error.IntegerOverflow;
-                }
-                return @intCast(long);
-            },
-            .unsigned => {
+            .signed => if (options.allow_overflow)
+                @truncate(long)
+            else if (long >= std.math.minInt(T) and long <= std.math.maxInt(T))
+                @intCast(long)
+            else
+                error.IntegerOverflow,
+            .unsigned => get: {
                 if (!options.allow_overflow) {
-                    if (long < 0) return error.NegativeValue;
+                    if (long < 0) break :get error.NegativeValue;
                 }
                 const ulong: php.Ulong = @bitCast(long);
-                if (options.allow_overflow) return @truncate(ulong);
-                if (long < std.math.minInt(T) or long > std.math.maxInt(T)) {
-                    return error.IntegerOverflow;
-                }
-                return @intCast(long);
+                break :get if (options.allow_overflow)
+                    @truncate(ulong)
+                else if (long >= std.math.minInt(T) and long <= std.math.maxInt(T))
+                    @intCast(long)
+                else
+                    error.IntegerOverflow;
             },
         },
         else => @compileLog("Integer type expected, received: " ++ @typeName(T)),
-    }
+    };
 }
-
+/// Return an unsigned integer if the value is holding an unsigned integer. Otherwise
+/// `error.NotBoolean` or `error.NegativeValue` is returned.
 pub fn getUnsigned(self: *const @This()) !php.Ulong {
     return try self.getIntegerAs(php.Ulong, .{});
 }
-
+/// Return a floating-point number if the value is holding a float, an integer, or a string that
+/// parsed as a float. Otherwise `error.NotFloatingPointNumber` is returned.
 pub fn getFloat(self: *const @This()) !f64 {
     return switch (self.kind()) {
         .float => self.float(),
@@ -189,42 +200,42 @@ pub fn getFloat(self: *const @This()) !f64 {
         else => error.NotFloatingPointNumber,
     };
 }
-
+/// Return a string if the value is holding a string. Otherwise `error.NotString` is returned.
 pub fn getString(self: *const @This()) !*String {
     return switch (self.kind()) {
         .string => self.string(),
         else => error.NotString,
     };
 }
-
+/// Return an array if the value is holding an array. Otherwise `error.NotArray` is returned.
 pub fn getArray(self: *const @This()) !*Array {
     return switch (self.kind()) {
         .array => self.array(),
         else => error.NotArray,
     };
 }
-
+/// Return an object if the value is holding an object. Otherwise `error.NotObject` is returned.
 pub fn getObject(self: *const @This()) !*Object {
     return switch (self.kind()) {
         .object => self.object(),
         else => error.NotObject,
     };
 }
-
+/// Return a resource if the value is holding a resource. Otherwise `error.NotResource` is returned.
 pub fn getResource(self: *const @This()) !*Resource {
     return switch (self.kind()) {
         .resource => self.resource(),
         else => error.NotResource,
     };
 }
-
+/// Return a reference if the value is holding a reference. Otherwise `error.NotReference` is returned.
 pub fn getReference(self: *const @This()) !*Reference {
     return switch (self.kind()) {
         .reference => self.reference(),
         else => error.NotReference,
     };
 }
-
+/// Return a stream if the value is holding a stream. Otherwise `error.NotStream` is returned.
 pub fn getStream(self: *const @This()) !*Stream {
     if (self.kind() == .resource) {
         const zres_ptr = pi.zend_fetch_resource2_ex(
@@ -237,14 +248,15 @@ pub fn getStream(self: *const @This()) !*Stream {
     }
     return error.NotStream;
 }
-
+/// Return an opaque pointer if the value is holding a pointer. Otherwise `error.NotPointer` is returned.
 pub fn getPointer(self: *const @This()) !*anyopaque {
     return switch (self.kind()) {
         .pointer => self.pointer(),
         else => error.NotPointer,
     };
 }
-
+/// Return the given type of pointer if the value is holding a pointer. Otherwise
+/// `error.NotPointer` is returned.
 pub fn getPointerAs(self: *const @This(), comptime T: type) !T {
     const ptr = try self.getPointer();
     return @ptrCast(@alignCast(ptr));
@@ -457,8 +469,32 @@ pub fn fromInteger(lval: php.Long) @This() {
     };
 }
 
-pub fn fromUnsigned(ul: php.Ulong) @This() {
-    return fromInteger(@intCast(ul));
+pub fn fromUnsigned(ulval: php.Ulong) @This() {
+    return fromInteger(@bitCast(ulval));
+}
+
+pub fn fromIntegerAny(arg: anytype) @This() {
+    const T = @TypeOf(arg);
+    switch (@typeInfo(T)) {
+        .int => |int| {
+            if (int.bits > @bitSizeOf(php.Ulong)) {
+                @compileError("Int type is too large for PHP: " ++ @typeName(T));
+            }
+            return switch (int.signedness) {
+                .signed => .fromInteger(arg),
+                .unsigned => .fromUnsigned(arg),
+            };
+        },
+        .comptime_int => {
+            return if (arg >= 0 and arg <= std.math.maxInt(php.Ulong))
+                .fromUnsigned(arg)
+            else if (arg >= std.math.minInt(php.long) and arg <= std.math.minInt(php.long))
+                .fromInteger(arg)
+            else
+                @compileError("Number is too large for PHP: " ++ std.fmt.comptimePrint("{d}", .{arg}));
+        },
+        else => @compileError("Integer type expected, received: " ++ @typeName(T)),
+    }
 }
 
 pub fn fromFloat(dval: f64) @This() {
@@ -533,7 +569,7 @@ pub fn fromPointer(ptr: *const anyopaque) @This() {
     };
 }
 
-pub fn fromEnum(arg: anytype, options: ConversionOptions) @This() {
+pub fn createFromEnum(arg: anytype, options: ConversionOptions) @This() {
     const T = @TypeOf(arg);
     if (@typeInfo(T) != .@"enum") @compileError("Enum expected, received: " ++ @typeName(T));
     const int = @backingInt(arg);
@@ -544,7 +580,7 @@ pub fn fromEnum(arg: anytype, options: ConversionOptions) @This() {
         }
         // fall through and return an int if convert_enum_to_integer is true
     }
-    const int_value = fromAny(int, .{});
+    const int_value = fromIntegerAny(int);
     if (options.convert_enum_to_integer) return int_value;
     const obj = init: {
         if (Enum.Custom(T).isRegistered()) {
@@ -567,12 +603,12 @@ pub fn fromEnum(arg: anytype, options: ConversionOptions) @This() {
     return fromObject(obj);
 }
 
-pub fn fromStruct(arg: anytype, options: ConversionOptions) @This() {
+pub fn createFromStruct(arg: anytype, options: ConversionOptions) @This() {
     const T = @TypeOf(arg);
     if (@typeInfo(T) != .@"struct") @compileError("Struct expected, received: " ++ @typeName(T));
     const st = @typeInfo(T).@"struct";
     return if (st.backing_integer) |Int|
-        .fromAny(@as(Int, @bitCast(arg)), .{})
+        .fromIntegerAny(@as(*const Int, @ptrCast(&arg)).*)
     else if (st.is_tuple)
         .fromArray(.createFromAny(arg, options))
     else if ((comptime php.util.api.canBeCustomClass(T)) and Class.Custom(T).isRegistered())
@@ -583,7 +619,7 @@ pub fn fromStruct(arg: anytype, options: ConversionOptions) @This() {
         @panic("Struct has not been exported as a custom class and cannot be automatically converted to stdclass: " ++ @typeName(T));
 }
 
-pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@TypeOf(arg))) {
+pub fn createFromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@TypeOf(arg))) {
     .error_union => |eu| eu.error_set!@This(),
     else => @This(),
 } {
@@ -592,42 +628,42 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
     return switch (@typeInfo(T)) {
         .void, .null, .undefined => .fromNull(),
         .bool => .fromBoolean(arg),
-        .int => |int| switch (int.signedness) {
-            .signed => .fromInteger(arg),
-            .unsigned => .fromUnsigned(arg),
-        },
-        .comptime_int => .fromInteger(arg),
+        .int, .comptime_int => .fromIntegerAny(arg),
         .float, .comptime_float => .fromFloat(arg),
-        .@"enum" => .fromEnum(arg, options),
+        .@"enum" => .createFromEnum(arg, options),
         .enum_literal => .fromString(.static(@tagName(arg))),
-        .error_union => if (arg) |payload| .fromAny(payload, options) else |err| err,
+        .error_union => if (arg) |payload| .createFromAny(payload, options) else |err| err,
         .array, .vector => .fromArray(.createFromAny(arg, options)),
-        .optional => if (arg) |p| fromAny(p, options) else .fromNull(),
+        .optional => if (arg) |p| createFromAny(p, options) else .fromNull(),
         .pointer => |pt| switch (pt.size) {
             .one => switch (pt.child) {
-                Array => .fromArray(arg),
-                Object => .fromObject(arg),
-                Object.StdClass => .fromObject(arg.object()),
-                Reference => .fromReference(arg),
-                Resource => .fromResource(arg),
-                Stream => .fromStream(arg),
-                String => .fromString(arg),
+                Array => .fromArray(arg.retain()),
+                Object => .fromObject(arg.retain()),
+                Object.StdClass => .fromObject(arg.object().retain()),
+                Reference => .fromReference(arg.retain()),
+                Resource => .fromResource(arg.retain()),
+                Stream => .fromStream(arg.retain()),
+                String => .fromString(arg.retain()),
                 else => switch (@typeInfo(pt.child)) {
                     .array => |ar| convert: {
                         defer if (options.getDisposalAllocator()) |al| al.destroy(arg);
                         break :convert switch (ar.child == u8) {
                             true => .fromString(if (@inComptime()) .static(arg) else .create(arg)),
-                            false => fromAny(arg.*, .{}),
+                            false => createFromAny(arg.*, .{}),
                         };
                     },
-                    .@"struct" => .fromObject(.fromCustom(arg)),
+                    .@"struct" => convert: {
+                        const obj: *Object = .fromCustom(arg);
+                        break :convert .fromObject(obj.retain());
+                    },
                     else => unsupported(T),
                 },
             },
             .slice => convert: {
                 switch (pt.child) {
                     u8 => if (options.get_string_from_slice) {
-                        break :convert .fromString(.fromOwnSlice(arg));
+                        const str: *String = .fromOwnSlice(arg);
+                        break :convert .fromString(str.retain());
                     } else {
                         defer if (options.getDisposalAllocator()) |al| al.free(arg);
                         break :convert .fromString(.create(arg));
@@ -642,11 +678,11 @@ pub fn fromAny(arg: anytype, options: ConversionOptions) switch (@typeInfo(@Type
         },
         .@"struct" => switch (T) {
             Callable => arg.value,
-            else => .fromStruct(arg, options),
+            else => .createFromStruct(arg, options),
         },
         .@"union" => |un| if (un.tag_type) |Tag|
             inline for (un.field_names) |name| {
-                if (arg == @field(Tag, name)) break .fromAny(@field(arg, name), options);
+                if (arg == @field(Tag, name)) break .createFromAny(@field(arg, name), options);
             } else unsupported(T)
         else
             unsupported(T),
@@ -706,7 +742,7 @@ pub const State = enum(c_int) {
     not_false,
     present,
 };
-/// Conversion options for `fromAny`, `fromStruct`, and `fromEnum`.
+/// Conversion options for `createFromAny`, `createFromStruct`, and `createFromEnum`.
 pub const ConversionOptions = packed struct {
     free_pointer: bool = false,
     get_string_from_slice: bool = false,

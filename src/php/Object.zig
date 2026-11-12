@@ -95,6 +95,11 @@ pub fn retain(self: *@This()) *@This() {
     self.addRef();
     return self;
 }
+/// Reduce the object's refcount by one and return the object.
+pub fn cede(self: *@This()) *@This() {
+    self.impl.gc.refcount -= 1;
+    return self;
+}
 /// Increase the object's refcount by one.
 pub fn addRef(self: *@This()) void {
     self.impl.gc.refcount += 1;
@@ -103,10 +108,6 @@ pub fn addRef(self: *@This()) void {
 pub fn release(self: *@This()) void {
     const zobj = &self.impl;
     pi.zend_object_release(zobj);
-}
-/// Reduce the object's refcount by one.
-pub fn subtractRef(self: *@This()) void {
-    self.impl.gc.refcount -= 1;
 }
 /// Place the object into a `Value`.
 pub fn toValue(self: *const @This()) Value {
@@ -238,6 +239,7 @@ pub fn fromCustom(custom_ptr: anytype) *@This() {
     if (self.isUninitialized()) {
         // set class, handlers, etc. and register object with PHP
         custom_obj.initPhpPortion();
+        self.impl.gc.refcount = 0;
     } else if (builtin.mode == .debug and !self.isCustom(T)) {
         @panic("pointer to " ++ @typeName(T) ++ " not within a proper object");
     }
@@ -257,7 +259,7 @@ pub fn getter(comptime T: type, comptime field: std.meta.FieldEnum(T)) RT: {
     const FT = @FieldType(T, field_name);
     const ns = struct {
         fn _(self: *const T) FT {
-            return php.util.retainAny(@field(self, field_name), .{ .duplicate_slice = false });
+            return @field(self, field_name);
         }
     };
     return ns._;

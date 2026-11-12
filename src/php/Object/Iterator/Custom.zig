@@ -92,9 +92,9 @@ pub fn _(comptime T: type) type {
                 };
                 if (result) |entry| {
                     const key = if (Entry == Payload) self.index else entry[0];
-                    self.key = .fromAny(key, .{});
+                    self.key = .createFromAny(key, .{});
                     const payload = if (Entry == Payload) entry else entry[1];
-                    self.iter.data().* = .fromAny(payload, .{});
+                    self.iter.data().* = .createFromAny(payload, .{});
                     self.has_value = true;
                 }
             }

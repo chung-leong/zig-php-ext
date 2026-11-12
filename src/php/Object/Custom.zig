@@ -163,10 +163,8 @@ pub fn _(comptime T: type) type {
             switch (deinit_fn.exists) {
                 true => T.deinit(self.custom()),
                 false => {
-                    inline for (st.field_names, st.field_types) |field_name, FT| {
-                        if (comptime php.util.autoFreeable(FT)) {
-                            php.util.freeAny(@field(self.custom_struct, field_name));
-                        }
+                    if (comptime php.util.autoFreeable(T)) {
+                        php.util.freeAny(self.custom_struct);
                     }
                 },
             }
@@ -263,7 +261,7 @@ pub fn _(comptime T: type) type {
                     if (@typeInfo(T).@"struct".backing_integer) |Int| {
                         if (desired_kind == .integer) {
                             const custom_int_ptr: *const Int = @ptrCast(self.custom());
-                            break :cast .fromAny(custom_int_ptr.*, .{});
+                            break :cast .createFromAny(custom_int_ptr.*, .{});
                         }
                     }
                     break :cast error.InvalidOperation;
@@ -394,8 +392,7 @@ pub fn _(comptime T: type) type {
                 return null;
             };
             // caller expects array without refcount
-            if (result) |arr| arr.subtractRef();
-            return result;
+            return if (result) |arr| arr.cede() else null;
         }
 
         fn getPropertiesFor(obj: *Object, purpose: PropertiesPurpose) callconv(.c) ?*Array {
@@ -713,7 +710,7 @@ pub fn _(comptime T: type) type {
         fn callGetter(self: *@This(), comptime getter_name: []const u8) !Value {
             const get = @field(getters, getter_name);
             const payload = get(self.custom());
-            return Value.fromAny(payload, .{});
+            return Value.createFromAny(payload, .{});
         }
 
         fn callSetter(self: *@This(), comptime setter_name: []const u8, value: Value) !void {

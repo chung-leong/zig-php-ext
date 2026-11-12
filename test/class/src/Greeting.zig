@@ -13,7 +13,8 @@ pub const @"get greeting" = getter(@This(), .greeting);
 pub const @"set greeting" = setter(@This(), .greeting);
 
 pub fn @"get template"(self: *@This()) *String {
-    return .print("{s}, $name!", .{self.greeting});
+    const str: *String = .print("{s}, $name!", .{self.greeting});
+    return str.cede();
 }
 
 greeting: []const u8 = "Hello",

@@ -80,7 +80,7 @@ pub fn createLiteral(comptime T: type, arg: T) *@This() {
         .array => {
             for (array_elems, values, keys, 0..) |array_elem, value, key, i| {
                 const arg_elem = arg[i];
-                writeZval(value, .fromAny(arg_elem, .{}), 0);
+                writeZval(value, .createFromAny(arg_elem, .{}), 0);
                 writeNode(array_elem, .array_elem, .{ value, key });
             }
         },
@@ -88,7 +88,7 @@ pub fn createLiteral(comptime T: type, arg: T) *@This() {
             const field_names = @typeInfo(T).@"struct".field_names;
             inline for (array_elems, values, keys, field_names) |array_elem, value, key, field_name| {
                 const arg_elem = @field(arg, field_name);
-                writeZval(value, .fromAny(arg_elem, .{}), 0);
+                writeZval(value, .createFromAny(arg_elem, .{}), 0);
                 if (key) |k| writeZval(k, .fromString(.static(field_name)), 0);
                 writeNode(array_elem, .array_elem, .{ value, key });
             }
