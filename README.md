@@ -1,7 +1,7 @@
 # ZPX
 
 <picture>
-    <source media="(max-width:450px)" srcset="img/logo-large.png">
+    <source media="(max-width:500px)" srcset="img/logo-large.png">
     <img src="img/logo.png" align="right" alt="AI-generated logo">
 </picture>
 
