@@ -27,7 +27,11 @@ pub fn deinit(self: *@This()) void {
 }
 
 pub fn next(self: *@This()) ?Value {
-    return self.array_iter.next();
+    const value = self.array_iter.next() orelse return null;
+    return switch (value.kind()) {
+        .indirect => value.indirect().*,
+        else => value,
+    };
 }
 
 pub fn name(self: *@This()) *String {

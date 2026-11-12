@@ -1,6 +1,10 @@
 <?php
 
 class Person {
+    var $name;
+    var $profession;
+    var $age;
+
     function __construct($name, $profession, $age) {
         $this->name = $name;
         $this->profession = $profession;

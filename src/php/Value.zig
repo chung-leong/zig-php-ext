@@ -71,6 +71,10 @@ pub fn reference(self: *const @This()) *Reference {
 pub fn pointer(self: *const @This()) *anyopaque {
     return @ptrCast(self.impl.value.ptr);
 }
+/// Return indirect value.
+pub fn indirect(self: *const @This()) *@This() {
+    return @ptrCast(self.impl.value.zv);
+}
 /// Increase the refcount by one if the value is holding a ref-counted object. Return the
 /// same value.
 pub fn retain(self: *const @This()) @This() {
@@ -403,11 +407,17 @@ pub fn extract(self: *const @This(), allocator: std.mem.Allocator, comptime T: t
                 else => try self.getCustom(pt.child),
             },
             .slice => get: {
-                if (pt.child == u8 and self.kind() == .string) {
-                    break :get self.string().slice();
+                if (pt.child == u8) {
+                    if (self.getString()) |str| {
+                        break :get str.slice();
+                    } else |err| {
+                        const list = self.getList() catch return err;
+                        break :get list.extract(allocator, T);
+                    }
+                } else {
+                    const list = try self.getList();
+                    break :get list.extract(allocator, T);
                 }
-                const list = try self.getList();
-                break :get list.extract(allocator, T);
             },
             else => unsupported(T),
         },

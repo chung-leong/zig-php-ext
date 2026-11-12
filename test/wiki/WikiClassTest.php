@@ -7,9 +7,17 @@ final class WikiClassTest extends ExtensionTestCase
     public function testBareBoneClass(): void
     {
         $lines = $this->runTest("class-bare-bone", "test.php");
-        $this->assertSame(<<<OUTPUT
-        Point Object
-        OUTPUT, implode(PHP_EOL, $lines));
+        if (PHP_MAJOR_VERSION > 8 or PHP_MINOR_VERSION >= 3) { 
+            $this->assertSame(<<<OUTPUT
+            Point Object
+            (
+            )
+            OUTPUT, implode(PHP_EOL, $lines));
+        } else {
+            $this->assertSame(<<<OUTPUT
+            Point Object
+            OUTPUT, implode(PHP_EOL, $lines));
+        }
     }
 
     public function testManualGetterSetter(): void
