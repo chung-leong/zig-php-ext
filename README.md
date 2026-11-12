@@ -1,6 +1,9 @@
 # ZPX
 
-<img src="img/logo.png" align="right" alt="AI-generated logo">
+<picture>
+    <source media="(max-width:450px)" srcset="img/logo-large.png">
+    <img src="img/logo.png" align="right" alt="AI-generated logo">
+</picture>
 
 ZPX (Zig PHP eXtension) is a framework for creating PHP extensions using the Zig programming 
 language. It's designed, first and foremost, with ease of development in mind. Set-up is simple.
