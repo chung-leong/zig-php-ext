@@ -33,6 +33,35 @@ final class WikiReturnValueTest extends ExtensionTestCase
         OUTPUT, implode(PHP_EOL, $lines));
     }
 
+    public function testFixedArrayReturnValue(): void
+    {
+        $lines = $this->runTest("retval-array-fixed", "test.php");
+        $this->assertSame(<<<OUTPUT
+        Array
+        (
+            [0] => 10
+            [1] => 20
+            [2] => 30
+            [3] => 40
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testArrayReturnValue(): void
+    {
+        $lines = $this->runTest("retval-array", "test.php");
+        $this->assertSame(<<<OUTPUT
+        Array
+        (
+            [0] => 10
+            [1] => 20
+            [2] => 30
+            [3] => 40
+            [4] => 50
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
     public function testPlainObjectReturnValue(): void
     {
         $lines = $this->runTest("retval-stdclass", "test.php");
