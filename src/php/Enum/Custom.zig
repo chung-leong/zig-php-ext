@@ -174,9 +174,11 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryGetStaticMethod(self: *@This(), method_name: *String) !*const Function {
-            if (static_method_set.find(method_name)) |func| return func;
+            const lc_name = method_name.duplicateLowerCase();
+            defer lc_name.release();
+            if (static_method_set.find(lc_name)) |func| return func;
             if (!@hasDecl(T, "getStaticMethod")) return error.Undefined;
-            return T.getStaticMethod(self.custom(), method_name);
+            return T.getStaticMethod(self.custom(), lc_name);
         }
 
         fn getInstanceMethod(obj_ptr: **Object, fn_name: *String, key: *Value) callconv(.c) ?*const Function {

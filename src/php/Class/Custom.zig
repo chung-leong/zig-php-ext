@@ -221,9 +221,11 @@ pub fn _(comptime T: type) type {
         }
 
         fn tryGetMethod(self: *@This(), method_name: *String) !?*const Function {
+            const lc_name = method_name.duplicateLowerCase();
+            defer lc_name.release();
             if (method_set.find(method_name)) |func| return func;
             if (!@hasDecl(T, "getStaticMethod")) return null;
-            return T.getStaticMethod(self.custom(), method_name);
+            return T.getStaticMethod(self.custom(), lc_name);
         }
 
         fn freeConstant(value: *Value) callconv(.c) void {

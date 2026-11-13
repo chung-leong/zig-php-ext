@@ -48,6 +48,12 @@ pub fn _(comptime names: anytype) type {
             } else null;
         }
 
+        pub fn findCaseInsensitive(self: *const @This(), name: *String) ?*const Function {
+            const lc_name = name.duplicateLowerCase();
+            defer lc_name.release();
+            return self.find(lc_name);
+        }
+
         pub const CallCache = struct {
             pub fn init(context: Value) !@This() {
                 var entries: CallCacheContainer = undefined;
