@@ -1,0 +1,62 @@
+<?php declare(strict_types=1);
+
+require_once __DIR__ . '/../ExtensionTestCase.php';
+
+final class WikiEnumerationTest extends ExtensionTestCase
+{   
+    public function testBasicEnumeration(): void
+    {
+        $lines = $this->runTest("enumeration-basic", "test.php");
+        $this->assertSame(<<<OUTPUT
+        Array
+        (
+            [0] => Fruit Enum:int
+                (
+                    [name] => apple
+                    [value] => 0
+                )
+
+            [1] => Fruit Enum:int
+                (
+                    [name] => banana
+                    [value] => 1
+                )
+
+            [2] => Fruit Enum:int
+                (
+                    [name] => cherry
+                    [value] => 2
+                )
+
+            [3] => Fruit Enum:int
+                (
+                    [name] => durian
+                    [value] => 3
+                )
+
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+        echo implode(PHP_EOL, $lines), "\n";
+    }
+
+    public function testEnumerationAlias(): void
+    {
+        $lines = $this->runTest("enumeration-alias", "test.php");
+        $this->assertSame(<<<OUTPUT
+        Fruit Enum:int
+        (
+            [name] => banana
+            [value] => 1
+        )
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
+    public function testEnumerationMethods(): void
+    {
+        $lines = $this->runTest("enumeration-method", "test.php");
+        // $this->assertSame(<<<OUTPUT
+        // OUTPUT, implode(PHP_EOL, $lines));
+        echo implode(PHP_EOL, $lines), "\n";
+    }
+
+}
