@@ -48,15 +48,35 @@ final class WikiEnumerationTest extends ExtensionTestCase
             [name] => banana
             [value] => 1
         )
+        Fruit Enum:int
+        (
+            [name] => banana
+            [value] => 1
+        )
         OUTPUT, implode(PHP_EOL, $lines));
     }
 
-    public function testEnumerationMethods(): void
+    public function testEnumerationMethod(): void
     {
         $lines = $this->runTest("enumeration-method", "test.php");
-        // $this->assertSame(<<<OUTPUT
-        // OUTPUT, implode(PHP_EOL, $lines));
-        echo implode(PHP_EOL, $lines), "\n";
+        $this->assertSame(<<<OUTPUT
+        Fruit #3: cherry
+        OUTPUT, implode(PHP_EOL, $lines));
     }
 
+    public function testEnumerationStaticMethod(): void
+    {
+        $lines = $this->runTest("enumeration-method-static", "test.php");
+        $this->assertSame(<<<OUTPUT
+        Fruit #1: apple
+        Fruit #2: banana <-- special
+        Fruit #3: cherry
+        Fruit #4: durian
+        ---
+        Fruit #1: apple
+        Fruit #2: banana
+        Fruit #3: cherry <-- special
+        Fruit #4: durian
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
 }

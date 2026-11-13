@@ -127,7 +127,7 @@ pub fn _(comptime T: type, comptime options: struct {
             Allocator.mode = .per_request;
             try registerNonscalarConstants();
             try injectCustomEnumHandlers();
-            try initializeClassStatic();
+            try initializeStaticContexts();
             if (!@hasDecl(T, "requestStartup")) return;
             const self = Singleton(T).get();
             return T.requestStartup(self, module_type, module_no);
@@ -144,7 +144,7 @@ pub fn _(comptime T: type, comptime options: struct {
         fn tryRequestShutdown(module_type: Module.Type, module_no: c_int) !void {
             defer {
                 Singleton(T).reset(ini_default_value);
-                deinitializeClassStatic();
+                deinitializeStaticContexts();
             }
             if (!@hasDecl(T, "requestShutdown")) return;
             const self = Singleton(T).get();
@@ -321,15 +321,25 @@ pub fn _(comptime T: type, comptime options: struct {
             }
         }
 
-        fn initializeClassStatic() !void {
-            inline for (comptime std.meta.fieldNames(@TypeOf(classes))) |class_name| {
+        fn initializeStaticContexts() !void {
+            const class_names = comptime std.meta.fieldNames(@TypeOf(classes));
+            inline for (class_names) |class_name| {
                 try @field(classes, class_name).initStatic();
+            }
+            const enum_names = comptime std.meta.fieldNames(@TypeOf(enums));
+            inline for (enum_names) |enum_name| {
+                try @field(enums, enum_name).initStatic();
             }
         }
 
-        fn deinitializeClassStatic() void {
-            inline for (comptime std.meta.fieldNames(@TypeOf(classes))) |class_name| {
+        fn deinitializeStaticContexts() void {
+            const class_names = comptime std.meta.fieldNames(@TypeOf(classes));
+            inline for (class_names) |class_name| {
                 @field(classes, class_name).deinitStatic();
+            }
+            const enum_names = comptime std.meta.fieldNames(@TypeOf(enums));
+            inline for (enum_names) |enum_name| {
+                @field(enums, enum_name).deinitStatic();
             }
         }
 

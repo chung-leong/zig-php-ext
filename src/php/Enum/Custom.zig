@@ -11,6 +11,7 @@ const failure = php.failure;
 const Function = php.Function;
 const Object = php.Object;
 const pi = php.imports;
+const Singleton = php.Singleton;
 const String = php.String;
 const Value = php.Value;
 const argCount = php.util.argCount;
@@ -159,6 +160,14 @@ pub fn _(comptime T: type) type {
                 const CustomEnum = @field(enums, enum_name);
                 try CustomEnum.get().injectCustomEnumHandlers();
             }
+        }
+
+        pub fn initStatic() !void {
+            if (Static != void) try Singleton(Static).init();
+        }
+
+        pub fn deinitStatic() void {
+            if (Static != void) Singleton(Static).deinit();
         }
 
         fn getStaticMethod(self: *@This(), method_name: *String) callconv(.c) ?*const Function {
