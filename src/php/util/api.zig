@@ -118,10 +118,17 @@ pub fn canBeCustomClass(comptime T: type) bool {
     Validator(T, .class, .{ .comptime_error = false }).check() catch return false;
     return true;
 }
+/// Return true if the given type can be use to create a stdclass object.
 pub fn canBeStdClass(comptime T: type) bool {
     if (@typeInfo(T) != .@"struct") @compileError("Struct type expected, received: " ++ @typeName(T));
-    // struct should have no functions and all its fields must be convertible
-    return php.util.functionCount(T) == 0 and for (@typeInfo(T).@"struct".field_types) |FT| {
+    // struct should have no special declarations and all its fields must be convertible
+    const st = @typeInfo(T).@"struct";
+    return inline for (st.decl_names) |decl_name| {
+        if (std.mem.startsWith(u8, decl_name, "call ")) break false;
+        if (std.mem.startsWith(u8, decl_name, "use ")) break false;
+        if (std.mem.startsWith(u8, decl_name, "get ")) break false;
+        if (std.mem.startsWith(u8, decl_name, "set ")) break false;
+    } else for (st.field_types) |FT| {
         if (!php.util.autoConvertible(FT)) break false;
     } else true;
 }

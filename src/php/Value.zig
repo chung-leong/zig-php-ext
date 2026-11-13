@@ -457,19 +457,19 @@ pub fn toZval(self: *const @This()) c.zval {
 pub fn fromZval(val: c.zval) @This() {
     return @as(*const @This(), @ptrCast(&val)).*;
 }
-
+/// Return a value containing null.
 pub fn fromNull() @This() {
     return .{
         .impl = .{ .u1 = .{ .type_info = c.IS_NULL } },
     };
 }
-
+/// Return a value containing the given boolean.
 pub fn fromBoolean(b: bool) @This() {
     return .{
         .impl = .{ .u1 = .{ .type_info = if (b) c.IS_TRUE else c.IS_FALSE } },
     };
 }
-
+/// Return a value containing the given integer.
 pub fn fromInteger(lval: php.Long) @This() {
     return .{
         .impl = .{
@@ -478,11 +478,11 @@ pub fn fromInteger(lval: php.Long) @This() {
         },
     };
 }
-
+/// Return a value containing the given unsigned integer.
 pub fn fromUnsigned(ulval: php.Ulong) @This() {
     return fromInteger(@bitCast(ulval));
 }
-
+/// Return a value containing the given integer.
 pub fn fromIntegerAny(arg: anytype) @This() {
     const T = @TypeOf(arg);
     switch (@typeInfo(T)) {
@@ -506,7 +506,7 @@ pub fn fromIntegerAny(arg: anytype) @This() {
         else => @compileError("Integer type expected, received: " ++ @typeName(T)),
     }
 }
-
+/// Return a value containing the given floating-point number.
 pub fn fromFloat(dval: f64) @This() {
     return .{
         .impl = .{
@@ -515,7 +515,7 @@ pub fn fromFloat(dval: f64) @This() {
         },
     };
 }
-
+/// Return a value containing the given string.
 pub fn fromString(str: *const String) @This() {
     return .{
         .impl = .{
@@ -529,7 +529,7 @@ pub fn fromString(str: *const String) @This() {
         },
     };
 }
-
+/// Return a value containing the given array.
 pub fn fromArray(arr: *const Array) @This() {
     return .{
         .impl = .{
@@ -538,7 +538,7 @@ pub fn fromArray(arr: *const Array) @This() {
         },
     };
 }
-
+/// Return a value containing the given object.
 pub fn fromObject(obj: *const Object) @This() {
     return .{
         .impl = .{
@@ -547,7 +547,7 @@ pub fn fromObject(obj: *const Object) @This() {
         },
     };
 }
-
+/// Return a value containing the given resource.
 pub fn fromResource(res: *const Resource) @This() {
     return .{
         .impl = .{
@@ -556,11 +556,11 @@ pub fn fromResource(res: *const Resource) @This() {
         },
     };
 }
-
+/// Return a value containing the given stream.
 pub fn fromStream(strm: *const Stream) @This() {
     return strm.toValue();
 }
-
+/// Return a value containing the given reference.
 pub fn fromReference(ref: *const Reference) @This() {
     return .{
         .impl = .{
@@ -569,7 +569,7 @@ pub fn fromReference(ref: *const Reference) @This() {
         },
     };
 }
-
+/// Return a value containing the given pointer.
 pub fn fromPointer(ptr: *const anyopaque) @This() {
     return .{
         .impl = .{
