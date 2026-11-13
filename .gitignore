@@ -10,3 +10,4 @@ zig-pkg/
 composer.lock
 .*
 *.zip
+*.a
