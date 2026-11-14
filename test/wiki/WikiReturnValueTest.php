@@ -10,7 +10,6 @@ final class WikiReturnValueTest extends ExtensionTestCase
         $this->assertSame(<<<OUTPUT
         string(11) "Hello world"
         OUTPUT, implode(PHP_EOL, $lines));
-        // echo implode(PHP_EOL, $lines), "\n";
     }
 
     public function testStringReturnValueWithLeak(): void

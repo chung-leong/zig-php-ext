@@ -36,7 +36,6 @@ final class WikiEnumerationTest extends ExtensionTestCase
 
         )
         OUTPUT, implode(PHP_EOL, $lines));
-        echo implode(PHP_EOL, $lines), "\n";
     }
 
     public function testEnumerationAlias(): void
