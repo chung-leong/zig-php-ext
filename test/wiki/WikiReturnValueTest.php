@@ -102,6 +102,16 @@ final class WikiReturnValueTest extends ExtensionTestCase
         OUTPUT, implode(PHP_EOL, $lines));
     }
 
+    public function testIllegalPlainObjectReturnValue(): void
+    {
+        try {
+            $this->runTest("retval-stdclass-illegal", "test.php");
+            $this->fail();
+        } catch (Exception $e) {
+            $this->assertStringContainsString("has not been exported as a custom class", $e->getMessage());
+        }
+    }
+
     public function testTupleReturnValue(): void
     {
         $lines = $this->runTest("retval-tuple", "test.php");
@@ -109,6 +119,5 @@ final class WikiReturnValueTest extends ExtensionTestCase
         string(11) "Hello world"
         int(1234)
         OUTPUT, implode(PHP_EOL, $lines));
-        // echo implode(PHP_EOL, $lines), "\n";
     }
 }

@@ -105,6 +105,7 @@ pub fn _(comptime T: type, comptime options: struct {
             // switch allocation back to persistent mode
             Allocator.mode = .persistent;
             defer {
+                Singleton(T).reset(ini_default_value);
                 Singleton(T).deinit();
                 // adjust class constants prior to shutdown to avoid assertion when ZEND_DEBUG=1 (issue #34)
                 if (php.debug) php.util.macgyver.fixProblematicConstants();
@@ -129,6 +130,7 @@ pub fn _(comptime T: type, comptime options: struct {
             try injectCustomEnumHandlers();
             try initializeStaticContexts();
             if (!@hasDecl(T, "requestStartup")) return;
+            Singleton(T).reset(ini_default_value);
             const self = Singleton(T).get();
             return T.requestStartup(self, module_type, module_no);
         }
@@ -142,10 +144,7 @@ pub fn _(comptime T: type, comptime options: struct {
         }
 
         fn tryRequestShutdown(module_type: Module.Type, module_no: c_int) !void {
-            defer {
-                Singleton(T).reset(ini_default_value);
-                deinitializeStaticContexts();
-            }
+            defer deinitializeStaticContexts();
             if (!@hasDecl(T, "requestShutdown")) return;
             const self = Singleton(T).get();
             return T.requestShutdown(self, module_type, module_no);

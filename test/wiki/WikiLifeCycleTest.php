@@ -16,6 +16,7 @@ final class WikiLifeCycleTest extends ExtensionTestCase
     public function testRequestStartupShutdown(): void
     {
         $lines = $this->runTest("request-startup-shutdown", "test.php");
+        echo implode(PHP_EOL, $lines);
         $this->assertMatchesRegularExpression(
             '/init: counter = 0\nrequestStartup: counter = 1\nrequestShutdown: counter = 1\ndeinit: counter = 0/',
             implode("\n", $lines)

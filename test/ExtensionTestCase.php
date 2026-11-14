@@ -32,7 +32,7 @@ class ExtensionTestCase extends TestCase
         if ($result === false) {
             throw new Exception("Unable to run PHP with extension: $test_name");
         } else if ($code !== 0) {
-            throw new Exception($result);
+            throw new Exception(implode(PHP_EOL, $lines));
         }
         return $lines;
     }
