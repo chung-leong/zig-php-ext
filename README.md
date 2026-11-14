@@ -158,9 +158,11 @@ extension. It's also used for adding custom classes. We'll get to that in later 
 ## Documentation
 
 * [User guide and tutorials](https://github.com/chung-leong/zpx/wiki)
-* [API references]()
+* [API references](https://chung-leong.github.io/zpx/)
 
 
 ## Complete examples
 
-* [Typed Array](https://github.com/chung-leong/zpx/tree/main/examples/typed-array) - An implementation of JavaScript's typed arrays
+* [Typed Array](https://github.com/chung-leong/zpx/tree/main/examples/typed-array) - Implementation of JavaScript's typed arrays
+* [Zstd](https://github.com/chung-leong/zpx/tree/main/examples/zstd) - Providing support for zstd compression
+* [Roaring](https://github.com/chung-leong/zpx/tree/main/examples/roaring) - Roaring bitmap
