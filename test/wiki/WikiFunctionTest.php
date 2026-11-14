@@ -12,6 +12,14 @@ final class WikiFunctionTest extends ExtensionTestCase
         OUTPUT, implode(PHP_EOL, $lines));
     }
 
+    public function testFunctionInNamespace(): void
+    {
+        $lines = $this->runTest("function-namespace", "test.php");
+        $this->assertSame(<<<OUTPUT
+        foobar
+        OUTPUT, implode(PHP_EOL, $lines));
+    }
+
     public function testFunctionSelfPointer(): void
     {
         $lines = $this->runTest("function-self", "test.php");
